@@ -51,6 +51,7 @@ function showPage(page){
   if(page==='compare')openComparison().catch(failure);
   if(page==='downloads')loadAtlasDownloads().catch(failure);
   if(page==='research')openResearch();
+  if(page==='sdss')openSDSS();
   if(page==='archive')$('#archive-position').textContent=`RA ${state.ra.toFixed(5)}°  DEC ${state.dec.toFixed(5)}°`;
   if(page==='explore')window.dispatchEvent(new Event('resize'));
   if(page!=='explore')stopObjectVideo();
@@ -340,6 +341,7 @@ async function boot(){
     initAtlas();
     initComparison();
     initResearch();
+    initSDSS();
     initMapPanels();
     $('#fits-stretch').onchange=e=>{$('#original-image').src=state.image.preview_url+'?stretch='+e.target.value;updateEnhancementControls();};
     $('#save-image').onclick=()=>{const m=state.image;const center=m.center||m.extra;noteDialog({title:m.name,ra:center.ra??center.s_ra??null,dec:center.dec??center.s_dec??null,body:'Saved image for visual exploration and follow-up.',provenance:{image_id:m.id,input_sha256:m.sha256,source:m.source,filter:m.filter,ai:m.ai,observation:m.extra}});};

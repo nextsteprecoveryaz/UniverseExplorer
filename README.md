@@ -77,7 +77,23 @@ The installation was verified with an actual 5.42 GB JWST F187N product and a 21
 
 Open **Compare lenses** to see two independently rendered survey layers at the same ICRS position, field size and rotation. Drag the map or use the zoom buttons to steer both views. Choose **Swipe divider**, drag its handle or move its keyboard-accessible slider; choose **Blend layers** to adjust the right layer's opacity. **Use explorer position** copies your latest sky field, and **Explore this field** returns there with the left lens selected.
 
-All twelve telescope and wavelength lenses are available on either side. Each has a source description and loading status. The canvases have opaque backgrounds so absent coverage cannot masquerade as the other telescope's image. Angular alignment does not equal matched resolution, observing epoch, intensity calibration or gas abundance. The interface preserves these distinctions.
+All telescope and wavelength lenses, including the SDSS color and g/r/i layers, are available on either side. Each has a source description and loading status. The canvases have opaque backgrounds so absent coverage cannot masquerade as the other telescope's image. Angular alignment does not equal matched resolution, observing epoch, intensity calibration or gas abundance. The interface preserves these distinctions.
+
+## SDSS galaxies and MaNGA spectral maps
+
+Open **SDSS galaxies** for a 2048 × 2048 optical color image from the SkyServer DR20 service. Use a showcase, enter ICRS coordinates, or copy the current map position. Brightness, contrast and saturation controls create a display edit; **Save styled PNG** labels the exported pixels. Download the untouched JPEG or send it to **Image Lab** for the existing local and optional cloud enhancement workflows. The source URL, retrieval date and original SHA-256 are retained. The native SDSS camera sampling is about 0.396 arcseconds per pixel; larger output sizes do not add resolved detail. Very dark fields may be outside survey coverage.
+
+For continuous flight, select **SDSS · galaxy color**, or its individual **g**, **r** and **i** bands, in the map lenses. These are **DR9** HiPS mosaics from CDS, with the existing disk cache, saved routes and comparison tools. The image studio uses the **DR20 interface to legacy imaging**; it does not label these as new DR20 exposures.
+
+The **MaNGA gas & motion** tab searches for the nearest 25 observations within one degree or accepts a plate-IFU identifier. It retrieves **DR17** maps through the public Marvin API, with HYB10 / MILESHC-MASTARSSP processing. Available views are H-alpha, [O III], [S II] 6718, H-alpha gas velocity, stellar velocity and an assigned-color S/H/O composite. Emission-line channel names use the SDSS vacuum-wavelength convention.
+
+Flagged samples, nonfinite measurements and nonpositive inverse variance are excluded. Gas maps also require positive flux and the selected signal-to-noise threshold; gas velocity uses the corresponding H-alpha flux quality. Stellar velocities keep both signs and zero. All three gas channels must pass for the composite, whose channels are stretched independently. Colors show flux or line-of-sight velocity, not gas abundance. MaNGA spatial resolution is much coarser than the color photographs; display scaling retains the native grid.
+
+Hover over a map to inspect its measured value. Download the map PNG with embedded provenance, or the source measurements, inverse variance, masks and WCS as JSON. **Show measured map on sky** registers it using the supplied celestial WCS; **Remove MaNGA overlay** turns it off. Map visualizations sent to Image Lab remain display images and cannot enter source detection. The full observation, flags and additional spectral tools remain accessible through **Marvin**.
+
+SDSS requests run only when this workspace is used. Retrieved data shares the configured atlas disk budget and remains reusable in cached-only mode. Existing map-detail priority remains unchanged. No SDSS login or extra Python package is required. Scientific context and software links are included in the workspace: [SDSS science](https://www.sdss4.org/science/), [MaNGA](https://www.sdss4.org/surveys/manga/), [DR20 software](https://www.sdss.org/dr20/software/).
+
+With the app running, `.venv\Scripts\python.exe verify_sdss.py` checks a real 2048-pixel color image, its hash, a nearby catalog search, all six MaNGA views, quality-mask transparency and celestial WCS round trips. It writes `data/verification/sdss-live.json` and retains the fetched public data in the atlas cache.
 
 ## Flight preloading and downloaded tours
 
@@ -182,7 +198,7 @@ Run `Setup.cmd` for a fresh installation. It detects 64-bit Python 3.11 through 
 
 Developer checks: `.venv\Scripts\python.exe -m pytest -q` and `node --check static/app.js`. `verify_live.py` exercises live feeds, MAST, name resolution, Gaia, and the exoplanet archive. `verify_product.py` imports/verifies a real Hubble NICMOS product and runs original-FITS source detection. Test-injected stars and transit signals are confined to automated tests; they are never displayed as real discoveries.
 
-Run `.venv\Scripts\python.exe -m pytest -q` and `node --test tests/test_atlas_ui.cjs tests/test_flight.cjs tests/test_flight_controls.cjs tests/test_map_panels.cjs tests/test_route_timeline.cjs tests/test_route_player.cjs tests/spatial-math.test.js`. These include shared tile transfers, background cache refreshes, persistent cache quotas, visible-map priority and flight behavior. With the app running, `.venv\Scripts\python.exe verify_atlas.py` verifies real original-FITS cutouts, saved view files, the spatial index and cached-only behavior. Results are in `data/verification/atlas-api.json` and `atlas-ui.json`.
+Run `.venv\Scripts\python.exe -m pytest -q` and `node --test tests/test_atlas_ui.cjs tests/test_flight.cjs tests/test_flight_controls.cjs tests/test_map_panels.cjs tests/test_route_timeline.cjs tests/test_route_player.cjs tests/spatial-math.test.js tests/test_sdss_ui.cjs`. These include shared tile transfers, background cache refreshes, persistent cache quotas, visible-map priority, SDSS source preservation, MaNGA masks and registration, and flight behavior. With the app running, `.venv\Scripts\python.exe verify_atlas.py` verifies real original-FITS cutouts, saved view files, the spatial index and cached-only behavior. Results are in `data/verification/atlas-api.json` and `atlas-ui.json`.
 
 ## Sources and attribution
 

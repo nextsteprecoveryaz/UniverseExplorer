@@ -14,4 +14,6 @@ The small Pillars of Creation preview in `static/assets/` is a released Webb out
 
 Retrieved science products, catalogs, survey maps, videos and outreach images retain their publisher credits and terms. Consult each source before republishing its material. The app exposes source links and preserves original-product provenance; its AI visualization label does not replace the source credit.
 
+SDSS color cutouts are retrieved from the public SkyServer DR20 interface; MaNGA DR17 measurement arrays are retrieved through the public Marvin API. They are credited to SDSS / SDSS-IV / MaNGA, with source URLs and releases preserved. The continuous SDSS DR9 color and g/r/i maps are served by CDS HiPS; their registry lists ODbL-1.0. See [SDSS science](https://www.sdss4.org/science/), [MaNGA](https://www.sdss4.org/surveys/manga/), [SDSS software citation guidance](https://www.sdss.org/dr20/software/), and the [CDS SDSS color registry](https://alasky.cds.unistra.fr/MocServer/query?ID=CDS%2FP%2FSDSS9%2Fcolor&fmt=html&get=record). No SDSS or Marvin software distribution is vendored by this integration.
+
 These notices describe third-party components. An independent license for the original Universe Explorer application code has not yet been selected.

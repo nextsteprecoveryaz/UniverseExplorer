@@ -29,6 +29,7 @@ import aladin_desktop
 import expeditions
 import atlas
 import research
+import sdss
 
 ROOT=Path(__file__).parent
 DATA=ROOT/'data'
@@ -37,6 +38,7 @@ app=FastAPI(title='Universe Explorer',version='0.1.0')
 app.include_router(expeditions.router)
 app.include_router(atlas.router)
 app.include_router(research.router)
+app.include_router(sdss.router)
 app.add_middleware(TrustedHostMiddleware,allowed_hosts=['127.0.0.1','localhost','testserver'])
 HEAVY=asyncio.Semaphore(1)
 CLOUD_BUSY=asyncio.Lock()
@@ -55,7 +57,12 @@ SURVEYS=[
  {'id':'h2','name':'Webb · molecular H₂ band','tag':'F212N','url':'https://alasky.cds.unistra.fr/JWST/CDS_P_JWST_F212N','group':'Gas & wavelength lenses','description':'JWST F212N includes the 2.12 μm molecular-hydrogen line plus continuum. CDS beta mosaic; sparse coverage. A continuum-subtracted line map is required to isolate H₂ emission.'},
  {'id':'dust','name':'Dust emission · 12 μm','tag':'WISE','url':'https://alasky.cds.unistra.fr/WSSA','group':'Gas & wavelength lenses','description':'WISE WSSA 12 μm diffuse dust map (Meisner & Finkbeiner). Traces dust-related infrared emission, not a single gas species.'},
 ]
+SURVEYS.extend([
+ {'id':'sdss-color','name':'SDSS · galaxy color','tag':'DR9 · OPTICAL','url':'https://alasky.cds.unistra.fr/SDSS/DR9/color','group':'SDSS optical lenses','description':'SDSS DR9 optical imaging, combined from g/r/i bands and projected by CDS. Covers part of the sky. For SkyServer DR20 color cutouts and MaNGA DR17 gas maps, open SDSS galaxies.'},
+ *[{'id':'sdss-'+band,'name':'SDSS · '+band+' band','tag':'DR9 · '+band,'url':'https://alasky.cds.unistra.fr/SDSS/DR9/band-'+band,'group':'SDSS optical lenses','description':'SDSS DR9 '+band+' broadband optical imaging through CDS HiPS. Includes continuum and spectral features; this is not an isolated gas-emission map.'} for band in ('g','r','i')],
+])
 atlas.SURVEYS={s['id']:s for s in SURVEYS}
+expeditions.SURVEYS.update(atlas.SURVEYS)
 DESTINATIONS=[
  {'name':'Pillars of Creation','type':'STAR-FORMING REGION','ra':274.730583,'dec':-13.844944,'fov':0.073,'survey':'webb-color','description':'Explore a small part of the Eagle Nebula, where dense clouds and young stars shape the landscape.','source_url':'https://esawebb.org/images/weic2216a/'},
  {'name':'Carina · Cosmic Cliffs','type':'STELLAR NURSERY','ra':159.216,'dec':-58.621,'fov':0.15,'survey':'webb-color','description':'The edge of a star-forming region in NGC 3324, revealed in Webb infrared imagery.'},
@@ -171,6 +178,8 @@ def config():
       {'name':'NASA Space Telescope Live','url':'https://spacetelescopelive.org'},
       {'name':'MAST public archive','url':'https://mast.stsci.edu/portal/Mashup/Clients/Mast/Portal.html'},
       {'name':'CDS Aladin / HiPS','url':'https://aladin.cds.unistra.fr/AladinLite/'},
+      {'name':'SDSS SkyServer DR20','url':'https://skyserver.sdss.org/dr20/VisualTools/navi'},
+      {'name':'SDSS-IV MaNGA DR17','url':'https://www.sdss4.org/surveys/manga/'},
       {'name':'NASA Exoplanet Archive','url':'https://exoplanetarchive.ipac.caltech.edu'},
     ]}
 

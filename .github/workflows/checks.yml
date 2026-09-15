@@ -31,4 +31,4 @@ jobs:
       - name: Test Python application
         run: python -m pytest -q
       - name: Test JavaScript behavior
-        run: node --test tests/test_atlas_ui.cjs tests/test_flight.cjs tests/test_flight_controls.cjs tests/test_map_panels.cjs tests/test_route_timeline.cjs tests/test_route_player.cjs tests/spatial-math.test.js
+        run: node --test tests/test_atlas_ui.cjs tests/test_flight.cjs tests/test_flight_controls.cjs tests/test_map_panels.cjs tests/test_route_timeline.cjs tests/test_route_player.cjs tests/spatial-math.test.js tests/test_sdss_ui.cjs
