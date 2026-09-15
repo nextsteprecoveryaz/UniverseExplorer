@@ -4,8 +4,9 @@ import json
 import re
 import threading
 import hashlib
+import atexit
 from datetime import datetime,timezone
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Literal
 import httpx
 from PIL import Image
@@ -27,6 +28,29 @@ LOCK=threading.Lock()
 SCIENCE=ThreadPoolExecutor(max_workers=1,thread_name_prefix='fits-cutout')
 DOWNLOADS=ThreadPoolExecutor(max_workers=1,thread_name_prefix='atlas-download')
 CACHED_ONLY=False
+REMOTE_LOCK=threading.Lock()
+REMOTE_CLIENT=None
+TILE_LOCK=threading.Lock()
+TILE_PENDING={}
+TILE_REFRESHING=set()
+TILE_REFRESH=ThreadPoolExecutor(max_workers=2,thread_name_prefix='tile-refresh')
+
+def remote_client():
+    """Share persistent connections across tile requests instead of renegotiating TLS."""
+    global REMOTE_CLIENT
+    with REMOTE_LOCK:
+        if REMOTE_CLIENT is None:
+            REMOTE_CLIENT=httpx.Client(timeout=httpx.Timeout(90,connect=12,pool=15),follow_redirects=True,
+                limits=httpx.Limits(max_connections=24,max_keepalive_connections=16,keepalive_expiry=60))
+        return REMOTE_CLIENT
+
+def close_remote_client():
+    global REMOTE_CLIENT
+    with REMOTE_LOCK:
+        client=REMOTE_CLIENT;REMOTE_CLIENT=None
+    if client is not None:client.close()
+
+atexit.register(close_remote_client)
 
 class Cutout(BaseModel):
     model_config=ConfigDict(extra='forbid',allow_inf_nan=False)
@@ -37,6 +61,10 @@ class Cutout(BaseModel):
     quality:Literal[512,1024]=512
 
 class ViewRequest(expeditions.View):pass
+
+class CacheSettings(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    limit_gib:Literal[1,4,8,16,32,64]
 
 def public(item):
     return {'id':item['id'],'url':'/api/atlas/files/'+item['id'],'bytes':item['size'],**item['metadata']}
@@ -63,13 +91,12 @@ def begin(ident,work,pool):
 def read_remote(url,params=None,max_bytes=16*1024*1024):
     if CACHED_ONLY:raise ValueError('Cached-only mode is on. This view has not been downloaded.')
     data=bytearray()
-    with httpx.Client(timeout=httpx.Timeout(90,connect=12),follow_redirects=True) as client:
-        with client.stream('GET',url,params=params) as r:
-            r.raise_for_status()
-            for part in r.iter_bytes():
-                data.extend(part)
-                if len(data)>max_bytes:raise ValueError('The image exceeds the atlas transfer limit.')
-            mime=r.headers.get('content-type','application/octet-stream').split(';')[0]
+    with remote_client().stream('GET',url,params=params) as r:
+        r.raise_for_status()
+        for part in r.iter_bytes():
+            data.extend(part)
+            if len(data)>max_bytes:raise ValueError('The image exceeds the atlas transfer limit.')
+        mime=r.headers.get('content-type','application/octet-stream').split(';')[0]
     return bytes(data),mime
 
 def view_key(view):
@@ -100,6 +127,11 @@ def cached_only(enabled:bool):
     global CACHED_ONLY
     CACHED_ONLY=enabled
     return {'cached_only':CACHED_ONLY}
+
+@router.post('/cache-settings')
+def cache_settings(request:CacheSettings):
+    try:return cache.set_limit(request.limit_gib)
+    except ValueError as e:raise HTTPException(409,str(e))
 
 @router.get('/files/{ident}')
 def file(ident:str):
@@ -197,26 +229,70 @@ def tile_path(path):
     if path in ('properties','Moc.fits','metadata.xml','preview.jpg'):return True
     return bool(re.fullmatch(r'Norder(?:[0-9]|[12][0-9])/(?:Allsky\.(?:jpg|png|fits)|Dir\d{1,18}/Npix\d{1,18}\.(?:jpg|png|fits|webp))',path))
 
+def fetch_tile(survey_id,part,url,ident,refresh=False):
+    """Concurrent map/preview requests for one tile share a single transfer."""
+    with TILE_LOCK:
+        pending=TILE_PENDING.get(ident)
+        leader=pending is None
+        if leader:pending=Future();TILE_PENDING[ident]=pending
+    if not leader:return pending.result(timeout=110)
+    try:
+        # A completed transfer may have filled the cache after this request's
+        # first lookup but before it became the leader.
+        with cache.LOCK:
+            item=None if refresh else cache.get(ident)
+            result=(item['path'].read_bytes(),item['mime'],item['metadata']) if item else None
+        if result is None:
+            raw,mime=read_remote(url)
+            if part=='properties':
+                value=re.sub(r'^hips_service_url(?:_\d+)?\s*=.*$', '',raw.decode('utf-8'),flags=re.M)
+                raw=(value+'\nhips_service_url = http://127.0.0.1:8765/api/atlas/surveys/'+survey_id+'\n').encode()
+            metadata={'source_url':url,'created_at':now()}
+            cache.put(ident,raw,mime,metadata)
+            result=(raw,mime,metadata)
+        pending.set_result(result)
+        return result
+    except BaseException as error:
+        pending.set_exception(error)
+        raise
+    finally:
+        with TILE_LOCK:TILE_PENDING.pop(ident,None)
+
+def refresh_tile(survey_id,part,url,ident):
+    # Bound both concurrency and queued refreshes. A revisit never waits on them.
+    with TILE_LOCK:
+        if CACHED_ONLY or ident in TILE_REFRESHING or len(TILE_REFRESHING)>=24:return
+        TILE_REFRESHING.add(ident)
+    def work():
+        try:
+            if not CACHED_ONLY:fetch_tile(survey_id,part,url,ident,refresh=True)
+        except Exception:pass  # Keep the last successful pixels and retrieval date.
+        finally:
+            with TILE_LOCK:TILE_REFRESHING.discard(ident)
+    try:TILE_REFRESH.submit(work)
+    except RuntimeError:
+        with TILE_LOCK:TILE_REFRESHING.discard(ident)
+
 @router.get('/surveys/{survey_id}/{part:path}')
 def survey_tile(survey_id:str,part:str):
     if survey_id not in SURVEYS or not tile_path(part):raise HTTPException(404,'Unknown survey tile.')
-    url=SURVEYS[survey_id]['url']+'/'+part;ident=cache.key('tile:'+url);item=cache.get(ident);previous=item;stale=False
+    url=SURVEYS[survey_id]['url']+'/'+part;ident=cache.key('tile:'+url);stale=False
     try:
-        if item and not CACHED_ONLY:
-            age=(datetime.now(timezone.utc)-datetime.fromisoformat(item['metadata']['created_at'])).total_seconds()
-            if age>86400:item=None
-        if not item:
-            try:
-                raw,mime=read_remote(url)
-                if part=='properties':
-                    value=raw.decode('utf-8')
-                    # Preserve only this same-origin service URL so visited tiles remain local.
-                    value=re.sub(r'^hips_service_url(?:_\d+)?\s*=.*$', '',value,flags=re.M)
-                    raw=(value+'\nhips_service_url = http://127.0.0.1:8765/api/atlas/surveys/'+survey_id+'\n').encode()
-                item=cache.put(ident,raw,mime,{'source_url':url,'created_at':now()})
-            except Exception:
-                if not previous:raise
-                item=previous;stale=True
-        with cache.LOCK:data=item['path'].read_bytes()
-        return Response(data,media_type='text/plain' if part=='properties' else item['mime'],headers={'Cache-Control':'public, max-age='+('60' if stale else '86400'),'X-Atlas-Retrieved':item['metadata']['created_at'],'X-Atlas-Stale':str(stale).lower()})
+        # Copy bytes under the eviction lock before any background replacement.
+        with cache.LOCK:
+            item=cache.get(ident)
+            data=item['path'].read_bytes() if item else None
+        if item:
+            mime=item['mime'];metadata=item['metadata']
+            age=(datetime.now(timezone.utc)-datetime.fromisoformat(metadata['created_at'])).total_seconds()
+            stale=age>86400
+            if stale and not CACHED_ONLY:refresh_tile(survey_id,part,url,ident)
+        else:data,mime,metadata=fetch_tile(survey_id,part,url,ident)
+        return Response(data,media_type='text/plain' if part=='properties' else mime,headers={
+            'Cache-Control':'public, max-age='+('60' if stale else '86400'),
+            'X-Atlas-Retrieved':metadata['created_at'],'X-Atlas-Stale':str(stale).lower(),
+            'X-Atlas-Cache':'stale' if stale else 'hit' if item else 'miss'})
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code==404:raise HTTPException(404,'This survey has no tile at this position and resolution.') from None
+        raise HTTPException(503,'The survey server could not return this tile.') from None
     except Exception as e:raise HTTPException(503,str(e))

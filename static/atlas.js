@@ -1,5 +1,6 @@
 'use strict';
-const atlasUI={enabled:true,busy:false,timer:null,serial:0,layer:null,loaded:null,lastAttempt:null,cachedOnly:false,prefetched:new Set(),pack:null,packLayer:null,packIndex:-1,autoPack:null,warm:null,warmSurvey:null,warmAt:0};
+const atlasUI={enabled:true,busy:false,timer:null,serial:0,layer:null,loaded:null,lastAttempt:null,cachedOnly:false,prefetched:new Set(),prefetchTimer:null,detailPriority:true,pack:null,packLayer:null,packIndex:-1,autoPack:null,warm:null,warmSurvey:null,warmAt:0};
+function atlasMapBusy(){return atlasUI.detailPriority&&state.sky?.isStillActive?.();}
 function atlasSurveyURL(s){return location.origin+'/api/atlas/surveys/'+s.id;}
 function atlasMessage(text){$('#atlas-message').textContent=text;}
 const scienceTrail=new Map();let scienceRefineTimer;
@@ -15,6 +16,9 @@ function onAtlasViewChanged(){
   atlasUI.timer=setTimeout(()=>loadAutomaticScience().catch(e=>atlasMessage(e.message)),1200);
 }
 function atlasWarmFlight(){
+  // Offscreen viewers share download slots with the visible map. Keep those slots
+  // available for detail by default; ahead-of-flight warming remains optional.
+  if(atlasUI.detailPriority)return;
   if(!flight.active||!flight.camera||atlasUI.cachedOnly||!$('#atlas-prefetch').checked||Date.now()-atlasUI.warmAt<2000||flight.velocity.every(v=>Math.abs(v)<.02))return;
   atlasUI.warmAt=Date.now();
   const fov=state.sky.getFov()[0],rate=Math.max(.0002,fov)*.5;
@@ -41,6 +45,11 @@ async function awaitAtlasJob(job,stillWanted=()=>true){
 }
 async function loadAutomaticScience(force=false,quality=512){
   if(!state.sky||atlasUI.busy||(!atlasUI.enabled&&!force)||atlasUI.cachedOnly||atlasUI.pack||state.page!=='explore')return;
+  if(!force&&atlasMapBusy()){
+    clearTimeout(atlasUI.timer);
+    atlasUI.timer=setTimeout(()=>loadAutomaticScience().catch(e=>atlasMessage(e.message)),500);
+    return;
+  }
   const view={...currentField()};if(view.fov>1){atlasMessage('Zoom below 1° to load an original science cutout.');return;}
   if(!force&&atlasUI.loaded&&FlightMath.separation(view,atlasUI.loaded)<atlasUI.loaded.fov*.2&&view.fov>atlasUI.loaded.fov*.4)return;
   if(!force&&atlasUI.lastAttempt&&Date.now()-atlasUI.lastAttempt.time<30000&&FlightMath.separation(view,atlasUI.lastAttempt)<view.fov*.2)return;
@@ -75,7 +84,12 @@ function scienceDetails(){
   $('#atlas-open-observation').onclick=async()=>{closeModal();openRecentObservation(await api('/api/recent/observations/'+m.record_id));};
 }
 function atlasPrefetch(route,index){
+  clearTimeout(atlasUI.prefetchTimer);
   if(atlasUI.cachedOnly||!$('#atlas-prefetch').checked||route.kind!=='waypoints')return;
+  if(atlasMapBusy()){
+    atlasUI.prefetchTimer=setTimeout(()=>{if(routePlayer.route===route&&routePlayer.index===index&&state.page==='explore')atlasPrefetch(route,index);},500);
+    return;
+  }
   for(const stop of route.stops.slice(index+1,index+3)){
     const key=JSON.stringify([stop.ra,stop.dec,stop.fov,stop.survey]);if(atlasUI.prefetched.has(key))continue;
     atlasUI.prefetched.add(key);if(atlasUI.prefetched.size>200)atlasUI.prefetched.delete(atlasUI.prefetched.values().next().value);
@@ -86,6 +100,7 @@ async function atlasShowPackView(route,index){
   const pack=atlasUI.pack;if(pack&&(pack.route_id!==route.id||pack.revision!==route.revision)||index===atlasUI.packIndex)return;
   atlasUI.packIndex=index;let entry=pack?.views.find(v=>v.index===index);
   if(atlasUI.packLayer)state.sky.removeImageLayer('downloaded-tour-view');atlasUI.packLayer=null;
+  if(!pack&&atlasUI.detailPriority)return;
   if(!pack&&$('#atlas-prefetch').checked&&!atlasUI.cachedOnly){
     const stop=route.stops[index];if(!stop)return;
     try{const job=await jsonPost('/api/atlas/view',Object.fromEntries(['ra','dec','fov','survey','projection','roll'].filter(k=>stop[k]!==undefined).map(k=>[k,stop[k]])));entry={view:await awaitAtlasJob(job,()=>routePlayer.route===route&&routePlayer.index===index)};}catch{return;}
@@ -101,11 +116,13 @@ function atlasRetirePreview(layer,attempt=0){
   state.sky.removeImageLayer('downloaded-tour-view');atlasUI.packLayer=null;
   atlasMessage('Detailed survey tiles ready · prepared view released.');
 }
-function atlasStopPack(){if(atlasUI.packLayer)state.sky?.removeImageLayer('downloaded-tour-view');atlasUI.packLayer=null;atlasUI.pack=null;atlasUI.packIndex=-1;}
+function atlasStopPack(){clearTimeout(atlasUI.prefetchTimer);if(atlasUI.packLayer)state.sky?.removeImageLayer('downloaded-tour-view');atlasUI.packLayer=null;atlasUI.pack=null;atlasUI.packIndex=-1;}
 async function loadAtlasDownloads(){
   const [d,r]=await Promise.all([api('/api/atlas/status'),api('/api/navigation/routes')]);atlasUI.cachedOnly=d.cached_only;
   $('#atlas-cached-only').checked=d.cached_only;
-  $('#atlas-cache-summary').textContent=`${(d.bytes/1048576).toFixed(1)} MB / ${(d.limit_bytes/1073741824).toFixed(0)} GB · ${(d.pinned_bytes/1048576).toFixed(1)} MB protected by downloads · ${fmt(d.coverage.indexed,0)} pointings indexed`;
+  $('#atlas-cache-summary').textContent=`${(d.bytes/1048576).toFixed(1)} MiB / ${(d.limit_bytes/1073741824).toFixed(0)} GiB · ${(d.pinned_bytes/1048576).toFixed(1)} MiB protected by downloads · ${fmt(d.coverage.indexed,0)} pointings indexed`;
+  $('#atlas-cache-limit').value=String(d.limit_bytes/1073741824);
+  $('#atlas-cache-space').textContent=`${(d.disk_free_bytes/1073741824).toFixed(0)} GiB free on this drive. Space is used as you explore; this limit does not reserve GPU memory.`;
   const selected=$('#atlas-download-route').value;
   $('#atlas-download-route').innerHTML=r.rows.filter(x=>x.kind==='waypoints'&&x.stop_count).map(x=>`<option value="${esc(x.id)}">${esc(x.title)} · ${x.stop_count} stops</option>`).join('');
   if([...$('#atlas-download-route').options].some(o=>o.value===selected))$('#atlas-download-route').value=selected;
@@ -125,11 +142,16 @@ async function playAtlasPack(pack){
   await startRouteDocument(route,pack);
 }
 function initAtlas(){
+  try{atlasUI.detailPriority=localStorage.getItem('universe-atlas-detail-priority')!=='false';}catch{}
   api('/api/atlas/status').then(d=>{atlasUI.cachedOnly=d.cached_only;}).catch(()=>{});
   const nav=document.createElement('button');nav.className='nav-item';nav.textContent='◫ Compare lenses';nav.dataset.page='compare';nav.onclick=()=>showPage('compare');$('nav[aria-label="Workspace"]').append(nav);
   const downloads=document.createElement('button');downloads.className='nav-item';downloads.textContent='↓ Downloads & cache';downloads.dataset.page='downloads';downloads.onclick=()=>showPage('downloads');nav.after(downloads);
   const controls=document.createElement('section');controls.className='atlas-controls';controls.innerHTML=`<div class="section-label"><span class="overline">ORIGINAL OBSERVATIONS</span></div><label class="atlas-check"><input id="atlas-auto" type="checkbox" checked> Auto-load science cutouts</label><select id="atlas-mission" aria-label="Automatic observation telescope"><option value="both">Hubble + Webb</option><option value="webb">Webb only</option><option value="hubble">Hubble only</option></select><label class="field-label" for="atlas-opacity">Science layer opacity</label><input id="atlas-opacity" type="range" min="0" max="100" value="85"><p id="atlas-message" class="small muted" role="status">Zoom below 1° to load an original science cutout.</p><div class="flex"><button class="text-button" id="atlas-load">Load here</button><button class="text-button" id="atlas-details" disabled>Source details</button></div><label class="atlas-check"><input id="atlas-prefetch" type="checkbox" checked> Preload flight & tour views</label>`;
   $('.sidebar-footer').before(controls);
+  const priority=document.createElement('label');priority.className='atlas-check';priority.innerHTML='<input id="atlas-detail-priority" type="checkbox"> Prioritize visible map detail';controls.append(priority);
+  priority.title='Give visible survey tiles priority. Ahead-of-flight previews pause; automatic science cutouts and upcoming tour previews wait for the map.';
+  $('#atlas-detail-priority').checked=atlasUI.detailPriority;
+  $('#atlas-detail-priority').onchange=e=>{atlasUI.detailPriority=e.target.checked;try{localStorage.setItem('universe-atlas-detail-priority',String(atlasUI.detailPriority));}catch{}onAtlasViewChanged();};
   const page=document.createElement('section');page.id='downloads-page';page.className='page content-page';page.innerHTML=`<div class="page-heading"><div class="overline">TAKE THE SKY WITH YOU</div><h1>Your downloaded universe<span>.</span></h1><p>Save the views and available source previews from a waypoint tour. Browse visited map tiles from this PC.</p></div><div class="atlas-download-bar"><label for="atlas-download-route">Saved waypoint tour</label><select id="atlas-download-route"></select><button id="atlas-download-start" class="button primary">Download tour views</button><button id="atlas-download-cancel" class="button" hidden>Cancel remaining views</button><button id="atlas-download-refresh" class="button">Refresh</button></div><p id="atlas-download-job" role="status"></p><div class="atlas-cache-bar"><label class="atlas-check"><input id="atlas-cached-only" type="checkbox"> Cached-only atlas</label><span id="atlas-cache-summary"></span></div><p class="muted">Downloads retain 768 × 768 survey views at each saved stop, plus available image previews and captions. Flight between stops uses cached map tiles. Unvisited areas, higher detail, videos, new catalog searches and AI cloud processing need a connection. Black survey areas may have no telescope coverage.</p><div id="atlas-downloads"></div>`;$('main').append(page);
   $('#atlas-auto').onchange=e=>{atlasUI.enabled=e.target.checked;atlasClear();if(atlasUI.enabled)onAtlasViewChanged();else atlasMessage('Automatic science layers are off.');};
   $('#atlas-mission').onchange=()=>{atlasClear();atlasUI.lastAttempt=null;onAtlasViewChanged();};
@@ -137,5 +159,8 @@ function initAtlas(){
   $('#atlas-details').onclick=scienceDetails;$('#atlas-load').onclick=()=>{if(!atlasUI.enabled){atlasUI.enabled=true;$('#atlas-auto').checked=true;}loadAutomaticScience(true).catch(e=>atlasMessage(e.message));};
   $('#atlas-download-start').onclick=()=>busy($('#atlas-download-start'),'Queuing…',async()=>{const j=await api('/api/atlas/packs/'+$('#atlas-download-route').value,{method:'POST'});$('#atlas-download-cancel').hidden=false;$('#atlas-download-cancel').onclick=async()=>{await api('/api/atlas/jobs/'+j.id+'/cancel',{method:'POST'});$('#atlas-download-cancel').hidden=true;};await loadAtlasDownloads();});
   $('#atlas-download-refresh').onclick=()=>loadAtlasDownloads().catch(failure);
+  const cacheSettings=document.createElement('div');cacheSettings.className='atlas-download-bar';cacheSettings.innerHTML='<label for="atlas-cache-limit">Map cache on disk</label><select id="atlas-cache-limit">'+[1,4,8,16,32,64].map(n=>`<option value="${n}">${n} GiB</option>`).join('')+'</select><button class="button" id="atlas-cache-save">Save cache size</button><span id="atlas-cache-space" class="small muted"></span>';
+  $('.atlas-cache-bar').after(cacheSettings);
+  $('#atlas-cache-save').onclick=()=>busy($('#atlas-cache-save'),'Saving…',async()=>{await jsonPost('/api/atlas/cache-settings',{limit_gib:Number($('#atlas-cache-limit').value)});await loadAtlasDownloads();toast('Map cache size saved.');});
   $('#atlas-cached-only').onchange=async e=>{try{const d=await api('/api/atlas/cached-only?enabled='+e.target.checked,{method:'POST'});atlasUI.cachedOnly=d.cached_only;atlasMessage(d.cached_only?'Cached-only atlas · automatic downloads paused.':'Online atlas · local cache enabled.');}catch(err){e.target.checked=atlasUI.cachedOnly;failure(err);}};
 }

@@ -158,6 +158,9 @@ def test_failed_pack_keeps_successful_views_and_saved_revision(tmp_path,monkeypa
     assert cache.packs()[0]['state']=='partial'
 
 def test_expired_tile_falls_back_to_local_copy_when_network_is_unavailable(tmp_path,monkeypatch):
+    class Immediate:
+        def submit(self,fn):fn()
+    monkeypatch.setattr(atlas,'TILE_REFRESH',Immediate())
     monkeypatch.setattr(cache,'ROOT',tmp_path/'cache');monkeypatch.setattr(atlas,'CACHED_ONLY',False)
     url=atlas.SURVEYS['optical']['url']+'/properties'
     cache.put(cache.key('tile:'+url),b'hips_order=9','text/plain',{'created_at':'2000-01-01T00:00:00+00:00','source_url':url})
