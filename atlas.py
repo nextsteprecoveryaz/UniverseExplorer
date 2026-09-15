@@ -1,0 +1,222 @@
+"""Automatic original-FITS cutouts, trusted survey cache, and saved tour views."""
+import io
+import json
+import re
+import threading
+import hashlib
+from datetime import datetime,timezone
+from concurrent.futures import ThreadPoolExecutor
+from typing import Literal
+import httpx
+from PIL import Image
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import Response, FileResponse
+from pydantic import BaseModel, ConfigDict, Field
+import atlas_cache as cache
+import coverage_index
+import recent_archive
+import expeditions
+from integrations import now
+from sky_cutout import from_archive, view_header
+from range_fits import RangeFITS
+
+router=APIRouter(prefix='/api/atlas')
+SURVEYS={}
+JOBS={}
+LOCK=threading.Lock()
+SCIENCE=ThreadPoolExecutor(max_workers=1,thread_name_prefix='fits-cutout')
+DOWNLOADS=ThreadPoolExecutor(max_workers=1,thread_name_prefix='atlas-download')
+CACHED_ONLY=False
+
+class Cutout(BaseModel):
+    model_config=ConfigDict(extra='forbid',allow_inf_nan=False)
+    record_id:str=Field(pattern=r'^\d{1,20}$')
+    ra:float=Field(ge=0,lt=360)
+    dec:float=Field(ge=-90,le=90)
+    fov:float=Field(ge=.0001,le=2)
+    quality:Literal[512,1024]=512
+
+class ViewRequest(expeditions.View):pass
+
+def public(item):
+    return {'id':item['id'],'url':'/api/atlas/files/'+item['id'],'bytes':item['size'],**item['metadata']}
+
+def begin(ident,work,pool):
+    with LOCK:
+        old=JOBS.get(ident)
+        if old and old['state'] in ('queued','running'):return dict(old)
+        if sum(j['state'] in ('queued','running') for j in JOBS.values())>=8:raise HTTPException(429,'Download queue is full. Current downloads will finish first.')
+        if len(JOBS)>100:
+            for k in list(JOBS):
+                if JOBS[k]['state'] not in ('queued','running'):del JOBS[k]
+        job={'id':ident,'state':'queued','created_at':now(),'cancelled':False};JOBS[ident]=job
+    def run():
+        try:
+            if job['cancelled']:job['state']='cancelled';return
+            job['state']='running';job['result']=work(job)
+            job['state']='cancelled' if job['cancelled'] else 'complete'
+        except Exception as e:job.update(state='failed',error=str(e))
+        finally:job['finished_at']=now()
+    pool.submit(run)
+    return dict(job)
+
+def read_remote(url,params=None,max_bytes=16*1024*1024):
+    if CACHED_ONLY:raise ValueError('Cached-only mode is on. This view has not been downloaded.')
+    data=bytearray()
+    with httpx.Client(timeout=httpx.Timeout(90,connect=12),follow_redirects=True) as client:
+        with client.stream('GET',url,params=params) as r:
+            r.raise_for_status()
+            for part in r.iter_bytes():
+                data.extend(part)
+                if len(data)>max_bytes:raise ValueError('The image exceeds the atlas transfer limit.')
+            mime=r.headers.get('content-type','application/octet-stream').split(';')[0]
+    return bytes(data),mime
+
+def view_key(view):
+    return cache.key('survey-view-v1:'+json.dumps({k:view[k] for k in ('ra','dec','fov','survey')},sort_keys=True))
+
+def survey_view(view,pin=None):
+    ident=view_key(view);item=cache.get(ident)
+    if item:
+        if pin:cache.pin(pin,ident)
+        return public(item)
+    survey=SURVEYS[view['survey']];wcs=view_header(view['ra'],view['dec'],view['fov'])
+    raw,_=read_remote('https://alasky.cds.unistra.fr/hips-image-services/hips2fits',{'hips':survey['url'],'wcs':json.dumps(wcs),'format':'png'},8*1024*1024)
+    with Image.open(io.BytesIO(raw)) as im:
+        if im.size!=(768,768):raise ValueError('The survey service returned unexpected image dimensions.')
+        im.verify()
+    meta={'kind':'survey-view','survey':view['survey'],'survey_name':survey['name'],'source_url':survey['url'],'ra':view['ra'],'dec':view['dec'],'fov':view['fov'],'wcs':wcs,'created_at':now(),'credit':survey['name']+' · CDS HiPS2FITS','processing':'Saved 768 × 768 rendered survey cutout. Missing survey coverage can appear blank. Not a new telescope exposure or measurement image.'}
+    return public(cache.put(ident,raw,'image/png',meta,pin))
+
+@router.get('/status')
+def status():
+    for p in cache.packs():
+        if p['state']=='downloading' and JOBS.get(p['id'],{}).get('state') not in ('queued','running'):
+            p['state']='interrupted';cache.save_pack(p)
+    return {**cache.status(),'coverage':coverage_index.status(),'cached_only':CACHED_ONLY,'jobs':[dict(j) for j in JOBS.values() if j['state'] in ('queued','running')]}
+
+@router.post('/cached-only')
+def cached_only(enabled:bool):
+    global CACHED_ONLY
+    CACHED_ONLY=enabled
+    return {'cached_only':CACHED_ONLY}
+
+@router.get('/files/{ident}')
+def file(ident:str):
+    try:item=cache.get(ident)
+    except ValueError:raise HTTPException(400,'Invalid atlas file.')
+    if not item:raise HTTPException(404,'This atlas file is no longer cached.')
+    # Read while holding the eviction lock; no path can disappear during the response.
+    with cache.LOCK:
+        try:data=item['path'].read_bytes()
+        except FileNotFoundError:raise HTTPException(404,'This atlas file was evicted. Load the view again.')
+    return Response(data,media_type=item['mime'],headers={'Cache-Control':'private, no-cache','ETag':'"'+hashlib.sha256(data).hexdigest()+'"'})
+
+@router.post('/prepare')
+def prepare(request:Cutout):
+    params=request.model_dump();
+    if request.quality==512:params.pop('quality')
+    ident=cache.key('science-v1:'+json.dumps(params,sort_keys=True))
+    item=cache.get(ident)
+    if item:return {'id':ident,'state':'complete','result':public(item)}
+    if CACHED_ONLY:raise HTTPException(409,'This science cutout is not cached.')
+    observation=recent_archive.observation(request.record_id)
+    if observation.get('mtFlag'):raise HTTPException(400,'Moving-target products are not placed on the fixed sky atlas.')
+    def work(job):
+        if request.quality==1024:
+            content,meta=from_archive(observation,request.ra,request.dec,request.fov,size=1024,native_limit=1280,reader_factory=lambda uri:RangeFITS(uri,budget=192*1024*1024))
+        else:content,meta=from_archive(observation,request.ra,request.dec,request.fov)
+        return public(cache.put(ident,content,'application/fits',{'kind':'science-cutout','created_at':now(),**meta}))
+    return begin(ident,work,SCIENCE)
+
+@router.post('/view')
+def prepare_view(view:ViewRequest):
+    params=view.model_dump();ident=view_key(params);item=cache.get(ident)
+    if item:return {'id':ident,'state':'complete','result':public(item)}
+    if CACHED_ONLY:raise HTTPException(409,'This rendered view is not cached.')
+    return begin(ident,lambda job:survey_view(params),DOWNLOADS)
+
+@router.get('/jobs/{ident}')
+def job(ident:str):
+    if ident not in JOBS:raise HTTPException(404,'Job not found. The server may have restarted.')
+    return dict(JOBS[ident])
+
+@router.post('/jobs/{ident}/cancel')
+def cancel(ident:str):
+    if ident in JOBS:JOBS[ident]['cancelled']=True
+    return {'cancelled':True,'note':'The current bounded transfer may finish; remaining pack views will be skipped.'}
+
+@router.post('/packs/{route_id}')
+def download_pack(route_id:str):
+    route=expeditions.read(route_id)
+    if route['kind']!='waypoints' or not route['stops']:raise HTTPException(400,'Choose a waypoint tour with at least one stop. Continuous recordings can use the visited-tile cache.')
+    if CACHED_ONLY:raise HTTPException(409,'Turn off cached-only mode before downloading a tour.')
+    ident=cache.key('pack:'+route_id+':'+str(route['revision']))
+    def work(job):
+        pack={'id':ident,'route_id':route_id,'revision':route['revision'],'title':route['title'],'route':route,'state':'downloading','views':[],'errors':[],'created_at':now(),'total':len(route['stops'])}
+        cache.save_pack(pack)
+        for i,stop in enumerate(route['stops']):
+            if job['cancelled']:break
+            job['progress']=f'View {i+1} of {len(route["stops"])}';entry={'index':i}
+            try:entry['view']=survey_view(stop,ident)
+            except Exception as e:pack['errors'].append({'index':i,'error':str(e)})
+            media=route['media'][i] or {};preview=media.get('preview_url')
+            if preview and 'view' in entry:
+                try:
+                    # Only resolver-produced MAST previews or NASA gallery image URLs.
+                    if media.get('kind')=='mast':
+                        o=recent_archive.observation(media['id']);uri=o.get('jpegURL')
+                        if not uri or not uri.startswith('mast:'):raise ValueError('No archive preview identifier.')
+                        from urllib.parse import quote
+                        url='https://mast.stsci.edu/api/v0.1/Download/file?uri='+quote(uri,safe='')
+                    elif media.get('kind')=='gallery':
+                        from urllib.parse import urlparse
+                        host=urlparse(preview).hostname or ''
+                        if not (host.endswith('.staticflickr.com') or host=='live.staticflickr.com'):raise ValueError('Unsupported preview host.')
+                        url=preview
+                    else:url=None
+                    if url:
+                        pid=cache.key('pack-preview:'+url);item=cache.get(pid)
+                        if not item:
+                            raw,mime=read_remote(url,max_bytes=15*1024*1024)
+                            item=cache.put(pid,raw,mime,{'source_url':url},ident)
+                        else:cache.pin(ident,pid)
+                        entry['preview_url']='/api/atlas/files/'+pid
+                except Exception as e:entry['preview_error']=str(e)
+            pack['views'].append(entry);cache.save_pack(pack)
+        pack['state']='cancelled' if job['cancelled'] else 'partial' if pack['errors'] or any(v.get('preview_error') for v in pack['views']) else 'complete'
+        pack['finished_at']=now();cache.save_pack(pack);return pack
+    return begin(ident,work,DOWNLOADS)
+
+@router.delete('/packs/{ident}')
+def remove_pack(ident:str):
+    if ident in JOBS and JOBS[ident]['state'] in ('queued','running'):raise HTTPException(409,'Cancel the active download and wait for its current transfer before removing it.')
+    cache.remove_pack(ident);return {'removed':True}
+
+def tile_path(path):
+    if path in ('properties','Moc.fits','metadata.xml','preview.jpg'):return True
+    return bool(re.fullmatch(r'Norder(?:[0-9]|[12][0-9])/(?:Allsky\.(?:jpg|png|fits)|Dir\d{1,18}/Npix\d{1,18}\.(?:jpg|png|fits|webp))',path))
+
+@router.get('/surveys/{survey_id}/{part:path}')
+def survey_tile(survey_id:str,part:str):
+    if survey_id not in SURVEYS or not tile_path(part):raise HTTPException(404,'Unknown survey tile.')
+    url=SURVEYS[survey_id]['url']+'/'+part;ident=cache.key('tile:'+url);item=cache.get(ident);previous=item;stale=False
+    try:
+        if item and not CACHED_ONLY:
+            age=(datetime.now(timezone.utc)-datetime.fromisoformat(item['metadata']['created_at'])).total_seconds()
+            if age>86400:item=None
+        if not item:
+            try:
+                raw,mime=read_remote(url)
+                if part=='properties':
+                    value=raw.decode('utf-8')
+                    # Preserve only this same-origin service URL so visited tiles remain local.
+                    value=re.sub(r'^hips_service_url(?:_\d+)?\s*=.*$', '',value,flags=re.M)
+                    raw=(value+'\nhips_service_url = http://127.0.0.1:8765/api/atlas/surveys/'+survey_id+'\n').encode()
+                item=cache.put(ident,raw,mime,{'source_url':url,'created_at':now()})
+            except Exception:
+                if not previous:raise
+                item=previous;stale=True
+        with cache.LOCK:data=item['path'].read_bytes()
+        return Response(data,media_type='text/plain' if part=='properties' else item['mime'],headers={'Cache-Control':'public, max-age='+('60' if stale else '86400'),'X-Atlas-Retrieved':item['metadata']['created_at'],'X-Atlas-Stale':str(stale).lower()})
+    except Exception as e:raise HTTPException(503,str(e))

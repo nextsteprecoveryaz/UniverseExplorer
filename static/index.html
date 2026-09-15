@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Explore released Webb and Hubble imagery, switch real wavelength maps, and investigate with a local image and discovery lab.">
+  <title>Universe Explorer — Your personal observatory</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/flight.css">
+  <link rel="stylesheet" href="/navigation.css">
+  <link rel="stylesheet" href="/atlas.css">
+  <link rel="stylesheet" href="/research.css">
+  <link rel="stylesheet" href="/map-panels.css?v=2">
+  <script src="/vendor/aladin.js" charset="utf-8" defer></script>
+  <script src="/features.js" defer></script>
+  <script src="/journeys.js" defer></script>
+  <script src="/photometry.js" defer></script>
+  <script src="/flight-math.js" defer></script>
+  <script src="/flight.js" defer></script>
+  <script src="/route-timeline.js" defer></script>
+  <script src="/navigation.js" defer></script>
+  <script src="/route-player.js" defer></script>
+  <script src="/atlas.js" defer></script>
+  <script src="/comparison.js" defer></script>
+  <script src="/spatial-math.js" defer></script>
+  <script src="/stellar-flight.js" defer></script>
+  <script src="/research.js" defer></script>
+  <script src="/map-panels.js?v=3" defer></script>
+  <script src="/app.js?v=map-panels-1" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Universe Explorer home"><span class="brand-symbol">✳</span><span>UNIVERSE<span class="brand-light">EXPLORER</span></span></a>
+    <form id="search-form" class="search"><span aria-hidden="true">⌕</span><input id="search-input" aria-label="Search the sky" placeholder="Where do you want to go?  Try M31 or 83.82, -5.39" autocomplete="off"><kbd>↵</kbd></form>
+    <button id="update-images" class="button update-images" title="Refresh all public image records since 2022 and the NASA Webb Flickr collections">↻ Update images</button>
+    <div id="recording-chip" class="recording-chip" hidden><span id="recording-status">Recording</span><button id="recording-toggle" class="text-button" aria-label="Pause or resume recording">Ⅱ</button><button id="recording-stop" class="text-button">Stop & save</button><button id="recording-rescue" class="text-button" title="Download the recording, including samples not yet saved">↓ Backup</button></div>
+    <span class="local-badge"><i></i> LOCAL OBSERVATORY</span>
+    <button id="about-button" class="icon-button" aria-label="About this observatory">?</button>
+  </header>
+  <main>
+    <aside class="sidebar">
+      <div class="overline">YOUR OBSERVATORY</div>
+      <nav aria-label="Workspace">
+        <button class="nav-item active" data-page="explore"><span>◎</span> Explore the sky <small>01</small></button>
+        <button class="nav-item" data-page="journeys"><span>✦</span> Image journeys <small>NEW</small></button>
+        <button class="nav-item" data-page="routes"><span>⌁</span> Tours & routes <small>NEW</small></button>
+        <button class="nav-item" data-page="photometry"><span>⌁</span> Photometry & Aladin <small>NEW</small></button>
+        <button class="nav-item" data-page="archive"><span>▦</span> Telescope archive <small>02</small></button>
+        <button class="nav-item" data-page="lab"><span>◈</span> Image lab <small>03</small></button>
+        <button class="nav-item" data-page="transits"><span>⌁</span> Transit lab <small>04</small></button>
+        <button class="nav-item" data-page="notebook"><span>▤</span> Discovery notebook <small id="note-count">0</small></button>
+      </nav>
+      <div class="navigation-launcher"><button id="nearby-toggle" class="button" aria-pressed="true">◎ Nearby images</button><button id="open-routes" class="button">⌁ My routes</button></div>
+      <div class="sidebar-divider"></div>
+      <div class="section-label"><span class="overline">OBSERVE IN A NEW LIGHT</span><span class="tiny-pill">LENSES</span></div>
+      <label class="field-label" for="survey-select">Telescope or wavelength</label>
+      <select id="survey-select" aria-label="Telescope or wavelength"></select>
+      <div id="lens-chips" class="lens-chips">
+        <button data-survey="webb-color" class="selected">Webb</button><button data-survey="hubble-color">Hubble</button><button data-survey="optical">Visible</button>
+        <button data-survey="hydrogen">Hα</button><button data-survey="oxygen">O III</button><button data-survey="sulfur">S II</button><button data-survey="h2">H₂</button>
+      </div>
+      <p id="survey-description" class="muted small">Loading wavelength maps…</p>
+      <label class="field-label" for="sky-stretch">Display stretch</label>
+      <select id="sky-stretch"><option value="native">Original display</option><option value="asinh">Asinh · lift faint structure</option><option value="log">Log · reveal faint structure</option></select>
+      <p class="small subtle">Blank sky in a telescope layer usually means no coverage. Switch to Visible for context.</p>
+      <button id="capture-button" class="button capture-button">◈ &nbsp; Open this view in image lab</button>
+      <div class="sidebar-footer"><span class="status-dot"></span><div>Local originals · optional cloud AI<br><small>Maps, videos & cloud edits use internet</small></div></div>
+    </aside>
+    <section id="explore-page" class="page explore-page active all-sky-view" aria-label="Interactive sky explorer">
+      <div id="sky-fallback" class="sky-fallback atlas-loading">Loading the all-sky survey…</div>
+      <div id="aladin-lite-div" aria-label="Interactive astronomical sky map"></div>
+      <div class="sky-shade"></div>
+      <div id="object-markers" class="object-markers" aria-label="Known object markers" hidden></div>
+      <div id="image-markers" class="image-markers" aria-label="Hubble, Webb and NASA image locations"></div>
+      <div class="sky-top"><span id="sky-status" class="pill"><i></i> CONNECTING SKY ATLAS</span><span class="sky-caption">REAL OBSERVATIONS · ICRS SKY MAP</span></div>
+      <div class="mapping-control"><button id="overview-button" class="text-button overview-button" aria-label="All sky" aria-pressed="true" title="Return to the all-sky overview">◎ All sky</button><label class="switch-label"><input id="mapping-toggle" type="checkbox" role="switch"><span class="switch-track"></span>Object map</label><label id="mapping-labels-control" class="small" hidden><input id="mapping-labels" type="checkbox" checked> Labels</label><button id="flight-toggle" class="text-button flight-toggle" aria-pressed="false">✧ Fly</button></div>
+      <div class="image-map-control"><label class="switch-label"><input id="image-map-toggle" type="checkbox" role="switch" checked><span class="switch-track"></span>Image locations</label><select id="image-map-source" aria-label="Image map source"><option value="both">Hubble + Webb</option><option value="webb">Webb archive</option><option value="hubble">Hubble archive</option><option value="flickr">NASA Webb gallery</option></select><button id="browse-journeys" class="text-button">Browse images ↗</button></div>
+      <div id="image-index-card" class="image-index-card"><div class="image-map-legend"><span class="webb-dot">● Webb</span><span class="hubble-dot">● Hubble</span><span class="flickr-dot">◆ NASA releases</span></div><p id="image-index-summary" role="status">Connecting to your image collections…</p><p id="image-update-status" class="small muted"></p><span class="small subtle">Counts group image locations. Click to travel or open an image.</span></div>
+      <aside id="object-panel" class="object-panel" aria-label="Object information" hidden>
+        <div class="object-panel-top"><span class="overline">KNOW YOUR SKY</span><button id="object-panel-back" class="text-button" hidden>← Objects</button></div>
+        <div id="object-list-view"><h2>What’s in this field?</h2><p id="mapping-status" class="small muted" role="status">Turn on mapping to explore known objects.</p><label class="field-label" for="object-filter">Find in loaded objects</label><input id="object-filter" type="search" placeholder="Name or object type"><div id="object-list" class="object-list"></div><details class="featured-list"><summary>Featured destinations & videos</summary><div id="featured-objects"></div></details></div>
+        <div id="object-detail" hidden></div>
+      </aside>
+      <div id="live-panel" class="live-panel">
+        <div class="live-heading"><span class="overline">TELESCOPE LIVE</span><button id="refresh-live" class="text-button" aria-label="Refresh live telescope status">↻</button></div>
+        <div id="live-cards"><p class="small muted">Connecting to the observatories…</p></div>
+        <p class="live-note">Updated schedules. Released images appear in the archive after processing.</p>
+        <button id="requested-observation" class="text-button pinned-link">↗ Visit your linked Webb observation</button>
+      </div>
+      <aside id="nearby-panel" class="nearby-panel" aria-label="Nearby telescope coverage"><div class="nearby-head"><span class="overline">WHERE TO NEXT?</span><button id="nearby-refresh" class="text-button" aria-label="Refresh nearby suggestions">↻</button><button id="nearby-close" class="text-button" aria-label="Hide nearby suggestions">×</button></div><h2>Follow the observations.</h2><div class="nearby-controls"><label>Telescope<select id="nearby-mission"><option value="both">Hubble + Webb</option><option value="webb">Webb</option><option value="hubble">Hubble</option></select></label><label>Search radius<select id="nearby-radius"><option value="auto">Follow zoom</option><option value="1">1 degree</option><option value="5">5 degrees</option><option value="15">15 degrees</option><option value="180">Entire sky</option></select></label></div><p id="nearby-status" role="status">Suggestions update as you explore.</p><div id="nearby-results"></div><button id="nearby-tour" class="button" disabled>▶ Tour these observations</button><details><summary>Coverage & source details</summary><p id="nearby-provenance"></p></details></aside>
+      <section id="route-player" class="route-player" aria-label="Guided route player" hidden><div class="route-player-head"><span class="overline" id="route-playing-title">GUIDED JOURNEY</span><button id="route-play-close" class="text-button" aria-label="Close route player">×</button></div><h2 id="route-stop-title"></h2><img id="route-stop-image" alt="Source image for this route stop" hidden><p id="route-image-message"></p><p id="route-stop-description"></p><p id="route-stop-facts" class="route-stop-facts"></p><a id="route-stop-source" href="#" target="_blank" rel="noopener" hidden>Publisher source & credits ↗</a><p id="route-stop-credit"></p><div class="route-progress-track"><div id="route-play-progress"></div></div><input id="route-play-seek" type="range" min="0" max="1" step="0.1" value="0" aria-label="Route playback position"><div class="route-clock"><span id="route-play-status" role="status">Ready</span><span id="route-play-time">0:00</span></div><div class="route-play-buttons"><button id="route-play-prev" class="button" aria-label="Previous route stop">⏮</button><button id="route-play-toggle" class="button primary">Ⅱ Pause</button><button id="route-play-next" class="button" aria-label="Next route stop">⏭</button><button id="route-play-manual" class="button">Take controls</button></div><div class="route-player-options"><label>Speed <select id="route-play-speed" aria-label="Playback speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label><label><input id="route-narration" type="checkbox"> Read guide aloud</label></div><div id="route-stop-actions"><button id="route-stop-inspect" class="text-button">Inspect source image</button><button id="route-stop-video" class="text-button" hidden>▶ Source video</button></div></section>
+      <div class="sky-tools"><button id="zoom-in" class="icon-button" aria-label="Zoom in">+</button><button id="zoom-out" class="icon-button" aria-label="Zoom out">−</button><button id="reset-view" class="icon-button" aria-label="Reset current destination">⟲</button><button id="fullscreen" class="icon-button" aria-label="Fullscreen sky">⛶</button></div>
+      <div id="flight-reticle" class="flight-reticle" hidden aria-hidden="true"></div>
+      <section id="flight-panel" class="flight-panel" aria-label="Sky flight controls" hidden>
+        <div class="flight-panel-head"><span class="overline">SKY FLIGHT · YOU HAVE THE CONTROLS</span><button id="flight-exit" class="text-button">Exit flight ↗</button></div>
+        <p id="flight-status" role="status">Ready · arrows steer · W / S zoom</p>
+        <div class="flight-navigation"><div class="flight-controls" aria-label="Steering"><button class="button" data-flight-key="ArrowLeft" aria-label="Steer left">←</button><button class="button" data-flight-key="ArrowUp" aria-label="Steer up">↑</button><button class="button" data-flight-key="ArrowDown" aria-label="Steer down">↓</button><button class="button" data-flight-key="ArrowRight" aria-label="Steer right">→</button><button class="button thrust" data-flight-key="KeyW" aria-label="Fly closer">W +</button><button class="button thrust" data-flight-key="KeyS" aria-label="Fly farther">S −</button><button id="flight-stop" class="button brake" title="Space or Escape stops motion">■ Stop</button></div><label class="flight-speed">Steering pace<select id="flight-speed"><option value="0.35">Slow</option><option value="1" selected>Normal</option><option value="2.5">Fast</option></select></label></div>
+        <div class="flight-actions"><button id="flight-cruise" class="text-button" aria-pressed="false">▷ Cruise</button><button id="flight-level" class="text-button">North up</button><button id="flight-panels" class="text-button" aria-pressed="false">Show panels</button><button id="flight-images" class="text-button">Images in view ↗</button><button id="flight-save" class="text-button">+ Save waypoint</button></div>
+        <div class="flight-actions"><button id="flight-record" class="text-button">● Record flight</button><button id="flight-route-add" class="text-button">+ Add view to route</button><button id="flight-routes" class="text-button">Tours & saved routes ↗</button></div>
+        <details class="flight-help"><summary>Flight controls</summary><p><kbd>Arrows</kbd> steer · <kbd>W / S</kbd> closer / farther · <kbd>A / D</kbd> left / right · <kbd>Q / E</kbd> roll · <kbd>Shift</kbd> boost · <kbd>Space / Esc</kbd> stop. Hold the buttons or drag the sky. Cruise sweeps continuously to the right. Motion pauses when you open a dialog or leave the window.</p></details>
+        <p class="flight-scope">Explore real telescope imagery. Forward and back change magnification in this sky view.</p>
+      </section>
+      <div class="destination-intro">
+        <div id="destination-type" class="overline">ALL-SKY EXPLORATION</div>
+        <h1 id="destination-name">Start anywhere<span>.</span></h1>
+        <p id="destination-description">Drag to move across the sky. Scroll to zoom into any region. Turn on Object map for guide markers and catalog information as you move closer.</p>
+        <div class="intro-actions"><button id="find-observations" class="button primary">Explore observations <span>↗</span></button><button id="save-field" class="button ghost">+ Save field</button></div>
+      </div>
+      <div class="destination-dock"><div class="dock-title"><span class="overline">OPTIONAL DESTINATION SHORTCUTS</span><span>Drag to explore · Scroll to travel closer</span></div><div id="destinations" class="destinations"></div></div>
+      <div class="coordinate-bar"><span id="coordinates">RA 0.00000° &nbsp; DEC 0.00000°</span><span id="fov-readout">FIELD 360°</span><span id="sky-credit">Visible sky · DSS2 · CDS Aladin / HiPS</span></div>
+    </section>
+    <section id="routes-page" class="page workspace-page">
+      <div class="page-heading"><div><div class="overline">FOLLOW YOUR CURIOSITY</div><h1>Tours & routes<span>.</span></h1><p>Guided image journeys. Your own paths through the observed sky.</p></div><div class="flex"><button id="record-flight" class="button">● Record a flight</button><button id="new-route" class="button primary">+ New route</button></div></div>
+      <div id="guided-tours" class="guided-tours"><p class="small muted">Loading guided image journeys…</p></div>
+      <div class="route-workbench"><aside class="route-library"><div class="overline">SAVED ON THIS PC</div><label class="field-label" for="route-filter">Find a route</label><input id="route-filter" type="search" placeholder="Search saved routes"><label class="button upload-button route-import-label">↑ Import route<input id="route-import" type="file" accept=".json"></label><div id="saved-route-list"></div></aside><div class="route-editor-space">
+        <div id="route-editor-empty" class="empty-state"><span class="empty-symbol">⌁</span><h2>A path worth returning to.</h2><p>Customize a guided tour, add stops from nearby image suggestions, or record your own flight.</p></div>
+        <section id="route-editor" hidden><div class="route-editor-head"><span id="route-editor-kind" class="overline"></span><span id="route-save-status" class="small muted" role="status"></span></div><label class="field-label" for="route-title">Route name</label><input id="route-title" type="text" maxlength="200" required><label class="field-label" for="route-description">Description</label><textarea id="route-description" maxlength="4000" placeholder="What would you like to explore?"></textarea><div id="route-overview" class="route-overview"></div><div class="route-editor-toolbar"><button id="route-play" class="button primary">▶ Play route</button><button id="route-play-resume" class="button" hidden>Resume saved position</button><button id="route-add-view" class="button">+ Current view</button><button id="route-optimize" class="button" title="Greedy nearest-neighbor ordering in angular distance; not a guaranteed shortest route">Order nearby stops</button><button id="route-save" class="button">Save route</button></div><div id="route-stop-list"></div><div class="route-editor-footer"><button id="route-export" class="text-button">↓ Export route</button><button id="route-reload" class="text-button">Reload saved version</button><button id="route-duplicate" class="text-button">Duplicate</button><button id="route-delete" class="text-button danger">Delete route</button></div></section>
+      </div></div>
+    </section>
+    <section id="archive-page" class="page workspace-page">
+      <div class="page-heading"><div><div class="overline">FOLLOW THE EVIDENCE</div><h1>Telescope archive<span>.</span></h1><p>Public, calibrated observations around your current sky position.</p></div><button class="button" data-page="explore">← Back to sky</button></div>
+      <div class="toolbar"><label>Telescope<select id="archive-telescope"><option value="both">Webb + Hubble</option><option value="webb">James Webb</option><option value="hubble">Hubble</option></select></label><label>Filter<select id="archive-band"><option value="all">All wavelengths</option><option value="ha">Hα · F656N / F657N</option><option value="oiii">[O III] · F502N</option><option value="sii">[S II] · F673N</option><option value="h2">H₂ band · F212N</option><option value="nir">Near IR · F200W</option><option value="mir">Mid IR · F770W</option></select></label><label>Radius (degrees)<input id="archive-radius" type="number" min="0.001" max="1" step="0.01" value="0.1"></label><button id="archive-search" class="button primary">Search this field ↗</button></div>
+      <div class="result-summary"><span id="archive-summary">Choose Search this field to query MAST.</span><span id="archive-position" class="mono"></span></div>
+      <div id="archive-results" class="archive-results empty-state"><span class="empty-symbol">▦</span><h2>Look closer at what has been observed.</h2><p>Find original exposures, actual filters, observation dates, and downloadable science products.</p></div>
+      <div class="pagination"><button id="archive-prev" class="button" disabled>← Previous</button><span id="archive-page-number">Page 1</span><button id="archive-next" class="button" disabled>Next →</button></div>
+      <div class="help-strip">The archive and outreach sky maps have different release cadences and coverage. An observation may be public before it has a color image. Spectra are not included in this image search.</div>
+    </section>
+    <section id="journeys-page" class="page workspace-page">
+      <div class="page-heading"><div><div class="overline">FOLLOW THE IMAGES</div><h1>Image journeys<span>.</span></h1><p>Travel through NASA’s releases and actual Hubble and Webb observations.</p></div><button id="journeys-map" class="button">◎ Return to sky</button></div>
+      <div class="journey-tabs" role="tablist" aria-label="Image collection"><button id="gallery-tab" role="tab" aria-selected="true">NASA Webb gallery</button><button id="recent-tab" role="tab" aria-selected="false">Recent Hubble + Webb data</button></div>
+      <p id="journey-sync-status" class="help-strip" role="status"></p>
+      <div id="gallery-view" role="tabpanel" aria-labelledby="gallery-tab">
+        <div class="toolbar"><label>Collection<select id="gallery-source"><option value="all">All linked collections</option><option value="72177720331299130">2026 Webb Images/Science</option><option value="72177720323168468">2025 Webb Images/Science</option><option value="72177720332131144">Galaxies + Webb</option><option value="photostream">NASA Webb · full photostream</option></select></label><label>Find an image<input id="gallery-search" type="search" placeholder="Galaxy, nebula, target, illustration…"></label><label class="checkbox-label"><input id="gallery-mapped" type="checkbox"> With a sky location</label><button id="gallery-go" class="button">Browse</button></div>
+        <p class="small muted">Browse the linked collections: telescope composites, spectra, illustrations, videos, and mission photographs. Collection completeness is reported above. Sky markers use resolved target positions; publication dates are not exposure dates.</p>
+        <div class="result-summary"><span id="gallery-summary"></span></div><div id="gallery-results" class="journey-grid"></div>
+        <div class="pagination"><button id="gallery-prev" class="button">← Previous</button><span id="gallery-page-label"></span><button id="gallery-next" class="button">Next →</button></div>
+      </div>
+      <div id="recent-view" role="tabpanel" aria-labelledby="recent-tab" hidden>
+        <div class="toolbar"><label>Telescope<select id="recent-mission"><option value="both">Hubble + Webb</option><option value="webb">James Webb</option><option value="hubble">Hubble</option></select></label><label>Target, filter, or record<input id="recent-search" type="search" placeholder="NGC 3324, F200W…"></label><label class="checkbox-label"><input id="recent-field" type="checkbox"> Near current sky position</label><button id="recent-go" class="button">Browse</button></div>
+        <p class="small muted">Public calibrated science image observations captured since January 2022, newest first. Every matching MAST result page is indexed. Open a record for its preview, actual filters, footprint, and original files.</p>
+        <div class="result-summary"><span id="recent-summary"></span></div><div id="recent-results" class="journey-grid"></div>
+        <div class="pagination"><button id="recent-prev" class="button">← Previous</button><span id="recent-page-label"></span><button id="recent-next" class="button">Next →</button></div>
+      </div>
+    </section>
+    <section id="photometry-page" class="page workspace-page">
+      <div class="page-heading"><div><div class="overline">MEASURE THE LIGHT</div><h1>Photometry<span>.</span></h1><p>VizieR measurements and the complete Aladin Desktop toolkit.</p></div><button id="sed-use-sky" class="button">Use current sky position</button></div>
+      <div class="desktop-banner"><div><strong>Aladin Desktop · full application</strong><p id="desktop-status" class="small muted">Checking the local desktop package…</p></div><div class="flex"><button id="aladin-open" class="button primary">Open full Aladin Desktop ↗</button><button id="aladin-point" class="button">Send current sky position</button><a class="text-button" href="https://aladin.cds.unistra.fr/java/nph-aladin.pl?frame=downloading" target="_blank" rel="noopener">CDS package & documentation ↗</a></div></div>
+      <form id="sed-form" class="toolbar"><label>Target name or coordinates<input id="sed-target" type="text" value="HD100" required maxlength="200" placeholder="HD100 or 1.486383 +24.569006"></label><label>Radius (arcseconds)<input id="sed-radius" type="number" value="5" min="0.1" max="30" step="0.1" required></label><button id="sed-fetch" type="submit" class="button primary">Get photometry</button><label class="checkbox-label"><input id="sed-refresh" type="checkbox"> Refresh saved measurements</label></form>
+      <p class="help-strip">Measurements within a cone can belong to different objects, apertures, and epochs. Check catalog positions and source IDs before treating them as one target’s energy distribution. Missing uncertainty values remain missing.</p>
+      <p id="sed-status" class="small muted" role="status">Enter a target or send one here from an image or the sky map.</p>
+      <div id="sed-result" hidden>
+        <div class="toolbar"><label>Horizontal axis<select id="sed-axis"><option value="frequency">Frequency · GHz</option><option value="wavelength">Wavelength · μm</option></select></label><label>Catalog<select id="sed-catalog"><option value="all">All catalogs</option></select></label><button id="sed-reset-zoom" class="button">Reset plot zoom</button><button id="sed-csv" class="button">↓ Measurements CSV</button><a id="sed-votable" class="button" download>↓ Original VOTable</a><button id="sed-aladin" class="button">Send table to Aladin</button></div>
+        <div class="sed-plot-wrap"><canvas id="sed-plot" width="1200" height="440" aria-label="VizieR photometry plot of flux density against frequency or wavelength"></canvas><div id="sed-tooltip" class="sed-tooltip" hidden></div></div><p class="small subtle">Logarithmic axes · hover for measurements · click a point to select its table row · scroll to zoom · drag to pan. Nonpositive values remain in the table.</p>
+        <p id="sed-selection" class="small muted"></p><div id="sed-table" class="sed-table"></div><div class="pagination"><button id="sed-table-prev" class="button">← Previous measurements</button><span id="sed-table-page"></span><button id="sed-table-next" class="button">Next measurements →</button></div>
+      </div>
+    </section>
+    <section id="lab-page" class="page workspace-page">
+      <div class="page-heading"><div><div class="overline">A CLOSER LOOK</div><h1>Image lab<span>.</span></h1><p>Explore detail. Keep the original evidence.</p></div><label class="button primary upload-button">+ Open an image<input id="image-upload" type="file" accept=".fits,.fit,.fts,.gz,.png,.jpg,.jpeg,.tif,.tiff,.webp"></label></div>
+      <div id="image-library" class="image-library"></div>
+      <div id="lab-empty" class="empty-state lab-empty"><span class="empty-symbol">◈</span><h2>A universe of detail, on your PC.</h2><p>Capture the sky view, import a MAST product, or open a FITS / PNG / JPEG image.<br>Choose local enhancement, optional OpenAI cloud editing, or a ChatGPT handoff.</p><button id="lab-capture" class="button">Capture current sky view</button></div>
+      <div id="lab-content" hidden>
+        <div class="image-toolbar"><div><strong id="image-name"></strong><div id="image-info" class="small muted"></div></div><div class="flex"><label class="small">FITS display<select id="fits-stretch"><option value="asinh">Asinh</option><option value="linear">Linear</option><option value="log">Log</option></select></label><a id="original-download" class="button" download>↓ Original</a></div></div>
+        <div class="enhancement-tools"><div class="toolbar"><label>Enhancement provider<select id="enhancement-provider"><option value="local">Local · FSRCNN 2×</option><option value="cloud">OpenAI · cloud image editing</option><option value="chatgpt">ChatGPT · export & bring back</option></select></label><button id="enhance-button" class="button primary">✧ Enhance locally · 2×</button><button id="cloud-connect" class="button">Cloud connection</button></div>
+          <div id="cloud-options" hidden><div class="toolbar"><label>Cloud quality<select id="cloud-quality"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></label><label class="cloud-prompt-label">Visual preferences (optional)<input id="cloud-instructions" maxlength="2000" placeholder="For example: gentle denoising, preserve the colors"></label></div><p id="cloud-status" class="small muted"></p><p class="small muted">Enhance sends this image’s display preview to OpenAI. API usage is billed to your OpenAI account. Generative editing can change objects and structures.</p></div>
+          <div id="chatgpt-options" hidden><p class="small muted">Download a ZIP containing the image and an enhancement prompt. Extract it and attach the PNG in ChatGPT, then bring the result back here for comparison. This handoff does not call the API or automatically send a message.</p><div class="toolbar"><a id="handoff-download" class="button">↓ Image + prompt for ChatGPT</a><label class="button upload-button">Import returned enhancement<input id="enhancement-upload" type="file" accept=".png,.jpg,.jpeg,.webp"></label></div></div>
+          <div class="ai-output-picker"><label for="ai-output-select">Compare with</label><select id="ai-output-select"><option value="local">Local AI result</option></select></div>
+        </div>
+        <div class="image-compare"><figure><figcaption><span class="label-original">ORIGINAL DATA · DISPLAY PREVIEW</span></figcaption><div class="image-frame"><img id="original-image" alt="Original image preview"><svg id="candidate-overlay" aria-label="Candidate positions on original image"></svg></div></figure><figure><figcaption><span class="label-ai">AI ENHANCED · VISUALIZATION ONLY</span><a id="ai-download" hidden>↓ Save PNG</a></figcaption><div class="image-frame" id="ai-frame"><div id="ai-placeholder"><span>✧</span><p>Your original stays untouched.<br>Choose an enhancement option to compare.</p></div><img id="ai-image" alt="AI-enhanced visualization" hidden></div></figure></div>
+        <p id="ai-note" class="help-strip">FSRCNN runs locally on the CPU. It is a general image upscaler, not an astronomy reconstruction model. New-looking details are not evidence of new objects. Detection below uses only the original FITS pixels.</p>
+        <button id="save-image" class="button">+ Save image to notebook</button><button id="image-aladin" class="button">Open original in Aladin Desktop ↗</button>
+        <details class="analysis-panel"><summary>Investigate source candidates <span>ORIGINAL FITS ONLY</span></summary><p class="small muted">Find unclassified peaks, inspect their coordinates, and check known Gaia sources. Noise, cosmic rays, diffraction spikes, and galaxies can also create peaks.</p><div class="toolbar"><label>Threshold (background σ)<input id="detection-sigma" type="number" min="3" max="20" step="0.5" value="6"></label><button id="detect-button" class="button">Find source candidates</button><button id="export-candidates" class="button" disabled>↓ Export candidates</button></div><div id="candidate-results" class="small muted">Import a 2D FITS image to begin.</div></details>
+        <details class="analysis-panel"><summary>Image provenance</summary><pre id="image-provenance"></pre></details>
+      </div>
+    </section>
+    <section id="transits-page" class="page workspace-page">
+      <div class="page-heading"><div><div class="overline">PLANETS LEAVE A PATTERN</div><h1>Transit lab<span>.</span></h1><p>Look for periodic dips in a star’s light, using original time-series data.</p></div></div>
+      <div class="transit-grid"><div class="work-card"><span class="overline">KNOWN WORLDS IN THIS FIELD</span><h2>Meet the neighboring systems.</h2><p class="muted">Query the NASA Exoplanet Archive within 5° of your sky position. These are confirmed catalog entries.</p><button id="planet-search" class="button">Find known planets ↗</button><div id="planet-results" class="result-list"></div></div><div class="work-card"><span class="overline">SEARCH A LIGHT CURVE</span><h2>Find a repeating signal.</h2><p class="muted">Open a TESS / Kepler light-curve FITS, or CSV with <code>time,flux</code> columns. Time must be in days. Use one reasonably continuous observing segment.</p><div class="toolbar"><label>Min period (days)<input id="period-min" type="number" value="0.5" min="0.1" max="100" step="0.1"></label><label>Max period (days)<input id="period-max" type="number" value="15" min="0.2" max="365" step="0.1"></label></div><label class="button primary upload-button">Open light curve & analyze<input id="lightcurve-upload" type="file" accept=".csv,.fits,.fit,.gz"></label><p class="small muted"><a href="https://mast.stsci.edu/portal/Mashup/Clients/Mast/Portal.html" target="_blank" rel="noopener">Get TESS / Kepler light curves from MAST ↗</a></p></div></div>
+      <div id="transit-results" hidden><div id="transit-metrics" class="metrics"></div><div class="work-card"><h2>Phase-folded light curve</h2><p class="small muted">Brightness relative to the running median trend. Phase is time from the fitted mid-transit.</p><canvas id="transit-plot" width="1100" height="320" aria-label="Phase folded light curve"></canvas><p id="transit-note" class="help-strip"></p><button id="save-transit" class="button">+ Save transit candidate</button><button id="export-transit" class="button">↓ Export analysis</button></div></div>
+    </section>
+    <section id="notebook-page" class="page workspace-page">
+      <div class="page-heading"><div><div class="overline">FOLLOW YOUR CURIOSITY</div><h1>Discovery notebook<span>.</span></h1><p>Your fields, questions, and candidate evidence, saved on this computer.</p></div><div class="flex"><button id="export-notebook" class="button">↓ Export notebook</button><button id="new-note" class="button primary">+ Save current field</button></div></div>
+      <div id="notes-list" class="notes-list"></div>
+    </section>
+  </main>
+  <dialog id="modal"><div class="modal-header"><h2 id="modal-title"></h2><button id="modal-close" class="icon-button" aria-label="Close dialog">×</button></div><div id="modal-content"></div></dialog>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

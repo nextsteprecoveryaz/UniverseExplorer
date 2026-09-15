@@ -1,0 +1,11 @@
+fastapi>=0.115,<1
+uvicorn>=0.34,<1
+httpx>=0.28,<1
+numpy>=2.2,<3
+Pillow>=11,<13
+astropy>=7,<9
+scipy>=1.15,<2
+opencv-contrib-python-headless>=4.11,<5
+python-multipart>=0.0.20,<1
+pytest>=8,<10
+photutils>=3,<4

@@ -1,0 +1,5 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+const S=require('../static/spatial-math.js'),F=require('../static/flight-math.js');
+test('measured coordinates project consistently with camera translation',()=>{const c=F.basis(0,0),p=S.project([10,0,0],[0,0,0],c,1000,600);assert.equal(p.x,500);assert.equal(p.y,300);assert.equal(p.depth,10);assert.equal(S.project([-10,0,0],[0,0,0],c,1000,600),null);assert.equal(S.project([10,0,0],[2,0,0],c,1000,600).depth,8);});
+test('space steering normalizes diagonal speed and caps elapsed frames',()=>{const c=F.basis(0,0),p=S.move([0,0,0],c,[1,1,0],2,10);assert.ok(Math.abs(Math.hypot(...p)-.1)<1e-12);assert.deepEqual(S.move([0,0,0],c,[0,0,0],2,.01),[0,0,0]);});
+test('gamepad deadzone rejects jitter and unsupported mappings',()=>{assert.equal(S.deadzone(.1),0);assert.equal(S.deadzone(NaN),0);const p={mapping:'standard',connected:true,axes:[1,0,-1,-1],buttons:[{pressed:false}]};assert.deepEqual(S.gamepad(p).input,[1,-0,1,-1]);p.buttons[0].pressed=true;assert.equal(S.gamepad(p).stop,true);p.mapping='';assert.deepEqual(S.gamepad(p).input,[0,0,0,0]);});

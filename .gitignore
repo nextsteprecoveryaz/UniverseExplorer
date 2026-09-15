@@ -1,0 +1,36 @@
+# Local environments and test caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Personal notebooks, routes, imported images, API caches and credentials
+/data/
+/logs/
+.env
+.env.*
+!.env.example
+*.dpapi
+*.pem
+*.key
+*.sqlite*
+credentials*.json
+
+# Downloaded dependencies are installed by Setup.cmd on each computer
+/vendor/
+/static/vendor/*
+!/static/vendor/ALADIN-LICENSE.txt
+!/static/vendor/ALADIN-LGPL.txt
+/models/*
+!/models/LICENSE-FSRCNN.txt
+
+# Editor and operating-system files
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.download

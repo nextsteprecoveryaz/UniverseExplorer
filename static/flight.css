@@ -1,0 +1,16 @@
+.flight-toggle{border-left:1px solid #3d535c;padding-left:14px;color:#adf2e1;white-space:nowrap}
+.flight-toggle[aria-pressed=true]{color:#f3ca88}
+.flight-panel{position:absolute;z-index:7;bottom:54px;left:50%;transform:translateX(-50%);width:min(750px,calc(100% - 50px));padding:16px 20px;background:#08161ef2;border:1px solid #5b8981;border-radius:14px;box-shadow:0 20px 60px #0009;backdrop-filter:blur(16px)}
+.flight-panel-head,.flight-actions,.flight-navigation,.flight-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.flight-panel-head{justify-content:space-between;margin-bottom:12px}.flight-panel-head .overline{color:#a5ebd5}.flight-panel-head .text-button{margin-left:auto}
+.flight-panel #flight-status{font-size:12px;color:#a9c4ca;margin:0 0 12px;min-height:20px}
+.flight-navigation{justify-content:space-between;gap:16px}.flight-controls{gap:6px}.flight-controls button{min-width:39px;min-height:37px;padding:6px 10px;touch-action:none}.flight-controls .thrust{min-width:72px}.flight-controls .brake{border-color:#ba9d6c;color:#ffdbab;min-width:66px}
+.flight-panel select{width:108px;min-height:36px;font-size:12px;padding:5px 8px}.flight-speed{font-size:10px;color:#91b4bd;display:grid;gap:3px}.flight-actions{margin-top:13px;gap:16px}.flight-actions button,.flight-actions summary{font-size:11px}.flight-actions [aria-pressed=true]{color:#ffd29a}
+.flight-help{margin-top:10px;color:#9bb9c3;font-size:11px}.flight-help p{margin:7px 0 0}.flight-help kbd{font-family:inherit;color:#d6efea}.flight-scope{font-size:10px;color:#83a7b4;margin:10px 0 0}
+.flight-reticle{position:absolute;z-index:3;pointer-events:none;left:50%;top:50%;width:38px;height:38px;transform:translate(-50%,-50%);border:1px solid #aedfd45c;border-radius:50%;box-shadow:0 0 0 12px #05181d17}
+.flight-reticle:before,.flight-reticle:after{content:'';position:absolute;background:#cef9e9a0;left:50%;top:50%;transform:translate(-50%,-50%)}.flight-reticle:before{height:1px;width:12px}.flight-reticle:after{width:1px;height:12px}
+.flight-active .destination-dock,.flight-active .destination-intro{display:none}.flight-active .sky-tools{right:24px;bottom:300px;top:auto}.flight-active .aladin-logo-container{bottom:315px!important;right:85px!important}
+.flight-quiet .live-panel,.flight-quiet .image-index-card,.flight-quiet .object-panel:has(#object-detail[hidden]){display:none}
+.flight-active .object-panel{max-height:calc(100% - 325px)}
+@media(max-width:1150px){.flight-panel{padding:12px 15px}.flight-navigation{gap:10px}.flight-controls{gap:4px}.flight-controls button{min-width:32px;padding:5px 8px}.mapping-control{gap:10px}.flight-panel-head{margin-bottom:8px}}
+@media(max-width:800px){.flight-panel{width:calc(100% - 24px);bottom:42px;padding:12px}.flight-panel-head .overline{font-size:9px}.flight-navigation{justify-content:flex-start}.flight-actions{gap:12px;margin-top:9px}.flight-scope{display:none}.flight-active .sky-tools{bottom:350px}.flight-active .object-panel{max-height:calc(100% - 380px)}.flight-toggle{padding-left:8px}.flight-reticle{top:43%}}

@@ -1,0 +1,42 @@
+/* Keep layout controls reachable in normal, flight, tour and fullscreen views. */
+#map-view-toolbar{position:absolute;right:20px;top:16px;z-index:12;display:flex;gap:5px;padding:5px;background:#09151fee;border:1px solid #45626d;border-radius:9px;box-shadow:0 3px 18px #0004}
+#map-view-toolbar button,#map-panel-menu button,.map-motion-mini button{font:inherit;font-size:11px;color:#cfdddF;background:#162832;border:1px solid #3b5661;border-radius:5px;min-height:30px;padding:5px 9px;white-space:nowrap;cursor:pointer}
+#map-view-toolbar #map-clear-view{color:#d0f5df;background:#23463e;border-color:#538878}
+#map-view-toolbar button:hover,#map-panel-menu button:hover,.map-motion-mini button:hover{background:#2d4c55;color:white}
+#map-view-toolbar button:focus-visible,#map-panel-menu button:focus-visible,.map-panel-minimize:focus-visible,.map-motion-mini button:focus-visible{outline:2px solid #caf6de;outline-offset:3px}
+#map-panel-menu{position:absolute;right:20px;top:65px;z-index:13;width:310px;max-width:calc(100% - 30px);max-height:calc(100% - 115px);overflow:auto;padding:16px;background:#0b1b27fa;border:1px solid #608379;border-radius:10px;box-shadow:0 16px 60px #0009;scrollbar-width:thin}
+.map-menu-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#e0f6ea;font-size:14px}
+#map-panel-menu p{font-size:11px;line-height:1.6;color:#9fb6bf;margin:10px 0}
+.map-panel-option{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #263c47;cursor:pointer}
+.map-panel-option input{width:16px;height:16px;accent-color:#a8d7c3;flex:none}
+.map-panel-option strong{display:block;font-size:12px;font-weight:500;color:#e0eaea}
+.map-panel-option small{display:block;font-size:10px;color:#89a5b1;margin-top:3px;line-height:1.4}
+.map-panel-option:has(input:disabled){opacity:.55;cursor:default}
+.map-panel-minimize{flex:none!important;position:relative;z-index:1;display:inline-grid;place-items:center;width:26px;height:26px;min-height:26px;margin-left:auto;border:1px solid #57778088;border-radius:5px;background:#122631;color:#c8e5dc;font:20px/1 sans-serif;cursor:pointer;pointer-events:auto}
+.map-panel-minimize:hover{background:#355b60;color:#fff;border-color:#b5ddcb}
+.map-panel-minimized{visibility:hidden;pointer-events:none!important}
+.map-sidebar-heading{display:flex;align-items:center;gap:8px;margin-bottom:15px}
+.map-sidebar-heading>.overline{margin:0}
+.map-sidebar-heading .map-panel-minimize{display:none}
+body:has(#explore-page.active) .map-sidebar-heading .map-panel-minimize{display:inline-grid}
+body:has(#explore-page.active).map-sidebar-minimized .sidebar{display:none}
+body:not(:has(#explore-page.active)) .sidebar.map-panel-minimized{visibility:visible;pointer-events:auto!important}
+#explore-page .sky-top{max-width:calc(100% - 390px)}
+#explore-page .live-panel,#explore-page .object-panel,#explore-page .nearby-panel,#explore-page .route-player{top:72px;max-height:calc(100% - 120px)}
+.flight-active .nearby-panel,.flight-active .object-panel{max-height:calc(100% - 395px)!important}
+.image-map-legend{align-items:center;flex-wrap:wrap;gap:9px}
+.image-index-card{pointer-events:auto}
+.object-panel-top,.live-heading,.nearby-head,.route-player-head,.dock-title{gap:8px}
+.map-minimize-corner{position:absolute;right:10px;top:10px}
+.destination-intro>#destination-type{padding-right:30px}
+#explore-page .destination-intro{z-index:3}
+.map-clear-view .sky-top,.map-clear-view .sky-shade{visibility:hidden}
+.map-motion-mini{position:absolute;z-index:10;bottom:50px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;max-width:calc(100% - 120px);padding:9px 12px;border:1px solid #628f80;border-radius:10px;background:#0a1c26f5;box-shadow:0 10px 30px #0005}
+.map-motion-mini strong{font-size:11px;color:#bdebd6;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.map-motion-mini #map-flight-stop,.map-motion-mini #map-route-pause{color:#f3dbad;border-color:#8a7150}
+#explore-page.map-right-clear .sky-tools,#explore-page.map-compact-flight .sky-tools{right:18px;top:50%;bottom:auto}
+#explore-page.map-compact-flight .aladin-logo-container,#explore-page.map-compact-route .aladin-logo-container,#explore-page.map-clear-view .aladin-logo-container{right:20px!important;bottom:90px!important}
+#explore-page.map-compact-flight .nearby-panel,#explore-page.map-compact-flight .object-panel{max-height:calc(100% - 185px)!important}
+@media(max-width:1250px){#explore-page .sky-caption{display:none}}
+@media(max-width:900px){#map-view-toolbar{right:12px;top:10px}#explore-page .sky-top{display:none}#explore-page .mapping-control{top:62px}#explore-page .image-map-control{top:118px;max-width:calc(100% - 30px)}#explore-page .object-panel,#explore-page .live-panel,#explore-page .nearby-panel,#explore-page .route-player{top:180px;max-height:calc(100% - 225px)}#explore-page.map-clear-view .object-panel,#explore-page.map-clear-view .live-panel,#explore-page.map-clear-view .nearby-panel,#explore-page.map-clear-view .route-player{top:65px;max-height:calc(100% - 155px)}.map-motion-mini{gap:5px;max-width:calc(100% - 30px);flex-wrap:wrap;justify-content:center}.map-motion-mini strong{max-width:170px}#explore-page .coordinate-bar>span:last-child{display:block;font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}#explore-page .coordinate-bar{gap:8px}.map-sidebar-heading{margin-bottom:8px}.map-sidebar-heading .overline{font-size:9px}}
+@media(max-width:800px){body:has(#explore-page.active).map-sidebar-minimized #explore-page{height:calc(100dvh - 130px);min-height:480px}#explore-page:fullscreen{height:100dvh!important;min-height:0}#map-view-toolbar button{font-size:10px;padding:5px 7px}}
