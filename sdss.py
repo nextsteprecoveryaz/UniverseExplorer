@@ -4,7 +4,11 @@ import io
 import json
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor
+import atexit
+import logging
+import threading
+from contextvars import ContextVar
+from concurrent.futures import Future, ThreadPoolExecutor
 from urllib.parse import urlencode
 
 import numpy as np
@@ -27,6 +31,17 @@ MARVIN='https://magrathea.sdss.org/marvin'
 BINTYPE='HYB10'
 TEMPLATE='MILESHC-MASTARSSP'
 POOL=ThreadPoolExecutor(max_workers=2,thread_name_prefix='sdss')
+CDS_ENDPOINTS=('https://alasky.cds.unistra.fr/hips-image-services/hips2fits',
+               'https://alaskybis.cds.unistra.fr/hips-image-services/hips2fits')
+CDS_SURVEY='CDS/P/SDSS9/color'
+CLIENT=None
+CLIENT_LOCK=threading.Lock()
+FETCH_LOCK=threading.Lock()
+FETCH_PENDING={}
+CURRENT_JOB=ContextVar('sdss_job',default=None)
+LOG=logging.getLogger(__name__)
+NORMAL_TIMEOUT=httpx.Timeout(45,connect=20,pool=5)
+QUICK_TIMEOUT=httpx.Timeout(20,connect=12,pool=5)
 PRODUCTS={
  'ha':{'label':'Hydrogen Hα','property':'emline_gflux','channel':'ha_6564','kind':'flux'},
  'oiii':{'label':'Oxygen [O III]','property':'emline_gflux','channel':'oiii_5008','kind':'flux'},
@@ -50,6 +65,7 @@ class Position(BaseModel):
 class Cutout(Position):
     fov:float=Field(default=.23,ge=.01,le=2)
     size:Literal[1024,2048]=2048
+    source:Literal['auto','skyserver','cds']='auto'
 
 class Cone(Position):
     radius:float=Field(default=1,ge=.01,le=5)
@@ -64,7 +80,48 @@ class ImportRequest(BaseModel):
     model_config=ConfigDict(extra='forbid')
     ident:str=Field(pattern=r'^[a-f0-9]{64}$')
 
-def cached_bytes(label,url,params=None,max_bytes=8*1024*1024,validate=None):
+class ServiceUnavailable(ValueError):
+    """A transient upstream failure; safe to retry or use a labeled image backup."""
+
+def progress(message):
+    job=CURRENT_JOB.get()
+    if job is not None:
+        if job.get('cancelled'):raise ValueError('Download cancelled.')
+        job['message']=message
+
+def run_job(job,work,request):
+    token=CURRENT_JOB.set(job)
+    try:return work(request)
+    finally:CURRENT_JOB.reset(token)
+
+def remote_client():
+    # SDSS must not compete with sky tiles for the same connection pool.
+    global CLIENT
+    with CLIENT_LOCK:
+        if CLIENT is None:
+            CLIENT=httpx.Client(timeout=NORMAL_TIMEOUT,follow_redirects=True,
+                limits=httpx.Limits(max_connections=4,max_keepalive_connections=4,keepalive_expiry=30))
+        return CLIENT
+
+def close_remote_client():
+    global CLIENT
+    with CLIENT_LOCK:client=CLIENT;CLIENT=None
+    if client is not None:client.close()
+
+atexit.register(close_remote_client)
+
+def read_remote(url,params=None,max_bytes=8*1024*1024,timeout=NORMAL_TIMEOUT):
+    if atlas.CACHED_ONLY:raise ValueError('Cached-only mode is on. This SDSS data has not been downloaded.')
+    raw=bytearray()
+    with remote_client().stream('GET',url,params=params,timeout=timeout) as response:
+        response.raise_for_status()
+        for part in response.iter_bytes():
+            raw.extend(part)
+            if len(raw)>max_bytes:raise ValueError('The SDSS response exceeds the transfer limit.')
+        mime=response.headers.get('content-type','application/octet-stream').split(';')[0]
+    return bytes(raw),mime
+
+def cached_bytes(label,url,params=None,max_bytes=8*1024*1024,validate=None,attempts=3,timeout=NORMAL_TIMEOUT):
     ident=cache.key('sdss-remote-v1:'+url+'?'+urlencode(params or {}))
     with cache.LOCK:
         item=cache.get(ident)
@@ -73,16 +130,54 @@ def cached_bytes(label,url,params=None,max_bytes=8*1024*1024,validate=None):
             if validate:validate(raw)
             return raw,item['metadata']
     if atlas.CACHED_ONLY:raise ValueError('This SDSS data is not saved yet. Turn off Cached-only atlas to retrieve it.')
-    for attempt in range(2):
+    # Different gas products often request the same metadata or H-alpha map.
+    # Share that transfer and its retries instead of hitting the service twice.
+    with FETCH_LOCK:
+        pending=FETCH_PENDING.get(ident);leader=pending is None
+        if leader:pending=Future();FETCH_PENDING[ident]=pending
+    if not leader:
+        progress('Waiting for the existing '+label+' download…')
+        raw,metadata=pending.result()
+        if validate:validate(raw)
+        return raw,metadata
+    try:
+        result=download_bytes(ident,label,url,params,max_bytes,validate,attempts,timeout)
+        pending.set_result(result)
+        return result
+    except Exception as error:
+        pending.set_exception(error)
+        raise
+    finally:
+        with FETCH_LOCK:FETCH_PENDING.pop(ident,None)
+
+def download_bytes(ident,label,url,params,max_bytes,validate,attempts,timeout):
+    # Recheck after becoming leader: a previous transfer may have just finished.
+    with cache.LOCK:
+        saved=cache.get(ident)
+        if saved:
+            raw=saved['path'].read_bytes()
+            if validate:validate(raw)
+            return raw,saved['metadata']
+    for attempt in range(attempts):
+        progress(f'Retrieving {label} · attempt {attempt+1} of {attempts}…')
+        started=time.monotonic();delay=min(2**attempt,4)
         try:
-            raw,mime=atlas.read_remote(url,params=params,max_bytes=max_bytes)
+            raw,mime=read_remote(url,params=params,max_bytes=max_bytes,timeout=timeout)
             break
         except httpx.HTTPStatusError as error:
             status=error.response.status_code
-            if attempt==0 and status in (502,503,504):time.sleep(.5);continue
-            raise ValueError(f'The SDSS service returned HTTP {status}. Retry the request or choose another observation.') from None
-        except httpx.TimeoutException:
-            raise ValueError('The SDSS service is taking too long to respond. Retry this field; successfully downloaded data remains cached.') from None
+            if status not in (408,429,500,502,503,504):
+                raise ValueError(f'{label} returned HTTP {status}. Choose another field or observation.') from None
+            retry_after=error.response.headers.get('retry-after','')
+            if retry_after.isdigit():delay=min(max(delay,int(retry_after)),10)
+            reason=f'HTTP {status}'
+        except httpx.TransportError as error:
+            reason=type(error).__name__
+        LOG.warning('%s: %s after %.1fs (attempt %s/%s)',label,reason,time.monotonic()-started,attempt+1,attempts)
+        if attempt+1==attempts:
+            raise ServiceUnavailable(f'{label} is temporarily unreachable after {attempts} attempt(s). Saved data is still available.') from None
+        progress(f'{label} is slow or unavailable. Retrying automatically ({attempt+2}/{attempts})…')
+        time.sleep(delay)
     if validate:validate(raw)
     metadata={'kind':'sdss-source','label':label,'source_url':url+('?' + urlencode(params) if params else ''),'created_at':now(),'sha256':hashlib.sha256(raw).hexdigest()}
     cache.put(ident,raw,mime,metadata)
@@ -106,25 +201,76 @@ def json_file(ident):
 def navigate_url(ra,dec,scale):
     return 'https://skyserver.sdss.org/navigate/?'+urlencode({'ra':ra,'dec':dec,'scale':scale,'dr':20})
 
+def saved_color(ident,provider):
+    with cache.LOCK:
+        item=cache.get(ident)
+        if not item:return None
+        return {**item['metadata'],'provider':provider,'id':ident,'url':'/api/atlas/files/'+ident,
+                'delivery_note':'Loaded from your local cache.'}
+
 def color_cutout(request):
+    field=request.model_dump(exclude={'source'})
+    # Preserve keys for all SkyServer originals saved by the previous version.
+    original_id=cache.key('sdss-color-v1:'+json.dumps(field,sort_keys=True))
+    backup_id=cache.key('sdss-color-cds-v1:'+json.dumps(field,sort_keys=True))
+    for provider,ident in [('skyserver',original_id),('cds',backup_id)]:
+        if request.source in ('auto',provider):
+            saved=saved_color(ident,provider)
+            if saved:return saved
+    if request.source=='cds':return cds_color(request,backup_id)
+    if request.source=='skyserver':return skyserver_color(request,original_id)
+    try:return skyserver_color(request,original_id,attempts=1,timeout=QUICK_TIMEOUT)
+    except ServiceUnavailable:
+        progress('SkyServer is slow or unavailable. Loading the SDSS DR9 image through CDS…')
+        try:
+            result=cds_color(request,backup_id)
+            result['delivery_note']='SkyServer was slow or unavailable; the SDSS DR9 backup image is shown.'
+            return result
+        except ServiceUnavailable:
+            progress('The CDS backup is also busy. Retrying SkyServer automatically…')
+            try:return skyserver_color(request,original_id,attempts=2)
+            except ServiceUnavailable:
+                raise ServiceUnavailable('SkyServer and both CDS image services are currently unreachable. Automatic retries finished; try a saved field or return later.') from None
+
+def validate_color(raw,size):
+    with Image.open(io.BytesIO(raw)) as im:
+        if im.format!='JPEG' or im.size!=(size,size):raise ValueError('SDSS returned an error image or unexpected dimensions for this field.')
+        im.verify()
+
+def skyserver_color(request,ident,attempts=3,timeout=NORMAL_TIMEOUT):
     # Arcseconds per output pixel. A larger output cannot improve native seeing.
     params={'ra':request.ra,'dec':request.dec,'scale':request.fov*3600/request.size,'width':request.size,'height':request.size}
-    def validate(raw):
-        with Image.open(io.BytesIO(raw)) as im:
-            if im.format!='JPEG' or im.size!=(request.size,request.size):raise ValueError('SDSS returned an error image or unexpected dimensions for this field.')
-            im.verify()
-    raw,source=cached_bytes('SDSS SkyServer DR20 color cutout',SKYSERVER+'/SkyServerWS/ImgCutout/getjpeg',params,validate=validate)
+    raw,source=cached_bytes('SDSS SkyServer DR20 color cutout',SKYSERVER+'/SkyServerWS/ImgCutout/getjpeg',params,
+        validate=lambda raw:validate_color(raw,request.size),attempts=attempts,timeout=timeout)
+    return store_color(request,ident,raw,source,'skyserver')
+
+def cds_color(request,ident):
+    params={'hips':CDS_SURVEY,'ra':request.ra,'dec':request.dec,'fov':request.fov,
+        'width':request.size,'height':request.size,'projection':'TAN','coordsys':'icrs','format':'jpg'}
+    for index,url in enumerate(CDS_ENDPOINTS):
+        try:
+            raw,source=cached_bytes('SDSS DR9 color via CDS'+(' backup' if index else ''),url,params,
+                validate=lambda raw:validate_color(raw,request.size),attempts=1,timeout=httpx.Timeout(35,connect=12,pool=5))
+            return store_color(request,ident,raw,source,'cds')
+        except ServiceUnavailable:
+            if index==len(CDS_ENDPOINTS)-1:raise
+
+def store_color(request,ident,raw,source,provider):
     with Image.open(io.BytesIO(raw)) as im:
         if im.format!='JPEG' or im.size!=(request.size,request.size):raise ValueError('SDSS returned an error image or unexpected dimensions for this field.')
         # SkyServer can return a nearly black image outside the imaging footprint.
         # Report darkness as a hint, not a catalog coverage determination.
         im.load();dark_fraction=float(np.mean(np.max(np.asarray(im.convert('RGB')),axis=2)<8))
-    ident=cache.key('sdss-color-v1:'+json.dumps(request.model_dump(),sort_keys=True))
-    metadata={'kind':'sdss-color','label':'SDSS optical color · SkyServer DR20','name':f'SDSS-{request.ra:.5f}-{request.dec:.5f}.jpg',
-        **request.model_dump(),'source':source,'created_at':source['created_at'],'sha256':hashlib.sha256(raw).hexdigest(),
-        'credit':'Sloan Digital Sky Survey / SkyServer','scale_arcsec':params['scale'],'native_pixel_scale_arcsec':.396,
-        'processing':'SDSS server-rendered optical color JPEG. DR20 is the access interface; these are legacy imaging observations, not new DR20 exposures. Display colors are not calibrated fluxes.',
-        'dark_fraction':dark_fraction,'navigate_url':navigate_url(request.ra,request.dec,params['scale'])}
+    is_cds=provider=='cds';scale=request.fov*3600/request.size
+    metadata={'kind':'sdss-color','label':'SDSS DR9 color · CDS HiPS' if is_cds else 'SDSS optical color · SkyServer DR20',
+        'name':f'SDSS-{"DR9-CDS-" if is_cds else ""}{request.ra:.5f}-{request.dec:.5f}.jpg',
+        **request.model_dump(exclude={'source'}),'source':source,'created_at':source['created_at'],'sha256':hashlib.sha256(raw).hexdigest(),
+        'provider':provider,'source_label':'SDSS DR9 mosaic / CDS HiPS2FITS' if is_cds else 'SDSS / SkyServer DR20 interface · legacy optical imaging',
+        'credit':'Sloan Digital Sky Survey / CDS HiPS2FITS' if is_cds else 'Sloan Digital Sky Survey / SkyServer',
+        'scale_arcsec':scale,'native_pixel_scale_arcsec':.396,
+        'processing':('SDSS DR9 color HiPS mosaic reprojected by CDS at the requested coordinates and field width; not a SkyServer cutout or a new exposure. ' if is_cds else
+            'SDSS server-rendered optical color JPEG. DR20 is the access interface; these are legacy imaging observations, not new DR20 exposures. ')+'Display colors are not calibrated fluxes.',
+        'dark_fraction':dark_fraction,'navigate_url':navigate_url(request.ra,request.dec,scale)}
     cache.put(ident,raw,'image/jpeg',metadata)
     return {**metadata,'id':ident,'url':'/api/atlas/files/'+ident}
 
@@ -239,13 +385,13 @@ def make_manga_map(request):
 def config():return {'showcases':SHOWCASES,'products':PRODUCTS,'imaging_release':'SkyServer DR20 interface; legacy imaging','manga_release':'DR17'}
 
 @router.post('/cutout')
-def cutout(body:Cutout):return atlas.begin('sdss-color-'+cache.key(body.model_dump_json()),lambda job:color_cutout(body),POOL)
+def cutout(body:Cutout):return atlas.begin('sdss-color-'+cache.key(body.model_dump_json()),lambda job:run_job(job,color_cutout,body),POOL)
 
 @router.post('/manga/nearby')
-def nearby(body:Cone):return atlas.begin('sdss-nearby-'+cache.key(body.model_dump_json()),lambda job:manga_nearby(body),POOL)
+def nearby(body:Cone):return atlas.begin('sdss-nearby-'+cache.key(body.model_dump_json()),lambda job:run_job(job,manga_nearby,body),POOL)
 
 @router.post('/manga/map')
-def map_request(body:MapRequest):return atlas.begin('sdss-map-'+cache.key(body.model_dump_json()),lambda job:make_manga_map(body),POOL)
+def map_request(body:MapRequest):return atlas.begin('sdss-map-'+cache.key(body.model_dump_json()),lambda job:run_job(job,make_manga_map,body),POOL)
 
 @router.post('/import')
 def import_display(body:ImportRequest):

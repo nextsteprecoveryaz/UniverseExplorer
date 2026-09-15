@@ -93,7 +93,13 @@ Hover over a map to inspect its measured value. Download the map PNG with embedd
 
 SDSS requests run only when this workspace is used. Retrieved data shares the configured atlas disk budget and remains reusable in cached-only mode. Existing map-detail priority remains unchanged. No SDSS login or extra Python package is required. Scientific context and software links are included in the workspace: [SDSS science](https://www.sdss4.org/science/), [MaNGA](https://www.sdss4.org/surveys/manga/), [DR20 software](https://www.sdss.org/dr20/software/).
 
+Slow connections and temporary service errors are retried automatically with bounded backoff. The status shows the current source, attempt and elapsed time. SDSS has a separate persistent connection pool from map tiles, and simultaneous requests for the same MaNGA data share one download. Cached images are reused without a network request.
+
+For optical images, an initial SkyServer timeout switches to the **SDSS DR9 color mosaic through CDS HiPS2FITS**, at the requested coordinates, field width and output size. Both independent CDS endpoints are available; if they are unavailable too, the app retries SkyServer. Backup images have distinct cache keys, source labels, filenames and export credits. **Try SkyServer image** requests the primary image explicitly. This backup is a reprojected DR9 mosaic, not the identical SkyServer rendering or a substitute for measured MaNGA maps. A complete service outage can still prevent uncached downloads. [CDS service documentation](https://alasky.cds.unistra.fr/hips-image-services/hips2fits)
+
 With the app running, `.venv\Scripts\python.exe verify_sdss.py` checks a real 2048-pixel color image, its hash, a nearby catalog search, all six MaNGA views, quality-mask transparency and celestial WCS round trips. It writes `data/verification/sdss-live.json` and retains the fetched public data in the atlas cache.
+
+`.venv\Scripts\python.exe verify_sdss_recovery.py` checks automatic image delivery, an explicit CDS image, source attribution and cached reuse through the running app. It saves timings in `data/verification/sdss-recovery-live.json`. The Python regression suite separately injects timeouts, transport failures and complete outages to verify automatic recovery without depending on a live outage.
 
 ## Flight preloading and downloaded tours
 

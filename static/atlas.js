@@ -34,9 +34,10 @@ function atlasWarmFlight(){
   if(atlasUI.warmSurvey!==state.survey){atlasUI.warm.setImageSurvey(atlasSurveyURL(state.config.surveys.find(s=>s.id===state.survey)));atlasUI.warmSurvey=state.survey;}
   atlasUI.warm.gotoRaDec(pose.ra,pose.dec);atlasUI.warm.setFoV(nextFov);atlasUI.warm.setRotation(pose.roll);
 }
-async function awaitAtlasJob(job,stillWanted=()=>true){
+async function awaitAtlasJob(job,stillWanted=()=>true,onProgress=()=>{}){
   while(job.state==='queued'||job.state==='running'){
     if(!stillWanted())return null;
+    onProgress(job);
     await new Promise(resolve=>setTimeout(resolve,900));
     job=await api('/api/atlas/jobs/'+job.id);
   }

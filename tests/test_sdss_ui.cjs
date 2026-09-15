@@ -36,3 +36,51 @@ test('display controls affect the presentation without changing the source URL',
   assert.match(p.$('#sdss-image').style.filter,/brightness\(1.5\)/);assert.equal(p.$('#sdss-image').src,'/original');
   p.run('sdssResetStyle()');assert.match(p.$('#sdss-image').style.filter,/brightness\(1\)/);
 });
+
+test('backup images and exports are visibly attributed to SDSS DR9 and CDS',async()=>{
+  const p=harness(),pending=p.run('sdssLoadImage()');
+  p.pending[0].resolve({result:{...image('backup'),provider:'cds',source_label:'SDSS DR9 mosaic / CDS HiPS2FITS',delivery_note:'SkyServer was slow; backup image shown.'}});
+  await pending;
+  assert.match(p.$('#sdss-image-source').textContent,/SDSS DR9 mosaic \/ CDS/);
+  assert.match(p.$('#sdss-image').alt,/SDSS DR9/);
+  assert.match(p.$('#sdss-image-status').textContent,/backup image shown/);
+  assert.equal(p.$('#sdss-try-skyserver').hidden,false);
+  const labels=[];
+  p.$('#sdss-image').complete=true;p.$('#sdss-image').naturalWidth=2048;p.$('#sdss-image').naturalHeight=2048;
+  p.c.document={createElement:()=>({getContext:()=>({drawImage(){},fillRect(){},fillText:t=>labels.push(t)}),toBlob(){}})};
+  p.run('sdssSaveStyle()');assert.match(labels[0],/^SDSS DR9 \/ CDS · DISPLAY EDIT/);
+});
+
+test('requesting another field hides the previous image and its actions',async()=>{
+  const p=harness(),first=p.run('sdssLoadImage()');p.pending[0].resolve({result:image('first')});await first;
+  const next=p.run('sdssLoadImage()');
+  assert.equal(p.$('#sdss-image').hidden,true);assert.equal(p.$('#sdss-image-actions').hidden,true);
+  assert.equal(p.$('#sdss-image-source').textContent,'');
+  p.pending[1].resolve({result:image('next')});await next;
+  assert.equal(p.$('#sdss-image').hidden,false);assert.equal(p.$('#sdss-image-actions').hidden,false);
+});
+
+test('SDSS jobs display retry progress and preserve explicit source choice',async()=>{
+  const p=harness();
+  p.c.awaitAtlasJob=async(job,wanted,progress)=>{
+    if(wanted())progress({state:'running',created_at:new Date(Date.now()-21000).toISOString(),message:'Retrying automatically (2/3)…'});
+    assert.match(p.$('#sdss-image-status').textContent,/Retrying automatically \(2\/3\).*elapsed/);
+    return job.result;
+  };
+  const request=p.run("sdssLoadImage('skyserver')");
+  assert.equal(p.pending[0].body.source,'skyserver');
+  p.pending[0].resolve({result:image('primary')});await request;
+  assert.equal(p.$('#sdss-try-skyserver').hidden,true);
+});
+
+test('the shared job poller reports progress and stops updating superseded requests',async()=>{
+  const p=harness(),messages=[];
+  p.c.setTimeout=resolve=>resolve();p.c.clearTimeout=()=>{};
+  p.c.jobs=[{id:'retry',state:'running',message:'Retrying automatically'},{id:'retry',state:'complete',result:'loaded'}];
+  p.c.api=async()=>p.c.jobs.shift();p.c.report=j=>messages.push(j.message);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../static/atlas.js'),'utf8'),p.c);
+  assert.equal(await p.run("awaitAtlasJob({id:'retry',state:'queued',message:'Queued'},()=>true,report)"),'loaded');
+  assert.deepEqual(messages,['Queued','Retrying automatically']);
+  assert.equal(await p.run("awaitAtlasJob({id:'old',state:'running'},()=>false,report)"),null);
+  assert.equal(messages.length,2);
+});

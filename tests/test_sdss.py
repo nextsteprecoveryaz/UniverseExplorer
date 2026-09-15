@@ -1,6 +1,8 @@
 import hashlib
 import io
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import httpx
@@ -39,8 +41,8 @@ def metadata():
 
 def test_color_cutout_keeps_original_bytes_and_imports_as_display(isolated,monkeypatch):
     out=io.BytesIO();Image.new('RGB',(2048,2048),(35,50,80)).save(out,format='JPEG');raw=out.getvalue();calls=[]
-    def fetch(url,params,max_bytes):calls.append((url,params));return raw,'image/jpeg'
-    monkeypatch.setattr(atlas,'read_remote',fetch)
+    def fetch(url,params,max_bytes,**kwargs):calls.append((url,params));return raw,'image/jpeg'
+    monkeypatch.setattr(sdss,'read_remote',fetch)
     d=sdss.color_cutout(sdss.Cutout(ra=202.469575,dec=47.1952583,fov=.23))
     assert calls[0][1]['scale']==pytest.approx(.23*3600/2048)
     assert d['sha256']==hashlib.sha256(raw).hexdigest()
@@ -55,10 +57,10 @@ def test_color_cutout_keeps_original_bytes_and_imports_as_display(isolated,monke
 
 def test_wrong_size_error_images_and_failed_json_are_not_cached(isolated,monkeypatch):
     out=io.BytesIO();Image.new('RGB',(100,100)).save(out,format='JPEG')
-    monkeypatch.setattr(atlas,'read_remote',lambda *a,**kw:(out.getvalue(),'image/jpeg'))
+    monkeypatch.setattr(sdss,'read_remote',lambda *a,**kw:(out.getvalue(),'image/jpeg'))
     with pytest.raises(ValueError,match='unexpected dimensions'):sdss.color_cutout(sdss.Cutout(ra=0,dec=0))
     assert cache.status()['files']==0
-    monkeypatch.setattr(atlas,'read_remote',lambda *a,**kw:(b'{"status":-1,"error":"missing"}','application/json'))
+    monkeypatch.setattr(sdss,'read_remote',lambda *a,**kw:(b'{"status":-1,"error":"missing"}','application/json'))
     with pytest.raises(ValueError,match='unavailable'):sdss.manga_data('8485-1901','ha')
     assert cache.status()['files']==0
 
@@ -68,11 +70,125 @@ def test_temporary_upstream_error_retries_once_then_caches_valid_data(isolated,m
         calls.append(url)
         if len(calls)==1:httpx.Response(502,request=httpx.Request('GET',url)).raise_for_status()
         return b'{"status":1,"data":{}}','application/json'
-    monkeypatch.setattr(atlas,'read_remote',fetch);monkeypatch.setattr(sdss.time,'sleep',lambda _:None)
+    monkeypatch.setattr(sdss,'read_remote',fetch);monkeypatch.setattr(sdss.time,'sleep',lambda _:None)
     d,_=sdss.remote_json('test','https://example.test/data',{})
     assert d['status']==1 and len(calls)==2
     sdss.remote_json('test','https://example.test/data',{})
     assert len(calls)==2
+
+
+@pytest.mark.parametrize('failure',[httpx.ConnectTimeout,httpx.ReadTimeout,httpx.RemoteProtocolError])
+def test_transport_failures_retry_automatically_and_report_progress(isolated,monkeypatch,failure):
+    calls=[];delays=[];messages=[]
+    def fetch(url,**kwargs):
+        calls.append(url)
+        if len(calls)<3:raise failure('temporary failure')
+        return b'{"status":1,"data":{}}','application/json'
+    monkeypatch.setattr(sdss,'read_remote',fetch)
+    monkeypatch.setattr(sdss.time,'sleep',delays.append)
+    monkeypatch.setattr(sdss,'progress',messages.append)
+    result,_=sdss.remote_json('MaNGA test','https://example.test/data',{})
+    assert result['status']==1 and len(calls)==3 and delays==[1,2]
+    assert any('Retrying automatically (2/3)' in m for m in messages)
+    assert not sdss.FETCH_PENDING
+
+
+def test_optical_timeout_uses_labeled_full_size_backup_and_reuses_it_offline(isolated,monkeypatch):
+    out=io.BytesIO();Image.new('RGB',(2048,2048),(25,60,90)).save(out,format='JPEG');raw=out.getvalue()
+    calls=[]
+    def fetch(url,params,**kwargs):
+        calls.append((url,params))
+        if 'skyserver' in url:raise httpx.ConnectTimeout('slow primary')
+        return raw,'image/jpeg'
+    monkeypatch.setattr(sdss,'read_remote',fetch)
+    request=sdss.Cutout(ra=359.99,dec=85,fov=.03)
+    result=sdss.color_cutout(request)
+    assert len(calls)==2 and calls[1][1]['hips']=='CDS/P/SDSS9/color'
+    assert calls[1][1]['ra']==359.99 and calls[1][1]['dec']==85 and calls[1][1]['fov']==.03
+    assert calls[1][1]['width']==2048 and calls[1][1]['projection']=='TAN'
+    assert result['provider']=='cds' and 'DR9' in result['source_label']
+    assert 'alasky.cds.unistra.fr' in result['source']['source_url']
+    assert 'backup' in result['delivery_note'] and result['sha256']==hashlib.sha256(raw).hexdigest()
+    original_id=cache.key('sdss-color-v1:'+json.dumps(request.model_dump(exclude={'source'}),sort_keys=True))
+    assert result['id']!=original_id and cache.get(original_id) is None
+    imported=sdss.import_display(sdss.ImportRequest(ident=result['id']))
+    assert not imported['scientific'] and imported['extra']['provider']=='cds'
+    monkeypatch.setattr(atlas,'CACHED_ONLY',True)
+    assert sdss.color_cutout(request)['sha256']==result['sha256'] and len(calls)==2
+    assert sdss.color_cutout(request)['delivery_note']=='Loaded from your local cache.'
+
+
+def test_backup_outage_uses_independent_cds_endpoint(isolated,monkeypatch):
+    out=io.BytesIO();Image.new('RGB',(1024,1024)).save(out,format='JPEG');calls=[]
+    def fetch(url,**kwargs):
+        calls.append(url)
+        if url==sdss.CDS_ENDPOINTS[0]:raise httpx.ReadTimeout('busy')
+        return out.getvalue(),'image/jpeg'
+    monkeypatch.setattr(sdss,'read_remote',fetch)
+    d=sdss.color_cutout(sdss.Cutout(ra=12,dec=5,size=1024,source='cds'))
+    assert calls==list(sdss.CDS_ENDPOINTS)
+    assert d['source']['source_url'].startswith(sdss.CDS_ENDPOINTS[1])
+
+
+def test_complete_outage_has_bounded_retries_and_does_not_cache_errors(isolated,monkeypatch):
+    calls=[]
+    def fetch(url,**kwargs):calls.append(url);raise httpx.ReadTimeout('outage')
+    monkeypatch.setattr(sdss,'read_remote',fetch);monkeypatch.setattr(sdss.time,'sleep',lambda _:None)
+    with pytest.raises(sdss.ServiceUnavailable,match='Automatic retries finished'):
+        sdss.color_cutout(sdss.Cutout(ra=12,dec=5))
+    assert len(calls)==5 and cache.status()['files']==0 and not sdss.FETCH_PENDING
+
+
+def test_permanent_http_error_does_not_retry_or_use_backup(isolated,monkeypatch):
+    calls=[]
+    def fetch(url,**kwargs):
+        calls.append(url);httpx.Response(400,request=httpx.Request('GET',url)).raise_for_status()
+    monkeypatch.setattr(sdss,'read_remote',fetch)
+    with pytest.raises(ValueError,match='HTTP 400'):sdss.color_cutout(sdss.Cutout(ra=12,dec=5))
+    assert len(calls)==1 and cache.status()['files']==0
+
+
+def test_concurrent_products_share_the_same_upstream_transfer(isolated,monkeypatch):
+    started=threading.Event();waiting=threading.Event();release=threading.Event();calls=[]
+    def fetch(url,**kwargs):
+        calls.append(url);started.set();assert release.wait(5)
+        return b'{"status":1,"data":{}}','application/json'
+    monkeypatch.setattr(sdss,'read_remote',fetch)
+    monkeypatch.setattr(sdss,'progress',lambda message:waiting.set() if 'existing' in message else None)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first=pool.submit(sdss.remote_json,'metadata','https://example.test/data',{})
+        try:
+            assert started.wait(3)
+            second=pool.submit(sdss.remote_json,'metadata','https://example.test/data',{})
+            assert waiting.wait(3)
+        finally:release.set()
+        assert first.result(timeout=3)==second.result(timeout=3)
+    assert len(calls)==1 and not sdss.FETCH_PENDING
+
+
+def test_sdss_connections_are_reused_and_separate_from_map_tiles(monkeypatch):
+    requests=[]
+    def handler(request):requests.append(request);return httpx.Response(200,content=b'image-data')
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        monkeypatch.setattr(sdss,'CLIENT',client)
+        monkeypatch.setattr(atlas,'CACHED_ONLY',False)
+        monkeypatch.setattr(atlas,'remote_client',lambda:pytest.fail('SDSS must have separate download slots'))
+        assert sdss.read_remote('https://example.test/one')[0]==b'image-data'
+        assert sdss.read_remote('https://example.test/two',timeout=sdss.QUICK_TIMEOUT)[0]==b'image-data'
+        with pytest.raises(ValueError,match='transfer limit'):sdss.read_remote('https://example.test/large',max_bytes=2)
+        assert requests[1].extensions['timeout']['read']==20
+        assert requests[1].extensions['timeout']['connect']==12
+        monkeypatch.setattr(atlas,'CACHED_ONLY',True)
+        with pytest.raises(ValueError,match='Cached-only'):sdss.read_remote('https://example.test/offline')
+        assert len(requests)==3
+
+
+def test_explicit_skyserver_request_never_substitutes_cds(isolated,monkeypatch):
+    calls=[]
+    def fetch(url,**kwargs):calls.append(url);raise httpx.ReadTimeout('outage')
+    monkeypatch.setattr(sdss,'read_remote',fetch);monkeypatch.setattr(sdss.time,'sleep',lambda _:None)
+    with pytest.raises(sdss.ServiceUnavailable):sdss.color_cutout(sdss.Cutout(ra=12,dec=5,source='skyserver'))
+    assert len(calls)==3 and all('skyserver.sdss.org' in url for url in calls)
 
 
 def test_quality_mask_and_snr_preserve_real_values():
