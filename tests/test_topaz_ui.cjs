@@ -5,6 +5,33 @@ const path=require('node:path');
 const vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../static/features.js'),'utf8');
 const plain=value=>JSON.parse(JSON.stringify(value));
+const catalog={default_model:'Standard V2',max_output_pixels:25000000,models:[
+  {id:'Standard V2',label:'Standard V2',family:'Precision',description:'General-purpose precision upscale.',parameters:[
+    {key:'sharpen',label:'Sharpen',type:'number',min:0,max:1,step:.01,default:null},
+    {key:'denoise',label:'Denoise',type:'number',min:0,max:1,step:.01,default:null},
+  ]},
+  {id:'High Fidelity V2',label:'High Fidelity V2',family:'Precision',description:'Preserve detailed images.',parameters:[]},
+  {id:'Upscale High Fidelity V3',label:'High Fidelity V3',family:'Precision',description:'Detail recovery.',parameters:[
+    {key:'recoveryStrength',label:'Recovery strength',type:'number',min:0,max:1,step:.01,default:1},
+    {key:'opacity',label:'Opacity',type:'number',min:0,max:1,step:.01,default:1},
+  ]},
+  {id:'Bloom 2',label:'Bloom 2',family:'Creative',description:'Creative detail.',source_url:'https://developer.topazlabs.com/bloom',parameters:[
+    {key:'creativity',label:'Creativity',type:'integer',min:1,max:9,step:1,default:3},
+    {key:'colorPreservation',label:'Preserve colors',type:'boolean',default:true},
+    {key:'prompt',label:'Prompt',type:'text',max_length:1024,default:''},
+    {key:'grain',label:'Grain',type:'boolean',default:false},
+  ]},
+  {id:'Wonder 3.5',label:'Wonder 3.5',family:'Generative',description:'Reconstruct details.',parameters:[
+    {key:'enhancementStrength',label:'Enhancement strength',type:'enum',options:['low','medium','high'],default:'medium'},
+    {key:'grain',label:'Grain',type:'boolean',default:false},
+  ]},
+  {id:'Recover 3',label:'Recover 3',family:'Generative',description:'Recover degraded images.',parameters:[
+    {key:'enhancementStrength',label:'Enhancement strength',type:'number',min:0,max:10,step:.1,default:5},
+    {key:'creativity',label:'Creativity',type:'integer',min:1,max:9,step:1,default:3},
+    {key:'texture',label:'Texture',type:'integer',min:1,max:5,step:1,default:1},
+    {key:'prompt',label:'Prompt',type:'text',max_length:1024,default:''},
+  ]},
+]};
 
 function harness(){
   const nodes=new Map(),requests=[],errors=[],messages=[],modals=[],refreshes=[];
@@ -35,11 +62,13 @@ function harness(){
   });
   vm.runInContext(source,c);
   const run=code=>vm.runInContext(code,c);
+  c.catalog=catalog;run('installTopazModels(catalog)');
+  const choose=model=>{$('#topaz-model').value=model;run('renderTopazModel()');};
   const connect=()=>run("topazConnection={configured:true,model:'Standard V2',storage:'encrypted Windows account',max_output_pixels:25000000}");
   const result=(id='first')=>({id,width:400,height:300,scientific:false,cloud_ai:{variant:'topaz-1'},cloud_history:[{
     variant:'topaz-1',provider:'Topaz cloud',model:'Standard V2',scale:2,url:'/topaz.png',note:'AI visualization. Original preserved.',input_size:[400,300],output_size:[800,600],created_at:'today',
   }]});
-  return {$,state,c,run,connect,result,requests,errors,messages,modals,refreshes};
+  return {$,state,c,run,choose,connect,result,requests,errors,messages,modals,refreshes};
 }
 
 test('Topaz is an explicit provider and displays upload and credit information',()=>{
@@ -56,9 +85,9 @@ test('one explicit upscale sends its scale and FITS stretch and displays the sep
   const h=harness();h.connect();h.$('#enhancement-provider').value='topaz';h.$('#topaz-scale').value='4';h.$('#fits-stretch').value='log';
   const pending=h.run('runEnhancement()');
   assert.equal(h.requests.length,1);assert.equal(h.requests[0].url,'/api/images/first/enhance-topaz');
-  assert.deepEqual(JSON.parse(h.requests[0].options.body),{scale:4,stretch:'log'});
+  assert.deepEqual(JSON.parse(h.requests[0].options.body),{scale:4,stretch:'log',model:'Standard V2',parameters:{}});
   assert.equal(h.requests[0].options.method,'POST');assert.ok(h.requests[0].options.signal instanceof AbortSignal);
-  for(const id of ['#enhance-button','#enhancement-provider','#topaz-scale','#topaz-connect'])assert.equal(h.$(id).disabled,true);
+  for(const id of ['#enhance-button','#enhancement-provider','#topaz-scale','#topaz-connect','#topaz-model','#topaz-parameter-0-auto'])assert.equal(h.$(id).disabled,true);
   await h.run('runEnhancement()');assert.equal(h.requests.length,1);
   h.requests[0].resolve(h.result());await pending;
   assert.equal(h.$('#ai-output-select').value,'topaz-1');assert.match(h.$('#ai-image').src,/^\/topaz\.png\?v=/);
@@ -82,7 +111,7 @@ test('a Topaz failure releases every busy control and permits an explicit retry'
   h.requests[0].reject(new Error('Topaz could not process this image.'));await pending;
   assert.equal(h.errors.length,1);assert.match(h.errors[0].message,/could not process/);
   assert.equal(h.state.image.id,'first');assert.equal(h.refreshes.length,0);
-  for(const id of ['#enhance-button','#enhancement-provider','#topaz-scale','#topaz-connect'])assert.equal(h.$(id).disabled,false);
+  for(const id of ['#enhance-button','#enhancement-provider','#topaz-scale','#topaz-connect','#topaz-model','#topaz-parameter-0-auto'])assert.equal(h.$(id).disabled,false);
   const retry=h.run('runEnhancement()');assert.equal(h.requests.length,2);h.requests[1].resolve(h.result());await retry;
   assert.equal(h.$('#ai-output-select').value,'topaz-1');
 });
@@ -129,7 +158,7 @@ test('OpenAI requests and earlier enhancements remain available alongside Topaz'
   assert.deepEqual(JSON.parse(h.requests[0].options.body),{quality:'medium',instructions:'Preserve the star field.',stretch:'asinh'});
   h.requests[0].resolve(h.result());await pending;
   assert.equal(h.$('#enhancement-provider').value,'cloud');assert.equal(h.$('#topaz-settings').hidden,true);
-  assert.match(h.$('#ai-output-select').innerHTML,/Topaz cloud · 2×/);
+  assert.match(h.$('#ai-output-select').innerHTML,/Topaz cloud · Standard V2 · 2×/);
 });
 
 test('a provider change during processing is retained when the result arrives',async()=>{
@@ -141,10 +170,107 @@ test('a provider change during processing is retained when the result arrives',a
 
 test('initialization checks connection status without uploading an image or starting an upscale',async()=>{
   const h=harness();h.run('initObservatoryFeatures()');
-  assert.deepEqual(h.requests.map(request=>request.url),['/api/objects/featured','/api/cloud/status','/api/topaz/status']);
+  assert.deepEqual(h.requests.map(request=>request.url),['/api/objects/featured','/api/cloud/status','/api/topaz/status','/api/topaz/models']);
   const status=h.requests.find(request=>request.url==='/api/topaz/status');status.resolve({configured:true,model:'Standard V2',storage:'encrypted Windows account'});
   await Promise.resolve();await Promise.resolve();
   assert.match(h.$('#topaz-connection').textContent,/Connected/);assert.equal(h.$('#enhancement-provider').value,'local');
   assert.equal(typeof h.$('#topaz-connect').onclick,'function');assert.equal(typeof h.$('#topaz-scale').onchange,'function');
-  assert.equal(h.requests.length,3);
+  assert.equal(h.requests.length,4);
+});
+
+test('the catalog exposes all six models and labels creative output without changing the precision default',()=>{
+  const h=harness();assert.equal(h.$('#topaz-model').value,'Standard V2');
+  for(const model of catalog.models)assert.ok(h.$('#topaz-model').innerHTML.includes(model.id));
+  h.choose('Bloom 2');assert.match(h.$('#topaz-model-description').innerHTML,/Creative visualization.*invent structures/);
+  assert.match(h.$('#topaz-model-description').innerHTML,/https:\/\/developer\.topazlabs\.com\/bloom/);
+  assert.equal(h.$('#topaz-parameter-0').value,3);assert.equal(h.$('#topaz-parameter-1').checked,true);
+  assert.match(h.$('#topaz-model-parameters').innerHTML,/type="range" min="1" max="9" step="1"/);
+  assert.match(h.$('#topaz-model-parameters').innerHTML,/maxlength="1024"/);assert.equal(h.requests.length,0);
+});
+
+test('Auto omits optional parameters and explicit numeric settings survive model switches',()=>{
+  const h=harness();assert.deepEqual(plain(h.run('topazRequestSnapshot()')),{model:'Standard V2',parameters:{}});
+  assert.equal(h.$('#topaz-parameter-0').disabled,true);
+  h.$('#topaz-parameter-0-auto').checked=false;h.$('#topaz-parameter-0-auto').onchange();
+  assert.equal(h.$('#topaz-parameter-0').disabled,false);
+  h.$('#topaz-parameter-0-range').value='.37';h.$('#topaz-parameter-0-range').oninput();
+  assert.equal(h.$('#topaz-parameter-0').value,'.37');
+  assert.deepEqual(plain(h.run('topazRequestSnapshot()')),{model:'Standard V2',parameters:{sharpen:.37}});
+  h.choose('Bloom 2');h.$('#topaz-parameter-0').value='7';h.$('#topaz-parameter-0').oninput();
+  h.choose('Standard V2');assert.equal(h.$('#topaz-parameter-0-auto').checked,false);assert.equal(Number(h.$('#topaz-parameter-0').value),.37);
+  h.choose('Bloom 2');assert.equal(Number(h.$('#topaz-parameter-0').value),7);
+  h.choose('Standard V2');h.$('#topaz-parameter-0-auto').checked=true;h.$('#topaz-parameter-0-auto').onchange();
+  assert.deepEqual(plain(h.run('topazRequestSnapshot()')).parameters,{});assert.equal(h.$('#topaz-parameter-0-range').disabled,true);
+});
+
+test('Bloom requests snapshot the selected controls and cannot acquire later UI edits',async()=>{
+  const h=harness();h.connect();h.choose('Bloom 2');h.$('#enhancement-provider').value='topaz';
+  h.$('#topaz-parameter-0').value='8';h.$('#topaz-parameter-0').oninput();
+  h.$('#topaz-parameter-1').checked=false;h.$('#topaz-parameter-1').onchange();
+  h.$('#topaz-parameter-2').value='Keep the diffuse star colors.';h.$('#topaz-parameter-2').oninput();
+  h.$('#topaz-parameter-3').checked=true;h.$('#topaz-parameter-3').onchange();
+  const pending=h.run('runEnhancement()');
+  const expected={scale:2,stretch:'asinh',model:'Bloom 2',parameters:{creativity:8,colorPreservation:false,prompt:'Keep the diffuse star colors.',grain:true}};
+  assert.deepEqual(JSON.parse(h.requests[0].options.body),expected);
+  for(let i=0;i<4;i++)assert.equal(h.$('#topaz-parameter-'+i).disabled,true);
+  assert.equal(h.$('#topaz-parameter-0-range').disabled,true);
+  h.$('#topaz-parameter-2').value='A later edit';h.$('#topaz-parameter-2').oninput();
+  assert.deepEqual(JSON.parse(h.requests[0].options.body),expected);
+  const result=h.result();result.cloud_history[0].model='Bloom 2';h.requests[0].resolve(result);await pending;
+  assert.match(h.$('#ai-output-select').innerHTML,/Topaz cloud · Bloom 2 · 2×/);
+  assert.equal(h.$('#topaz-parameter-2').disabled,false);assert.equal(h.$('#topaz-model').disabled,false);
+});
+
+test('Wonder enum and Recover numeric controls only contribute their own supported parameters',()=>{
+  const h=harness();h.choose('Wonder 3.5');h.$('#topaz-parameter-0').value='high';h.$('#topaz-parameter-0').onchange();
+  assert.deepEqual(plain(h.run('topazRequestSnapshot()')),{model:'Wonder 3.5',parameters:{enhancementStrength:'high',grain:false}});
+  h.choose('Recover 3');h.$('#topaz-parameter-0').value='7.4';h.$('#topaz-parameter-0').oninput();
+  assert.deepEqual(plain(h.run('topazRequestSnapshot()')),{model:'Recover 3',parameters:{enhancementStrength:7.4,creativity:3,texture:1,prompt:''}});
+  h.choose('Upscale High Fidelity V3');
+  assert.deepEqual(plain(h.run('topazRequestSnapshot()')),{model:'Upscale High Fidelity V3',parameters:{recoveryStrength:1,opacity:1}});
+});
+
+test('out-of-range, fractional integer, and overlong prompt values never submit an upscale',async()=>{
+  const h=harness();h.connect();h.choose('Bloom 2');h.$('#enhancement-provider').value='topaz';
+  for(const value of ['10','2.5','']){
+    h.$('#topaz-parameter-0').value=value;h.$('#topaz-parameter-0').oninput();
+    await assert.rejects(h.run('runEnhancement()'),/supported value for Creativity/);
+  }
+  h.$('#topaz-parameter-0').value='3';h.$('#topaz-parameter-0').oninput();
+  h.$('#topaz-parameter-2').value='x'.repeat(1025);h.$('#topaz-parameter-2').oninput();
+  await assert.rejects(h.run('runEnhancement()'),/supported value for Prompt/);
+  h.choose('Wonder 3.5');h.$('#topaz-parameter-0').value='unsupported';h.$('#topaz-parameter-0').onchange();
+  await assert.rejects(h.run('runEnhancement()'),/supported value for Enhancement strength/);
+  assert.equal(h.requests.length,0);assert.equal(h.run('enhancementRunning'),false);
+});
+
+test('unknown model selections fail before submission instead of silently falling back',async()=>{
+  const h=harness();h.connect();h.$('#enhancement-provider').value='topaz';h.$('#topaz-model').value='Unavailable model';
+  await assert.rejects(h.run('runEnhancement()'),/Choose an available Topaz model/);assert.equal(h.requests.length,0);
+});
+
+test('catalog loading blocks only Topaz and failure explicitly exposes the precision fallback',async()=>{
+  const h=harness();h.connect();h.$('#enhancement-provider').value='topaz';const pending=h.run('loadTopazModels()');
+  assert.equal(h.$('#enhance-button').disabled,true);assert.equal(h.$('#topaz-model').disabled,true);
+  await assert.rejects(h.run('runEnhancement()'),/Wait for the Topaz models/);assert.equal(h.requests.length,1);
+  h.$('#enhancement-provider').value='local';h.run('updateEnhancementControls()');assert.equal(h.$('#enhance-button').disabled,false);
+  h.requests[0].reject(new Error('Unavailable'));await pending;
+  assert.equal(h.$('#topaz-model').value,'Standard V2');assert.match(h.$('#topaz-model-status').textContent,/unavailable.*automatic settings.*Reload/);
+  assert.deepEqual(plain(h.run('topazRequestSnapshot()')),{model:'Standard V2',parameters:{}});
+  assert.equal(h.requests.length,1);assert.equal(h.$('#topaz-model').disabled,false);
+});
+
+test('malformed catalogs produce the explicit fallback without empty or unknown model controls',async()=>{
+  const h=harness();const pending=h.run('loadTopazModels()');h.requests[0].resolve({models:[]});await pending;
+  assert.equal(h.$('#topaz-model').value,'Standard V2');assert.match(h.$('#topaz-model-status').textContent,/unavailable/);
+  assert.match(h.$('#topaz-model-parameters').innerHTML,/automatic settings/);assert.equal(h.requests.length,1);
+});
+
+test('a failed creative-model job restores all controls without losing its chosen settings',async()=>{
+  const h=harness();h.connect();h.choose('Bloom 2');h.$('#enhancement-provider').value='topaz';
+  h.$('#topaz-parameter-0-range').value='9';h.$('#topaz-parameter-0-range').oninput();const pending=h.run('runEnhancement()');
+  h.requests[0].reject(new Error('The job is saved; check again with the same settings.'));await pending;
+  assert.equal(h.$('#topaz-model').value,'Bloom 2');assert.equal(h.$('#topaz-model').disabled,false);
+  for(let i=0;i<4;i++)assert.equal(h.$('#topaz-parameter-'+i).disabled,false);
+  assert.equal(h.run('topazRequestSnapshot().parameters.creativity'),9);assert.equal(h.requests.length,1);
 });

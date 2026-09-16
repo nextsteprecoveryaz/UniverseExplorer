@@ -21,7 +21,7 @@ function harness(){
   const sky={ra:12,dec:3,fov:1,projection:'AIT',rotation:0,base:{layer:'native-base'},
     getRaDec(){return [this.ra,this.dec];},getFov(){return [this.fov];},getRotation(){return this.rotation;},getProjectionName(){return this.projection;},getBaseImageLayer(){return this.base;},
     gotoRaDec(ra,dec){this.ra=ra;this.dec=dec;},setFoV(fov){this.fov=fov;},setRotation(roll){this.rotation=roll;},setProjection(projection){this.projection=projection;},
-    setImageSurvey(url){surveys.push(url);},isStillActive:()=>false,removeOverlay(){},
+    setBaseImageLayer(url){surveys.push(url);this.base={layer:'native-base',url};return this.base;},isStillActive:()=>false,removeOverlay(){},
     addListener(name,handler){listeners.set(name,handler);},removeImageLayer(key){removed.push(key);},
     setOverlayImageLayer(layer,key){layer.layer=key;listeners.get('AL:Layer.added')?.({detail:{layer}});}
   };

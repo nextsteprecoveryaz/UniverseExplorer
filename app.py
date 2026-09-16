@@ -141,6 +141,10 @@ def disconnect_cloud():
 def topaz_status():
     return topaz_ai.status()
 
+@app.get('/api/topaz/models')
+def topaz_models():
+    return topaz_ai.model_catalog()
+
 class TopazConnection(BaseModel):
     api_key:SecretStr
     remember:bool=False
@@ -156,12 +160,14 @@ def disconnect_topaz():
 class TopazEdit(BaseModel):
     scale:Literal[2,4]=2
     stretch:Literal['asinh','linear','log']='asinh'
+    model:str=Field(default=topaz_ai.MODEL,max_length=80)
+    parameters:dict[str,object]=Field(default_factory=dict,max_length=20)
 
 @app.post('/api/images/{image_id}/enhance-topaz')
 async def enhance_topaz(image_id:str,body:TopazEdit):
     if CLOUD_BUSY.locked():raise HTTPException(409,'A cloud enhancement is already running. Wait for it to finish before starting another.')
     async with CLOUD_BUSY:
-        return await topaz_ai.enhance(image_id,body.scale,body.stretch)
+        return await topaz_ai.enhance(image_id,body.scale,body.stretch,body.model,body.parameters)
 
 class CloudEdit(BaseModel):
     quality:Literal['low','medium','high']='medium'
@@ -302,6 +308,7 @@ async def upload(file:UploadFile=File(...),context:str=Form(default='')):
         if not isinstance(info,dict): raise ValueError('Invalid image context.')
     source='Sky view capture' if info else 'Local upload'
     if info.get('kind')=='telescope-live-capture':source='Telescope Live capture'
+    if info.get('kind')=='explore-sky-capture':source='Explore sky capture'
     if info.get('kind')=='image-lab-color-adjustment' or info.get('schema')=='universe-explorer-image-lab-colors-v1':source='Image Lab color adjustment'
     async with HEAVY:
         return await run_in_threadpool(science.import_image,content,file.filename or 'image',source,info)

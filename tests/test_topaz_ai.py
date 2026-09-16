@@ -246,9 +246,9 @@ def test_api_rejects_invalid_scale_and_blocks_concurrent_cloud_edits(monkeypatch
     metadata, _ = image_fixture()
     calls = []
 
-    async def fake_enhance(image_id, scale, stretch):
-        calls.append((image_id, scale, stretch))
-        return {'id': image_id, 'scale': scale, 'stretch': stretch}
+    async def fake_enhance(image_id, scale, stretch, model, parameters):
+        calls.append((image_id, scale, stretch, model, parameters))
+        return {'id': image_id, 'scale': scale, 'stretch': stretch, 'model': model, 'parameters': parameters}
 
     monkeypatch.setattr(topaz_ai, 'enhance', fake_enhance)
     with TestClient(application.app) as client:
@@ -258,4 +258,140 @@ def test_api_rejects_invalid_scale_and_blocks_concurrent_cloud_edits(monkeypatch
         assert result.status_code == 200 and result.json()['scale'] == 4
         monkeypatch.setattr(application.CLOUD_BUSY, 'locked', lambda: True)
         assert client.post(path, json={'scale': 2}).status_code == 409
-    assert calls == [(metadata['id'], 4, 'log')]
+    assert calls == [(metadata['id'], 4, 'log', topaz_ai.MODEL, {})]
+
+
+def test_model_catalog_offers_current_creative_generative_and_precision_options():
+    import app as application
+    with TestClient(application.app) as client:
+        response = client.get('/api/topaz/models')
+    assert response.status_code == 200
+    catalog = response.json()
+    assert catalog['default_model'] == 'Standard V2'
+    assert catalog['max_output_pixels'] == 25_000_000
+    assert catalog['scales'] == [2, 4]
+    models = {model['id']: model for model in catalog['models']}
+    assert set(models) == {'Standard V2', 'High Fidelity V2', 'Upscale High Fidelity V3',
+                           'Bloom 2', 'Wonder 3.5', 'Recover 3'}
+    assert models['Bloom 2']['family'] == 'Creative'
+    assert models['Wonder 3.5']['family'] == 'Generative'
+    assert models['Upscale High Fidelity V3']['family'] == 'Precision'
+    bloom = {setting['key']: setting for setting in models['Bloom 2']['parameters']}
+    assert bloom['creativity']['max'] == 9 and bloom['colorPreservation']['default'] is True
+    assert bloom['prompt']['max_length'] == 1024
+    assert FAKE_KEY not in response.text
+
+
+@pytest.mark.parametrize(('model', 'endpoint', 'parameters', 'expected'), [
+    ('Standard V2', '/enhance/async', {'sharpen': None, 'denoise': .25}, {'denoise': .25}),
+    ('High Fidelity V2', '/enhance/async', {'sharpen': 0}, {'sharpen': 0}),
+    ('Upscale High Fidelity V3', '/enhance/async', {'recoveryStrength': .6, 'opacity': .8},
+     {'recoveryStrength': .6, 'opacity': .8}),
+    ('Bloom 2', '/enhance-gen/async', {'creativity': 6, 'colorPreservation': False, 'prompt': 'Luminous nebula'},
+     {'creativity': 6, 'colorPreservation': False, 'prompt': 'Luminous nebula', 'grain': False}),
+    ('Wonder 3.5', '/enhance-gen/async', {'enhancementStrength': 'low'},
+     {'enhancementStrength': 'low', 'grain': False}),
+    ('Recover 3', '/enhance-gen/async', {'enhancementStrength': 2.5, 'texture': 2},
+     {'enhancementStrength': 2.5, 'texture': 2, 'creativity': 3, 'prompt': ''}),
+])
+def test_each_model_routes_validated_settings_and_records_actual_model(monkeypatch, model, endpoint, parameters, expected):
+    metadata, original = image_fixture()
+    calls = []
+    mock_api(monkeypatch, happy_api(calls))
+    result = run(topaz_ai.enhance(metadata['id'], 2, 'asinh', model, parameters))
+    submission = next(request for request in calls if request.method == 'POST')
+    assert str(submission.url) == topaz_ai.BASE_URL + endpoint
+    for key, value in expected.items():
+        text = ('true' if value else 'false') if isinstance(value, bool) else str(value)
+        assert (f'name="{key}"\r\n\r\n{text}\r\n').encode() in submission.content
+    assert b'None' not in submission.content
+    assert result['cloud_ai']['model'] == model
+    assert result['cloud_ai']['parameters'] == expected
+    assert result['cloud_ai']['model_family'] == next(item['family'] for item in topaz_ai.MODELS if item['id'] == model)
+    assert (science.IMAGES / metadata['original_file']).read_bytes() == original
+    variant = result['cloud_ai']['variant']
+    with Image.open(science.IMAGES / (metadata['id'] + '-cloud-' + variant + '.png')) as image:
+        provenance = json.loads(image.info['Provenance'])
+        options = json.loads(provenance['prompt'])
+        assert provenance['model'] == model
+        assert options['parameters'] == expected
+
+
+@pytest.mark.parametrize(('model', 'parameters'), [
+    ('Invented Model', {}),
+    ('Standard V2', {'creativity': 3}),
+    ('Standard V2', {'sharpen': float('nan')}),
+    ('Standard V2', {'denoise': True}),
+    ('Bloom 2', {'creativity': 10}),
+    ('Bloom 2', {'creativity': 3.5}),
+    ('Bloom 2', {'creativity': None}),
+    ('Bloom 2', {'colorPreservation': 'true'}),
+    ('Bloom 2', {'prompt': 'x' * 1025}),
+    ('Wonder 3.5', {'enhancementStrength': 4}),
+    ('Recover 3', {'enhancementStrength': 11}),
+    ('Upscale High Fidelity V3', {'opacity': -.1}),
+])
+def test_invalid_or_cross_model_settings_never_reach_network(model, parameters):
+    metadata, _ = image_fixture()
+    with pytest.raises(topaz_ai.TopazError):
+        run(topaz_ai.enhance(metadata['id'], 2, 'asinh', model, parameters))
+    assert 'topaz_pending' not in science.metadata(metadata['id'])
+
+
+def test_pending_job_identity_includes_model_and_all_options(monkeypatch):
+    metadata, _ = image_fixture()
+    calls = []
+    completed = happy_api(calls)
+    fail = True
+
+    def handler(request):
+        if fail and '/status/' in request.url.path:
+            raise httpx.ReadTimeout('Timeout', request=request)
+        return completed(request)
+
+    mock_api(monkeypatch, handler)
+    with pytest.raises(topaz_ai.TopazError):
+        run(topaz_ai.enhance(metadata['id'], model='Bloom 2', parameters={'creativity': 4}))
+    pending = science.metadata(metadata['id'])['topaz_pending']
+    assert pending['model'] == 'Bloom 2' and pending['parameters']['creativity'] == 4
+    for model, parameters in [('Wonder 3.5', {}), ('Bloom 2', {'creativity': 5}),
+                               ('Bloom 2', {'creativity': 4, 'colorPreservation': False})]:
+        with pytest.raises(topaz_ai.TopazError, match='original scale, model') as failure:
+            run(topaz_ai.enhance(metadata['id'], model=model, parameters=parameters))
+        assert failure.value.status == 409
+    fail = False
+    result = run(topaz_ai.enhance(metadata['id'], model='Bloom 2', parameters={'creativity': 4}))
+    assert result['cloud_ai']['model'] == 'Bloom 2'
+    assert len([request for request in calls if request.method == 'POST']) == 1
+
+
+def test_legacy_standard_job_without_parameters_resumes_without_submission(monkeypatch):
+    metadata, _ = image_fixture()
+    _, content, size, source = topaz_ai.prepare(metadata['id'])
+    metadata['topaz_pending'] = {'process_id': JOB_ID, 'scale': 2, 'model': 'Standard V2',
+        'input_sha256': hashlib.sha256(content).hexdigest(), 'input_size': size,
+        'output_size': [dimension * 2 for dimension in size], 'stretch': None, 'input_source': source}
+    science.save_metadata(metadata)
+    calls = []
+    mock_api(monkeypatch, happy_api(calls))
+    result = run(topaz_ai.enhance(metadata['id']))
+    assert result['cloud_ai']['model'] == 'Standard V2'
+    assert result['cloud_ai']['parameters'] == {}
+    assert not any(request.method == 'POST' for request in calls)
+
+
+def test_api_passes_selected_model_and_parameters_to_backend(monkeypatch):
+    import app as application
+    metadata, _ = image_fixture()
+    calls = []
+
+    async def capture(*args):
+        calls.append(args)
+        return {'id': args[0]}
+
+    monkeypatch.setattr(topaz_ai, 'enhance', capture)
+    with TestClient(application.app) as client:
+        response = client.post('/api/images/' + metadata['id'] + '/enhance-topaz',
+            json={'scale': 4, 'model': 'Bloom 2', 'parameters': {'creativity': 7, 'prompt': 'Bright stars'}})
+    assert response.status_code == 200
+    assert calls == [(metadata['id'], 4, 'asinh', 'Bloom 2', {'creativity': 7, 'prompt': 'Bright stars'})]

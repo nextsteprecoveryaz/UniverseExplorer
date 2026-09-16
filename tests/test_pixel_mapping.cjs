@@ -23,10 +23,10 @@ function layer(name, {query = Promise.resolve(), readPixel = () => [128, 128, 12
     setSaturation(value) { this.saturation = value; },
   };
 }
-function harness({saved, storageError = false} = {}) {
-  const nodes = new Map(), frames = new Map(), timers = new Map(), timerDelays = new Map(), storage = new Map(), writes = [], resize = [];
+function harness({saved, storageError = false, storageKey='test-pixel-profile', sharedStorage=null, controllerOptions={}} = {}) {
+  const nodes = new Map(), frames = new Map(), timers = new Map(), timerDelays = new Map(), storage = sharedStorage||new Map(), writes = [], resize = [];
   let serial = 0, currentLayer = null;
-  if (saved !== undefined) storage.set('test-pixel-profile', saved);
+  if (saved !== undefined) storage.set(storageKey, saved);
   function node(selector) {
     if (/^\[data-output=/.test(selector) && !/brightness|contrast|saturation|red|yellow|green|blue/.test(selector)) return null;
     if (!nodes.has(selector)) {
@@ -87,7 +87,7 @@ function harness({saved, storageError = false} = {}) {
   });
   vm.runInContext(script, context);
   const Controller = vm.runInContext('PixelMappingController', context);
-  const controller = new Controller({host, sky, storageKey: 'test-pixel-profile', onResize: value => resize.push(value)});
+  const controller = new Controller({host, sky, storageKey, onResize: value => resize.push(value),...controllerOptions});
   function flushFrames() {
     for (let guard = 0; frames.size && guard < 10; guard += 1) {
       const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(callback => callback());
@@ -462,8 +462,8 @@ test('numeric entry previews without replacing active text and commits the clamp
   assert.equal(input.value, (h.controller.settings.black * 255).toFixed(1));
 });
 
-function exportHarness() {
-  const h=harness(),canvases=[],downloads=[],updates=[],svg=[];
+function exportHarness(options={}) {
+  const h=harness(options),canvases=[],downloads=[],updates=[],svg=[];
   const source={width:400,height:240,name:'native-image'};
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6ZAAAAABJRU5ErkJggg==','base64');
   h.sky.getRaDec=()=>[83.82208,-5.39111];h.sky.getFov=()=>[.5,.3];
@@ -618,8 +618,8 @@ test('settings JSON exports reproducible values and source coordinates without a
   assert.equal(h.downloads[0].blob.type,'application/json');assert.equal(h.controller.layer.calls.length,calls);
 });
 
-function labExportHarness() {
-  const h=exportHarness(),uploads=[],opened=[];
+function labExportHarness(options={}) {
+  const h=exportHarness(options),uploads=[],opened=[];
   h.context.FormData=class {
     constructor(){this.entries=new Map();this.filenames=new Map();}
     append(key,value,filename){this.entries.set(key,value);if(filename)this.filenames.set(key,filename);}
@@ -718,4 +718,77 @@ test('upload failures restore both export buttons and allow a successful retry',
   assert.equal(h.controller.exporting,false);for(const action of ['save','lab'])assert.equal(h.node(`[data-action="${action}"]`).disabled,false);
   pending=h.controller.openInImageLab();h.flushFrames();await pending;
   assert.equal(attempts,2);assert.equal(h.opened.length,1);assert.equal(h.opened[0].id,'retry-capture');
+});
+
+test('arbitrary survey profiles reload with their own names, URLs and credits',async()=>{
+  const surveys={
+    'sdss-color':{name:'SDSS galaxy color',url:'https://alasky.cds.unistra.fr/SDSS/DR9/color',credit:'SDSS Collaboration'},
+    'sdss-g':{name:'SDSS g band',url:'https://alasky.cds.unistra.fr/SDSS/DR9/band-g',credit:'SDSS Collaboration'},
+    hydrogen:{name:'Ionized hydrogen',url:'https://alasky.cds.unistra.fr/FinkbeinerHalpha',credit:'H-alpha survey authors'},
+  };
+  const h=exportHarness({saved:JSON.stringify({'sdss-color':{blue:.6},'sdss-g':{red:-.3},hydrogen:{yellow:.2}}),controllerOptions:{surveyInfo:key=>surveys[key]}});
+  for(const [key,channel,value] of [['sdss-color','blue',.6],['sdss-g','red',-.3],['hydrogen','yellow',.2]]){
+    await h.bind(key,layer(surveys[key].name));
+    assert.equal(h.controller.settings[channel],value);assert.equal(h.node('[data-pm="survey"]').textContent,surveys[key].name);
+    const metadata=h.controller.exportMetadata();assert.equal(metadata.survey.id,key);assert.equal(metadata.survey.url,surveys[key].url);assert.equal(metadata.survey.credit,surveys[key].credit);
+    assert.doesNotMatch(metadata.survey.name,/DSS2|2MASS/);
+  }
+});
+
+test('Explore and Telescope Live retain separate profiles even for the same survey',async()=>{
+  const storage=new Map(),live=exportHarness({sharedStorage:storage,storageKey:'universe:telescope-pixel-mapping:v1'}),explore=exportHarness({sharedStorage:storage,storageKey:'universe:explore-pixel-mapping:v1'});
+  await live.bind('2mass',layer('2mass'));await explore.bind('2mass',layer('2mass'));
+  live.controller.change({...PixelMappingMath.defaults(),blue:.8});live.flushFrames();
+  explore.controller.change({...PixelMappingMath.defaults(),red:-.5});explore.flushFrames();
+  assert.equal(live.controller.settings.red,0);assert.equal(explore.controller.settings.blue,0);
+  const reloaded=exportHarness({sharedStorage:storage,storageKey:'universe:explore-pixel-mapping:v1'});await reloaded.bind('2mass',layer('2mass'));
+  assert.equal(reloaded.controller.settings.red,-.5);assert.equal(reloaded.controller.settings.blue,0);
+});
+
+test('FITS levels use the native intensity range without accumulating cuts on later edits',async()=>{
+  const h=exportHarness(),image=layer('SDSS g');image.imgFormat='fits';image.getCuts=()=>image.cuts||[-10,190];
+  await h.bind('sdss-g',image);assert.deepEqual(image.cuts,[-10,190]);
+  h.controller.change({...PixelMappingMath.defaults(),black:.25,white:.75});h.flushFrames();assert.deepEqual(image.cuts,[40,140]);
+  h.controller.change({...h.controller.settings,red:.3});h.flushFrames();assert.deepEqual(image.cuts,[40,140]);
+  h.node('[data-action="original"]').onclick();h.flushFrames();assert.deepEqual(image.cuts,[-10,190]);
+  const metadata=h.controller.exportMetadata();assert.deepEqual([...metadata.native_intensity_range],[-10,190]);assert.equal(metadata.tile_format,'fits');
+  h.node('[data-action="reset"]').onclick();h.flushFrames();assert.deepEqual(image.cuts,[-10,190]);
+});
+
+test('FITS histograms normalize scalar intensity using native cuts instead of 255',async()=>{
+  const h=exportHarness(),image=layer('Native FITS',{readPixel:()=>40});image.imgFormat='fits';image.getCuts=()=>image.cuts||[-10,190];
+  await h.bind('sdss-r',image);await h.controller.sample();
+  assert.equal(h.controller.histogram.bins[64],640);assert.equal(h.controller.histogram.bins[40],0);
+});
+
+test('FITS controls wait for valid source cuts instead of overwriting them with raster values',async()=>{
+  const h=exportHarness(),image=layer('Unready FITS');image.imgFormat='fits';image.getCuts=()=>[undefined,undefined];
+  await h.bind('hydrogen',image);assert.equal(image.cuts,null);assert.match(h.node('[data-pm="status"]').textContent,/intensity range/);
+  image.defaultFitsMinCut=.03;image.defaultFitsMaxCut=.73;assert.equal(h.controller.apply(),true);assert.deepEqual(image.cuts,[.03,.73]);
+});
+
+test('PNG, JPEG and WebP layers keep byte cuts even when native sample values differ',async()=>{
+  for(const format of ['png','jpeg','webp']){
+    const h=exportHarness(),image=layer(format);image.imgFormat=format;image.getCuts=()=>[10,120];
+    await h.bind('sdss-color',image);h.controller.change({...PixelMappingMath.defaults(),black:.2,white:.8});h.flushFrames();
+    assert.deepEqual(image.cuts,[51,204]);
+  }
+});
+
+test('Explore transfer uses its configured source and provenance kind rather than Telescope Live',async()=>{
+  const h=labExportHarness({controllerOptions:{captureKind:'explore-sky-capture',captureLabel:'Explore sky',surveyInfo:()=>({name:'SDSS g band',url:'https://alasky.cds.unistra.fr/SDSS/DR9/band-g',credit:'SDSS Collaboration'})}});
+  await h.bind('sdss-g',layer('sdss-g'));const pending=h.controller.openInImageLab();h.flushFrames();await pending;
+  const form=h.uploads[0].body,metadata=JSON.parse(form.get('context'));
+  assert.equal(metadata.kind,'explore-sky-capture');assert.equal(metadata.survey,'sdss-g');assert.match(form.filenames.get('file'),/^Explore sky - SDSS/);
+  assert.match(metadata.pixel_mapping.image_kind,/Rendered sky survey/);assert.doesNotMatch(metadata.pixel_mapping.image_kind,/Ground-based|Hubble or Webb/);
+});
+
+test('captured map provenance keeps source pointers for visible FITS and SDSS overlays',async()=>{
+  const h=exportHarness(),base=layer('SDSS galaxy color');base.url='/api/atlas/surveys/sdss-color';base.imgFormat='jpeg';
+  await h.bind('sdss-color',base);
+  const layers={base,'science-overlay':{name:'Original calibrated science cutout',url:'/api/atlas/science/source-123.fits',imgFormat:'fits',getOpacity:()=>.85}};
+  h.sky.getStackLayers=()=>['base','science-overlay'];h.sky.getOverlayImageLayer=key=>layers[key];
+  const metadata=h.controller.exportMetadata();assert.equal(metadata.image_layers.length,2);
+  assert.equal(metadata.image_layers[0].base,true);assert.equal(metadata.image_layers[1].base,false);
+  assert.equal(metadata.image_layers[1].url,'/api/atlas/science/source-123.fits');assert.equal(metadata.image_layers[1].format,'fits');assert.equal(metadata.image_layers[1].opacity,.85);
 });

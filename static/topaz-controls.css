@@ -1,0 +1,23 @@
+#topaz-settings{padding:14px 0;border-top:1px solid var(--line,#293a4c)}
+#topaz-model{min-width:230px;max-width:100%}
+#topaz-model-description{line-height:1.6;max-width:900px}
+#topaz-model-description a{white-space:nowrap}
+#topaz-model-description.topaz-creative strong{color:#edc58a}
+.topaz-parameter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px 22px;margin:14px 0;max-width:960px}
+.topaz-parameter{display:flex;flex-direction:column;gap:7px;min-width:0}
+.topaz-parameter>label{font-size:12px;font-weight:600}
+.topaz-parameter>label .muted{font-weight:400;margin-left:6px}
+.topaz-range-pair{display:grid;grid-template-columns:minmax(100px,1fr) 78px;align-items:center;gap:12px}
+.topaz-range-pair input[type=range]{width:100%;min-width:0;padding:0}
+.topaz-range-pair input[type=number]{width:100%;min-width:0;padding:7px}
+.topaz-parameter input:disabled{opacity:.45}
+.topaz-parameter .topaz-auto{display:flex;align-items:center;gap:7px;font-weight:400}
+.topaz-parameter input[type=checkbox]{width:auto;min-width:0;margin:0;accent-color:#7bddd0}
+.topaz-boolean{flex-direction:row;align-items:center;justify-content:flex-start;gap:12px}
+.topaz-boolean>label{order:1}
+.topaz-boolean>input{order:0}
+.topaz-parameter-wide{grid-column:1/-1}
+.topaz-parameter textarea{width:100%;resize:vertical;min-height:78px}
+.topaz-parameter p{margin:0}
+#topaz-model-status{margin-top:8px}
+@media(max-width:540px){.topaz-parameter-grid{grid-template-columns:minmax(0,1fr)}#topaz-model{min-width:0;width:100%}}

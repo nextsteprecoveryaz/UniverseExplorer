@@ -2,13 +2,13 @@
 
 // Display controls for the locally pinned CDS Aladin Lite renderer. Source files are never modified.
 class PixelMappingController {
-  constructor({host, sky, onResize=()=>{}, storageKey='universe:telescope-pixel-mapping:v1'}) {
-    this.host=host; this.sky=sky; this.onResize=onResize; this.storageKey=storageKey;
-    this.settings=PixelMappingMath.defaults(); this.profiles={}; this.key=null; this.layer=null;
+  constructor({host, sky, onResize=()=>{}, onChange=()=>{}, surveyInfo=null, captureKind='telescope-live-capture', captureLabel='Telescope Live', storageKey='universe:telescope-pixel-mapping:v1'}) {
+    this.host=host; this.sky=sky; this.onResize=onResize; this.onChange=onChange; this.surveyInfo=surveyInfo; this.captureKind=captureKind; this.captureLabel=captureLabel; this.storageKey=storageKey;
+    this.settings=PixelMappingMath.defaults(); this.profiles=Object.create(null); this.key=null; this.layer=null; this.nativeRanges=new WeakMap();
     this.original=false; this.generation=0; this.viewGeneration=0; this.sampleGeneration=0; this.editGeneration=0;
     this.histogram=null; this.sampleTimer=null; this.frame=null; this.sampling=false; this.persistent=true; this.emptyRetries=0;
     this.filterId='pixel-color-'+(++PixelMappingController.serial); this.exporting=false;
-    try { const saved=JSON.parse(localStorage.getItem(storageKey)||'{}'); for(const key of ['2mass','optical']) if(saved?.[key]) this.profiles[key]=PixelMappingMath.normalize(saved[key]); } catch { this.persistent=false; }
+    try { const saved=JSON.parse(localStorage.getItem(storageKey)||'{}'); if(saved&&typeof saved==='object'&&!Array.isArray(saved))for(const [key,value] of Object.entries(saved))if(/^[a-z0-9][a-z0-9_.:-]{0,127}$/i.test(key))this.profiles[key]=PixelMappingMath.normalize(value); } catch { this.persistent=false; }
     this.build(); this.render();
   }
   el(selector) { return this.host.querySelector(selector); }
@@ -98,8 +98,10 @@ class PixelMappingController {
     if(!this.layer||this.layer!==this.sky.getBaseImageLayer())return false;
     const s=this.original?PixelMappingMath.defaults():this.settings;
     try {
-      // JPEG/PNG color surveys in Aladin 3.8.2 take byte-valued cuts, unlike FITS intensities.
-      this.layer.setCuts(s.black*255,s.white*255);
+      // Raster HiPS use byte-valued cuts. FITS HiPS retain their native intensity range.
+      const range=this.nativeRange();
+      if(!range){this.el('[data-pm="status"]').textContent='Waiting for the survey intensity range. Try again once its pixels load.';return false;}
+      this.layer.setCuts(range[0]+s.black*(range[1]-range[0]),range[0]+s.white*(range[1]-range[0]));
       // Yellow is a local two-stop LUT registered through Aladin's public custom-colormap API.
       if(s.colormap==='yellow'&&!this.yellowRegistered){this.sky.addColormap('universe-yellow',['#000000','#ffff00']);this.yellowRegistered=true;}
       this.layer.setColormap(s.colormap==='yellow'?'universe-yellow':s.colormap,{stretch:s.stretch,reversed:s.reversed});
@@ -115,6 +117,33 @@ class PixelMappingController {
   }
   static basicFilter(s) {
     return s.brightness||s.contrast||s.saturation?`brightness(${1+s.brightness}) contrast(${1+s.contrast}) saturate(${1+s.saturation})`:'none';
+  }
+  nativeRange() {
+    const layer=this.layer;if(!layer)return null;
+    const format=String(layer.imgFormat||layer.colorCfg?.imgFormat||'').toLowerCase();
+    if(!format.startsWith('fits'))return [0,255];
+    if(this.nativeRanges.has(layer))return this.nativeRanges.get(layer);
+    const cuts=typeof layer.getCuts==='function'?layer.getCuts():null;
+    const range=cuts?.length===2&&cuts.every(Number.isFinite)&&cuts[1]>cuts[0]?cuts:[layer.defaultFitsMinCut,layer.defaultFitsMaxCut];
+    if(!range.every(Number.isFinite)||range[1]<=range[0])return null;
+    this.nativeRanges.set(layer,[...range]);return this.nativeRanges.get(layer);
+  }
+  surveyDescriptor() {
+    const supplied=typeof this.surveyInfo==='function'?this.surveyInfo(this.key,this.layer):null;
+    const defaults={
+      '2mass':{name:'2MASS near-infrared color survey',label:'Webb · 2MASS',url:'https://alasky.cds.unistra.fr/2MASS/Color',credit:'2MASS / University of Massachusetts / IPAC-Caltech; HiPS by CDS'},
+      optical:{name:'Digitized Sky Survey 2 color',label:'Hubble · DSS2',url:'https://alasky.cds.unistra.fr/DSS/DSSColor',credit:'DSS2 / STScI / ESO; color HiPS by CDS'},
+    };
+    if(supplied)return {id:this.key,...supplied,label:supplied.label||supplied.name,credit:supplied.credit||`${supplied.name||this.key}; see the linked survey source for credits`};
+    return {id:this.key,...(defaults[this.key]||{name:this.layer?.name||this.key||'Sky survey',label:this.layer?.name||this.key,url:this.layer?.url||'',credit:'See the linked survey source for credits'})};
+  }
+  imageLayers() {
+    if(typeof this.sky.getStackLayers!=='function')return [];
+    return this.sky.getStackLayers().map(key=>{
+      const layer=this.sky.getOverlayImageLayer?.(key);if(!layer)return null;
+      return {key,name:layer.name||layer.id||key,url:layer.url||'',base:layer===this.layer,
+        format:layer.imgFormat||layer.colorCfg?.imgFormat||'raster',opacity:typeof layer.getOpacity==='function'?layer.getOpacity():1};
+    }).filter(Boolean);
   }
   displayFilter(s) {
     const basic=PixelMappingController.basicFilter(s);
@@ -134,16 +163,17 @@ class PixelMappingController {
     return (basic==='none'?'':basic+' ')+`url("#${this.filterId}")`;
   }
   exportMetadata() {
-    const info=this.key==='2mass'?{name:'2MASS near-infrared color survey',url:'https://alasky.cds.unistra.fr/2MASS/Color',credit:'2MASS / University of Massachusetts / IPAC-Caltech; HiPS by CDS'}:
-      {name:'Digitized Sky Survey 2 color',url:'https://alasky.cds.unistra.fr/DSS/DSSColor',credit:'DSS2 / STScI / ESO; color HiPS by CDS'};
+    const info=this.surveyDescriptor();
     const center=this.sky.getRaDec(),fov=this.sky.getFov();
     return {schema:'universe-explorer-pixel-mapping-v1',created_at:new Date().toISOString(),
       survey:{id:this.key,...info},view:{ra_deg:center[0],dec_deg:center[1],fov_deg:fov[0],coordinate_frame:'ICRS'},
       original_preview:this.original,display:PixelMappingMath.normalize(this.original?PixelMappingMath.defaults():this.settings),
       saved_adjustments:PixelMappingMath.normalize(this.settings),renderer:'CDS Aladin Lite 3.8.2',
       color_intensity_model:'rgb-channel-gains-v1',
+      native_intensity_range:this.nativeRange(),tile_format:this.layer?.imgFormat||this.layer?.colorCfg?.imgFormat||'raster',
+      image_layers:this.imageLayers(),
       processing:'Survey display visualization. Native cuts, stretch, colormap and gamma; browser brightness, contrast and saturation; red, green and blue channel gains with yellow multiplying red and green. Not calibrated photometry.',
-      image_kind:'Ground-based survey context; not a Hubble or Webb exposure.'};
+      image_kind:this.captureKind==='telescope-live-capture'?'Ground-based survey context; not a Hubble or Webb exposure.':'Rendered sky survey visualization; not calibrated photometry.'};
   }
   download(blob,filename) {
     const url=URL.createObjectURL(blob),link=document.createElement('a');
@@ -168,8 +198,8 @@ class PixelMappingController {
       const {blob,metadata}=await this.capturePNG({creditFooter:!toLab});
       if(toLab){
         const form=new FormData();
-        form.append('file',blob,`Telescope Live - ${metadata.survey.name}.png`);
-        form.append('context',JSON.stringify({kind:'telescope-live-capture',ra:metadata.view.ra_deg,dec:metadata.view.dec_deg,fov:metadata.view.fov_deg,
+        form.append('file',blob,`${this.captureLabel} - ${metadata.survey.name}.png`);
+        form.append('context',JSON.stringify({kind:this.captureKind,ra:metadata.view.ra_deg,dec:metadata.view.dec_deg,fov:metadata.view.fov_deg,
           survey:metadata.survey.id,survey_url:metadata.survey.url,captured_at:metadata.created_at,calibrated:false,pixel_mapping:metadata}));
         status.textContent='Saving this view to your local Image Lab…';
         const image=await api('/api/images/upload',{method:'POST',body:form});
@@ -225,7 +255,7 @@ class PixelMappingController {
     const source=[`${metadata.survey.name} · ${metadata.renderer} · ${metadata.original_preview?'Original preview':'Display visualization'}`,
       `${metadata.survey.credit} | ${metadata.survey.url}`,
       `RA ${metadata.view.ra_deg.toFixed(5)}° · Dec ${metadata.view.dec_deg.toFixed(5)}° · Field ${metadata.view.fov_deg.toFixed(4)}° · ${metadata.created_at}`,
-      'Ground-based survey context. Source and full display settings are embedded in this PNG.'];
+      `${metadata.image_kind||'Sky survey visualization.'} Source and full display settings are embedded in this PNG.`];
     const lines=[];
     for(const text of source) {
       let line='';
@@ -282,15 +312,17 @@ class PixelMappingController {
     this.sampling=true; this.el('[data-action="auto"]').disabled=true; this.el('[data-action="sample"]').disabled=true;
     this.el('[data-pm="sample-status"]').textContent='Sampling unadjusted survey pixels…';
     try {
-      const box=this.sky.aladinDiv?.getBoundingClientRect?.()||document.getElementById('telescope-live-sky').getBoundingClientRect();
-      if(!box.width||!box.height){this.el('[data-pm="sample-status"]').textContent='Open the map to sample its current view.';return;}
+      const box=this.sky.aladinDiv?.getBoundingClientRect?.();
+      if(!box?.width||!box?.height){this.el('[data-pm="sample-status"]').textContent='Open the map to sample its current view.';return;}
+      const nativeRange=this.nativeRange();
+      if(!nativeRange){this.el('[data-pm="sample-status"]').textContent='The survey intensity range is still loading.';return;}
       const samples=[];
       for(let row=0;row<20;row++) {
         if(!valid())return;
         for(let col=0;col<32;col++) {
           // Pixels outside an all-sky projection throw; missing tiles return null.
           try { const pixel=await layer.readPixel((col+.5)*box.width/32,(row+.5)*box.height/20);
-            const brightness=PixelMappingController.pixelBrightness(pixel);
+            const brightness=typeof pixel==='number'&&Number.isFinite(pixel)?(pixel-nativeRange[0])/(nativeRange[1]-nativeRange[0]):PixelMappingController.pixelBrightness(pixel);
             if(brightness!==null)samples.push(brightness);
           } catch { /* No valid survey pixel at this sample position. */ }
         }
@@ -324,7 +356,7 @@ class PixelMappingController {
   }
   render() {
     const s=this.settings;
-    this.el('[data-pm="survey"]').textContent=this.key==='2mass'?'Webb · 2MASS':this.key==='optical'?'Hubble · DSS2':'Waiting for survey';
+    this.el('[data-pm="survey"]').textContent=this.key?this.surveyDescriptor().label:'Waiting for survey';
     this.el('[data-pm="mode"]').textContent=this.original?'Original preview':JSON.stringify(s)===JSON.stringify(PixelMappingMath.defaults())?'Original':'Adjusted';
     for(const name of ['black','mid','white']) {
       const handle=this.el(`[data-handle="${name}"]`); handle.style.left=(s[name]*100)+'%'; handle.setAttribute('aria-valuenow',(s[name]*255).toFixed(1));
@@ -339,6 +371,7 @@ class PixelMappingController {
     // Scalar tone curve: native levels/stretch/gamma, followed by browser brightness and contrast.
     const gamma=PixelMappingMath.gamma(s);
     this.el('[data-pm="curve"]').setAttribute('d',Array.from({length:129},(_,i)=>{const x=i/128;let y=Math.max(0,Math.min(1,(x-s.black)/(s.white-s.black)));if(s.stretch==='sqrt')y=Math.sqrt(y);else if(s.stretch==='pow2')y*=y;else if(s.stretch==='asinh')y=Math.asinh(10*y)/3;else if(s.stretch==='log')y=Math.log(1000*y+1)/Math.log(1000);if(s.reversed)y=1-y;y=Math.pow(Math.max(0,Math.min(1,y)),gamma);y=Math.max(0,Math.min(1,.5+(1+s.contrast)*(y*(1+s.brightness)-.5)));return `${i?'L':'M'}${x*256} ${(1-y)*112}`;}).join(''));
+    if(this.key)this.onChange({...s},{key:this.key,original:this.original});
   }
 }
 PixelMappingController.serial=0;

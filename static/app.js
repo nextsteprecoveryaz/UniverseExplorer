@@ -69,6 +69,7 @@ function coordinates(){
   onImageSkyChanged();
   onNavigationSkyChanged();
   onAtlasViewChanged();
+  if(typeof invalidateExplorePixelMapping==='function')invalidateExplorePixelMapping();
 }
 const HIDDEN_MAP_SURVEYS=new Set(['webb-color','hubble-color','oxygen','sulfur']);
 function skyMapSurveys(){return state.config.surveys.filter(s=>!HIDDEN_MAP_SURVEYS.has(s.id));}
@@ -85,7 +86,7 @@ function chooseSurvey(id){
   if(survey.credit&&survey.source_url)$('#sky-credit').innerHTML=`${esc(survey.name)} · <a href="${esc(survey.source_url)}" target="_blank" rel="noopener">${esc(survey.credit)} ↗</a> · CDS Aladin / HiPS`;
   if(survey.auto_science===false)atlasClear();
   if(state.sky){
-    try{state.sky.setImageSurvey(atlasSurveyURL(survey));$('#sky-status').innerHTML='<i></i> '+esc(survey.tag)+' · SKY ATLAS';}
+    try{const layer=state.sky.setBaseImageLayer(atlasSurveyURL(survey));if(typeof bindExplorePixelMapping==='function')bindExplorePixelMapping(id,layer);$('#sky-status').innerHTML='<i></i> '+esc(survey.tag)+' · SKY ATLAS';}
     catch(e){failure(e);}
   }
 }
@@ -119,6 +120,7 @@ async function initSky(){
     $('#aladin-lite-div').addEventListener('wheel',()=>cancelAnimationFrame(travelFrame),{passive:true});
     state.sky.on('positionChanged',()=>coordinates());
     state.sky.on('zoomChanged',()=>coordinates());
+    initExplorePixelMapping();
     $('#aladin-lite-div').style.opacity='1';
     $('#sky-fallback').classList.add('loaded');
     $('#sky-status').innerHTML='<i></i> RELEASED IMAGERY · SKY ATLAS';
@@ -234,6 +236,7 @@ async function captureSky(){
     while(state.sky.isStillActive()&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,250));
     if(state.sky.isStillActive())throw new Error('Sky tiles are still loading. Wait for the view to settle, then capture again.');
   }
+  if(typeof explorePixelMapping!=='undefined'&&explorePixelMapping.controller)return explorePixelMapping.controller.openInImageLab();
   const field=currentField();
   const url=await state.sky.getViewDataURL({format:'image/png',logo:true});
   const response=await fetch(url);const blob=await response.blob();
@@ -327,7 +330,7 @@ async function boot(){
     $$('#lens-chips button').forEach(b=>b.onclick=()=>{showPage('explore');chooseSurvey(b.dataset.survey);});
     $('#survey-select').onchange=e=>{showPage('explore');chooseSurvey(e.target.value);};
     $('#sky-stretch').onchange=e=>{
-      if(!state.sky)return;try{const layer=state.sky.getBaseImageLayer();if(e.target.value==='native')layer.setColormap('native',{stretch:'linear'});else layer.setColormap('native',{stretch:e.target.value});}catch(error){failure(error);}
+      if(!state.sky)return;try{setExplorePixelStretch(e.target.value);}catch(error){failure(error);}
     };
     $('#search-form').onsubmit=searchSky;
     $('#about-button').onclick=about;$('#modal-close').onclick=closeModal;

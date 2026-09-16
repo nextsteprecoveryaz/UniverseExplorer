@@ -2,6 +2,9 @@
 const mapUI={enabled:false,featured:[],rows:[],selected:null,request:0,timer:null,frame:null,lastQuery:'',queryResult:null};
 let cloudConnection={configured:false,model:'gpt-image-2.5-sunburst'};
 let topazConnection={configured:false,model:'Standard V2',max_output_pixels:25000000};
+let topazModels={default_model:'Standard V2',max_output_pixels:25000000,models:[]};
+let topazModelsReady=false;
+const topazModelValues=new Map();
 let enhancementRunning=false;
 
 function stopObjectVideo(){const video=document.querySelector('#object-detail video');if(video)video.pause();}
@@ -101,24 +104,115 @@ function showObjectDetail(o){
   positionObjectMarkers();
 }
 
+function selectedTopazModel(){return topazModels.models.find(model=>model.id===$('#topaz-model').value);}
+function topazParameterOptions(parameter){return (parameter.options||[]).map(option=>typeof option==='string'?{value:option,label:option}:option);}
+function topazNumericParameter(parameter){return ['number','integer'].includes(parameter.type);}
+function topazParameterId(index){return 'topaz-parameter-'+index;}
+function topazValues(model){
+  if(!topazModelValues.has(model.id))topazModelValues.set(model.id,Object.fromEntries(model.parameters.map(parameter=>[parameter.key,parameter.default])));
+  return topazModelValues.get(model.id);
+}
+function lockTopazModelControls(locked){
+  $('#topaz-model').disabled=locked||!topazModelsReady;
+  const model=selectedTopazModel();if(!model)return;
+  const values=topazValues(model);
+  model.parameters.forEach((parameter,index)=>{
+    const id=topazParameterId(index),automatic=parameter.default===null&&values[parameter.key]===null;
+    $('#'+id).disabled=locked||automatic;
+    if(topazNumericParameter(parameter))$('#'+id+'-range').disabled=locked||automatic;
+    if(parameter.default===null)$('#'+id+'-auto').disabled=locked;
+  });
+}
+function renderTopazModel(){
+  const model=selectedTopazModel();
+  if(!model){$('#topaz-model-description').textContent='Choose an available Topaz model.';$('#topaz-model-parameters').innerHTML='';return;}
+  const values=topazValues(model),creative=model.family.toLowerCase()!=='precision';
+  const source=typeof model.source_url==='string'&&model.source_url.startsWith('https://')?` <a href="${esc(model.source_url)}" target="_blank" rel="noopener">Model details ↗</a>`:'';
+  $('#topaz-model-description').innerHTML=`<strong>${creative?'Creative visualization':'Precision upscale'}.</strong> ${esc(model.description)}${creative?' May reconstruct or invent structures. Use the original for scientific interpretation.':''}${source}`;
+  $('#topaz-model-description').classList.toggle('topaz-creative',creative);
+  $('#topaz-model-parameters').className='topaz-parameter-grid';
+  $('#topaz-model-parameters').innerHTML=model.parameters.map((parameter,index)=>{
+    const id=topazParameterId(index),value=values[parameter.key],automatic=parameter.default===null;
+    let control;
+    if(topazNumericParameter(parameter))control=`<div class="topaz-range-pair"><input id="${id}-range" type="range" min="${parameter.min}" max="${parameter.max}" step="${parameter.step||1}" aria-label="${esc(parameter.label)} slider"><input id="${id}" type="number" min="${parameter.min}" max="${parameter.max}" step="${parameter.step||1}" aria-label="${esc(parameter.label)} value"></div>`;
+    else if(parameter.type==='enum')control=`<select id="${id}">${topazParameterOptions(parameter).map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('')}</select>`;
+    else if(parameter.type==='boolean')control=`<input id="${id}" type="checkbox">`;
+    else control=`<textarea id="${id}" rows="3" maxlength="${parameter.max_length||1024}" placeholder="Describe the appearance you want"></textarea>`;
+    return `<div class="topaz-parameter${parameter.type==='text'?' topaz-parameter-wide':''}${parameter.type==='boolean'?' topaz-boolean':''}"><label for="${id}">${esc(parameter.label)}${topazNumericParameter(parameter)?` <span class="muted">${parameter.min}–${parameter.max}</span>`:''}</label>${control}${automatic?`<label class="topaz-auto"><input id="${id}-auto" type="checkbox">Auto</label>`:''}${parameter.description?`<p class="small muted">${esc(parameter.description)}</p>`:''}</div>`;
+  }).join('')||'<p class="small muted">Uses the model’s automatic settings.</p>';
+  model.parameters.forEach((parameter,index)=>{
+    const id=topazParameterId(index),input=$('#'+id),value=values[parameter.key];
+    if(parameter.type==='boolean')input.checked=Boolean(value);else input.value=value??parameter.min??'';
+    if(topazNumericParameter(parameter)){
+      const slider=$('#'+id+'-range');slider.value=input.value;
+      slider.oninput=()=>{input.value=slider.value;values[parameter.key]=Number(slider.value);};
+      input.oninput=()=>{values[parameter.key]=input.value===''?'':Number(input.value);if(input.value!==''&&Number.isFinite(Number(input.value)))slider.value=input.value;};
+    }else input[parameter.type==='text'?'oninput':'onchange']=()=>{values[parameter.key]=parameter.type==='boolean'?input.checked:input.value;};
+    if(parameter.default===null){
+      const automatic=$('#'+id+'-auto');automatic.checked=value===null;
+      automatic.onchange=()=>{values[parameter.key]=automatic.checked?null:Number(input.value);lockTopazModelControls(enhancementRunning);};
+    }
+  });
+  lockTopazModelControls(enhancementRunning);
+  updateEnhancementControls();
+}
+function installTopazModels(catalog){
+  const supportedTypes=['number','integer','enum','boolean','text'];
+  if(!catalog||!Array.isArray(catalog.models)||!catalog.models.length||!catalog.models.some(model=>model.id===catalog.default_model)||catalog.models.some(model=>!model.id||!model.label||!model.family||!Array.isArray(model.parameters)||model.parameters.some(parameter=>!parameter.key||!supportedTypes.includes(parameter.type))))throw new Error('Invalid Topaz model catalog.');
+  const previous=$('#topaz-model').value;
+  topazModels=catalog;topazModelsReady=true;
+  $('#topaz-model').innerHTML=catalog.models.map(model=>`<option value="${esc(model.id)}">${esc(model.label)} · ${model.family.toLowerCase()==='precision'?'Precision':'Creative visualization'}</option>`).join('');
+  $('#topaz-model').value=catalog.models.some(model=>model.id===previous)?previous:catalog.default_model;
+  renderTopazModel();
+}
+async function loadTopazModels(){
+  topazModelsReady=false;$('#topaz-model-status').textContent='Loading Topaz models…';lockTopazModelControls(enhancementRunning);updateEnhancementControls();
+  try{
+    installTopazModels(await api('/api/topaz/models'));
+    $('#topaz-model-status').textContent='Each model shows its supported controls. Auto lets Topaz choose the setting.';
+  }catch{
+    installTopazModels({default_model:'Standard V2',max_output_pixels:25000000,models:[{id:'Standard V2',label:'Standard V2',family:'Precision',description:'General-purpose upscaling with automatic settings.',parameters:[]}]});
+    $('#topaz-model-status').textContent='The model list is unavailable. Standard V2 is available with automatic settings. Reload this page to retry the other models.';
+  }
+}
+function topazRequestSnapshot(){
+  if(!topazModelsReady)throw new Error('Wait for the Topaz models to load.');
+  const model=selectedTopazModel();if(!model)throw new Error('Choose an available Topaz model.');
+  const parameters={},values=topazValues(model);
+  for(const parameter of model.parameters){
+    const value=values[parameter.key];
+    if(parameter.default===null&&value===null)continue;
+    let valid;
+    if(topazNumericParameter(parameter)){
+      valid=typeof value==='number'&&Number.isFinite(value)&&value>=parameter.min&&value<=parameter.max&&(parameter.type!=='integer'||Number.isInteger(value));
+      if(valid&&parameter.step){const steps=(value-parameter.min)/parameter.step;valid=Math.abs(steps-Math.round(steps))<1e-7;}
+    }else if(parameter.type==='boolean')valid=typeof value==='boolean';
+    else if(parameter.type==='enum')valid=topazParameterOptions(parameter).some(option=>option.value===value);
+    else valid=typeof value==='string'&&value.length<=(parameter.max_length||1024);
+    if(!valid)throw new Error(`Choose a supported value for ${parameter.label}.`);
+    parameters[parameter.key]=value;
+  }
+  return {model:model.id,parameters};
+}
 function updateEnhancementControls(){
   const provider=$('#enhancement-provider').value;
   $('#cloud-options').hidden=provider!=='cloud';$('#chatgpt-options').hidden=provider!=='chatgpt';$('#enhance-button').hidden=provider==='chatgpt';
   $('#topaz-settings').hidden=provider!=='topaz';
   $('#cloud-connect').hidden=provider==='topaz';
-  if(!enhancementRunning)$('#enhance-button').textContent=provider==='cloud'?'✧ Enhance with OpenAI':provider==='topaz'?`✧ Upscale with Topaz · ${$('#topaz-scale').value}×`:'✧ Enhance locally · 2×';
+  if(!enhancementRunning){$('#enhance-button').textContent=provider==='cloud'?'✧ Enhance with OpenAI':provider==='topaz'?`✧ Upscale with Topaz · ${$('#topaz-scale').value}×`:'✧ Enhance locally · 2×';$('#enhance-button').disabled=provider==='topaz'&&!topazModelsReady;}
   $('#cloud-status').textContent=cloudConnection.configured?`Connected · ${cloudConnection.model} · key in ${cloudConnection.storage}.`:'OpenAI is not connected. Add an API key using Cloud connection.';
-  $('#topaz-connection').textContent=topazConnection.configured?`Connected · ${topazConnection.model} · key in ${topazConnection.storage}.`:(topazConnection.problem||'Topaz is not connected. Add an API key using Topaz connection.');
+  $('#topaz-connection').textContent=topazConnection.configured?`Connected · key in ${topazConnection.storage}.`:(topazConnection.problem||'Topaz is not connected. Add an API key using Topaz connection.');
   const scale=Number($('#topaz-scale').value),image=state.image;
   const size=image&&Number.isFinite(image.width)&&Number.isFinite(image.height)?` Output: ${image.width*scale} × ${image.height*scale} pixels.`:'';
-  $('#topaz-note').textContent=`Sends ${image?.scientific?'the selected FITS display stretch':'the original image or saved color-adjusted copy'} to Topaz when you click Upscale. Uses your Topaz API credits. Save an adjusted copy first to include Image Lab color changes. Standard V2; maximum 25 megapixels.${size}`;
+  const model=selectedTopazModel();
+  $('#topaz-note').textContent=`Sends ${image?.scientific?'the selected FITS display stretch':'the original image or saved color-adjusted copy'} to Topaz when you click Upscale. Uses your Topaz API credits. Save an adjusted copy first to include Image Lab color changes. ${model?model.label+'; ':''}maximum 25 megapixels.${size}`;
   if(state.image)$('#handoff-download').href=`/api/images/${state.image.id}/handoff?stretch=${$('#fits-stretch').value}`;
 }
 function renderEnhancementComparison(preferred){
   const image=state.image;if(!image)return;
   const options=[];
   if(image.ai)options.push({value:'local',label:'Local · FSRCNN 2×',result:image.ai});
-  for(const result of [...(image.cloud_history||[])].reverse())options.push({value:result.variant,label:`${result.provider}${result.scale?' · '+result.scale+'×':''} · ${date(result.created_at)}`,result});
+  for(const result of [...(image.cloud_history||[])].reverse())options.push({value:result.variant,label:`${result.provider}${result.provider==='Topaz cloud'&&result.model?' · '+result.model:''}${result.scale?' · '+result.scale+'×':''} · ${date(result.created_at)}`,result});
   const select=$('#ai-output-select');const selection=preferred||select.value;
   select.innerHTML=options.length?options.map(o=>`<option value="${esc(o.value)}">${esc(o.label)}</option>`).join(''):'<option value="none">No enhancement yet</option>';
   if(options.some(o=>o.value===selection))select.value=selection;
@@ -164,20 +258,21 @@ async function runEnhancement(){
   if(provider==='topaz'&&!topazConnection.configured){await openTopazConnection();return;}
   const scale=Number($('#topaz-scale').value);
   if(provider==='topaz'&&![2,4].includes(scale))throw new Error('Choose a Topaz scale of 2× or 4×.');
+  const body=provider==='topaz'?{scale,stretch:$('#fits-stretch').value,...topazRequestSnapshot()}:{quality:$('#cloud-quality').value,instructions:$('#cloud-instructions').value,stretch:$('#fits-stretch').value};
   const id=state.image.id;const button=$('#enhance-button');enhancementRunning=true;
   $('#enhancement-provider').disabled=true;$('#topaz-scale').disabled=true;$('#topaz-connect').disabled=true;
+  lockTopazModelControls(true);
   const endpoint=provider==='cloud'?'enhance-cloud':provider==='topaz'?'enhance-topaz':'enhance';
   const label=provider==='cloud'?'OpenAI is editing… this can take a few minutes':provider==='topaz'?'Topaz is upscaling… this can take a few minutes':'Enhancing on this PC…';
   try{
     await busy(button,label,async()=>{
-      const body=provider==='topaz'?{scale,stretch:$('#fits-stretch').value}:{quality:$('#cloud-quality').value,instructions:$('#cloud-instructions').value,stretch:$('#fits-stretch').value};
       const options=provider==='local'?{method:'POST'}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(provider==='topaz'?450000:360000)};
       const result=await api(`/api/images/${id}/${endpoint}`,options);
       if(state.image?.id===id){state.image=result;renderEnhancementComparison(provider==='local'?'local':result.cloud_ai.variant);$('#image-provenance').textContent=JSON.stringify(result,null,2);}
       toast(state.image?.id===id?'Enhancement saved. Original data preserved.':'Enhancement saved to the original image in your library.');
     });
   }finally{
-    enhancementRunning=false;$('#enhancement-provider').disabled=false;$('#topaz-scale').disabled=false;$('#topaz-connect').disabled=false;updateEnhancementControls();
+    enhancementRunning=false;$('#enhancement-provider').disabled=false;$('#topaz-scale').disabled=false;$('#topaz-connect').disabled=false;lockTopazModelControls(false);updateEnhancementControls();
   }
 }
 function initObservatoryFeatures(){
@@ -201,6 +296,7 @@ function initObservatoryFeatures(){
   $('#cloud-connect').onclick=()=>openCloudConnection().catch(failure);
   $('#topaz-connect').onclick=()=>openTopazConnection().catch(failure);
   $('#topaz-scale').onchange=updateEnhancementControls;
+  $('#topaz-model').onchange=renderTopazModel;
   $('#enhance-button').onclick=()=>runEnhancement().catch(failure);
   $('#ai-output-select').onchange=()=>renderEnhancementComparison();
   $('#enhancement-upload').onchange=async e=>{
@@ -214,4 +310,5 @@ function initObservatoryFeatures(){
   };
   api('/api/cloud/status').then(s=>{cloudConnection=s;updateEnhancementControls();}).catch(failure);
   api('/api/topaz/status').then(s=>{topazConnection=s;updateEnhancementControls();}).catch(error=>{topazConnection={...topazConnection,configured:false,problem:error.message};updateEnhancementControls();});
+  loadTopazModels();
 }
