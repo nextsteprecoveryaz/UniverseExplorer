@@ -13,12 +13,10 @@ function tourSurveyRoute(route){
 }
 function tourSurveyActive(){return typeof routePlayer!=='undefined'&&Boolean(routePlayer.route)&&state.page==='explore'&&!$('#route-player').hidden;}
 function syncTourSkyControls(){
-  const current=tourSkySurvey(),active=tourSurveyActive();
+  const current=tourSkySurvey();
   for(const select of document.querySelectorAll('[data-tour-sky]')){
     select.innerHTML=tourSkySurveys().map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');select.value=current;
   }
-  for(const option of document.querySelectorAll('#survey-select option'))option.disabled=active&&!TOUR_SKY_IDS.includes(option.value);
-  for(const button of document.querySelectorAll('#lens-chips button'))button.disabled=active&&!TOUR_SKY_IDS.includes(button.dataset.survey);
 }
 function setTourSkySurvey(id){
   if(!tourSkySurveys().some(s=>s.id===id))return false;

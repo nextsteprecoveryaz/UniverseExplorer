@@ -39,7 +39,7 @@ function currentField(){
 function showPage(page){
   if(typeof researchLeaving==='function'&&page!=='research')researchLeaving();
   cancelAnimationFrame(travelFrame);
-  if(page!=='explore')interruptTour('Paused · another workspace is open');
+  if(page!=='explore')leaveTourView('Paused · another workspace is open');
   if(page!=='explore'&&flight.active)exitFlight();
   currentField();state.page=page;
   syncTourSkyControls();
@@ -71,13 +71,9 @@ function coordinates(){
   onAtlasViewChanged();
 }
 function chooseSurvey(id){
-  if(tourSurveyActive()&&!routePlayer.writing){
-    if(!setTourSkySurvey(id)){toast('Choose a full-sky survey for this tour. Close the tour to explore other telescope layers.');$('#survey-select').value=tourSkySurvey();}
-    return;
-  }
-  interruptTour('Paused · survey changed');
   const survey=state.config.surveys.find(s=>s.id===id);
   if(!survey)return;
+  if(!routePlayer.writing)leaveTourView('Paused · exploring another survey');
   state.survey=id;$('#survey-select').value=id;$('#survey-description').textContent=survey.description;
   $$('#lens-chips button').forEach(b=>b.classList.toggle('selected',b.dataset.survey===id));
   $('#sky-stretch').value='native';
@@ -90,7 +86,7 @@ function chooseSurvey(id){
   }
 }
 function flyTo(destination){
-  interruptTour('Paused · visiting another destination');
+  leaveTourView('Paused · visiting another destination');
   if(flight.active)exitFlight();
   const origin=state.sky?{...currentField()}:null;
   state.destination=destination;showPage('explore');

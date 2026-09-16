@@ -1,5 +1,5 @@
 'use strict';
-const routePlayer={route:null,timeline:null,elapsed:0,playing:false,frame:null,last:0,index:-1,writing:false,projection:null,survey:null,waitSince:0,waitKey:'',skipWait:false,lastProgress:0,prefetch:[],drawn:0};
+const routePlayer={route:null,pack:null,timeline:null,elapsed:0,playing:false,frame:null,last:0,index:-1,writing:false,projection:null,survey:null,waitSince:0,waitKey:'',skipWait:false,lastProgress:0,prefetch:[],drawn:0};
 const routeRecorder={route:null,active:false,paused:false,last:0,elapsed:0,saving:null,pending:false,lastSaved:0,error:null};
 let routeProgressQueue=Promise.resolve(),recordingStarting=false;
 function skyView(){
@@ -10,12 +10,17 @@ function interruptTour(reason='Paused for manual exploration'){
   if(routePlayer.writing||!routePlayer.playing)return;
   pauseRoute(reason);
 }
-function pauseRouteForFlight(){
-  if(!atlasUI.pack)atlasStopPack();
-  interruptTour('Paused · manual exploration');
-  if(routePlayer.route){$('#route-player').hidden=true;$('#explore-page').classList.remove('route-active');}
+function leaveTourView(reason='Paused · manual exploration'){
+  if(!routePlayer.route||routePlayer.writing||$('#route-player').hidden)return;
+  pauseRoute(reason);
+  atlasStopPack();
+  $('#route-player').hidden=true;$('#explore-page').classList.remove('route-active');
+  if(navigationUI.footprint){state.sky?.removeOverlay(navigationUI.footprint);navigationUI.footprint=null;}
+  setNearbyVisible(navigationUI.nearbyPreference);
+  if(typeof atlasMessage==='function')atlasMessage('');
   syncTourSkyControls();
 }
+function pauseRouteForFlight(){leaveTourView();}
 function pauseRoute(reason='Paused'){
   routePlayer.playing=false;cancelAnimationFrame(routePlayer.frame);routePlayer.frame=null;
   if(typeof pauseTourNarration==='function')pauseTourNarration();else if(window.speechSynthesis)window.speechSynthesis.cancel();
@@ -23,7 +28,7 @@ function pauseRoute(reason='Paused'){
   if(routePlayer.route)saveRouteProgress();
 }
 async function saveRouteProgress(){
-  const p=routePlayer;if(!p.route?.id||!p.timeline||atlasUI.pack)return;
+  const p=routePlayer;if(!p.route?.id||!p.timeline||p.pack||atlasUI.pack)return;
   const id=p.route.id,body=JSON.stringify({revision:p.route.revision,elapsed:p.elapsed,origin:p.timeline.origin});
   routeProgressQueue=routeProgressQueue.then(()=>api('/api/navigation/routes/'+id+'/progress',{method:'PUT',headers:{'Content-Type':'application/json'},body})).catch(()=>{if(p.route?.id===id)$('#route-play-status').textContent+=' · progress could not be saved';});
   return routeProgressQueue;
@@ -31,7 +36,7 @@ async function saveRouteProgress(){
 function closeRoutePlayer(){
   atlasStopPack();
   if(typeof resetTourNarration==='function')resetTourNarration();
-  pauseRoute();routePlayer.route=null;routePlayer.timeline=null;$('#route-player').hidden=true;
+  pauseRoute();routePlayer.route=null;routePlayer.pack=null;routePlayer.timeline=null;$('#route-player').hidden=true;
   $('#explore-page').classList.remove('route-active');if(navigationUI.footprint){state.sky?.removeOverlay(navigationUI.footprint);navigationUI.footprint=null;}
   setNearbyVisible(navigationUI.nearbyPreference);
   syncTourSkyControls();
@@ -50,7 +55,7 @@ async function startRouteDocument(route,pack=null,resume=false){
   pauseRoute();if(flight.active)exitFlight();showPage('explore');setNearbyVisible(false);
   const progress=resume?route.progress:null;
   const origin=tourSurveyView(progress?.origin||skyView());
-  Object.assign(routePlayer,{route,timeline:RouteTimeline.build(route,origin),elapsed:progress?.elapsed||0,index:-1,waitKey:'',waitSince:0,skipWait:false,projection:null,survey:null});
+  Object.assign(routePlayer,{route,pack,timeline:RouteTimeline.build(route,origin),elapsed:progress?.elapsed||0,index:-1,waitKey:'',waitSince:0,skipWait:false,projection:null,survey:null});
   $('#route-player').hidden=false;$('#explore-page').classList.add('route-active');$('#route-playing-title').textContent=route.title;
   syncTourSkyControls();
   $('#route-play-seek').max=routePlayer.timeline.total;$('#route-play-seek').value=routePlayer.elapsed;
@@ -61,6 +66,7 @@ function resumeRoute(){
   if(!routePlayer.route||!state.sky)return;
   if(state.page!=='explore')showPage('explore');if(flight.active)exitFlight();
   atlasClear();clearTourImageOverlays();
+  if(routePlayer.pack)atlasUI.pack=routePlayer.pack;
   if(routePlayer.elapsed>=routePlayer.timeline.total)routePlayer.elapsed=0;
   routePlayer.playing=true;routePlayer.last=performance.now();routePlayer.waitSince=0;routePlayer.waitKey='';
   routePlayer.projection=null;routePlayer.survey=null;
@@ -220,7 +226,7 @@ function initRoutePlayer(){
   $('#route-play-close').onclick=closeRoutePlayer;
   $('#route-play-prev').onclick=()=>skipRouteStop(-1);$('#route-play-next').onclick=()=>skipRouteStop(1);
   $('#route-play-seek').oninput=e=>seekRoute(Number(e.target.value));
-  $('#route-play-manual').onclick=()=>{pauseRoute('Paused · you have the flight controls');$('#route-player').hidden=true;$('#explore-page').classList.remove('route-active');syncTourSkyControls();startFlight();};
+  $('#route-play-manual').onclick=()=>{leaveTourView('Paused · you have the flight controls');startFlight();};
   $('#route-stop-inspect').onclick=()=>showTourStopDetails(routePlayer.route.media[routePlayer.index]);
   $('#route-stop-video').onclick=()=>{pauseRoute();const m=routePlayer.route.media[routePlayer.index];modal(m.video_title,`<video controls playsinline style="width:100%" src="${esc(m.video_url)}"></video><p>${esc(m.video_kind)}</p><a href="${esc(m.video_page)}" target="_blank" rel="noopener">Publisher credits ↗</a>`);};
   $('#route-narration').onchange=()=>{if($('#route-narration').checked)speakRouteStop();else window.speechSynthesis?.cancel();};
@@ -228,7 +234,7 @@ function initRoutePlayer(){
   $('#record-flight').onclick=()=>beginRecording().catch(failure);$('#flight-record').onclick=()=>beginRecording().catch(failure);
   $('#recording-toggle').onclick=()=>{routeRecorder.paused=!routeRecorder.paused;routeRecorder.last=performance.now();$('#recording-toggle').textContent=routeRecorder.paused?'▶':'Ⅱ';recordingLabel();};
   $('#recording-stop').onclick=()=>finishRecording().catch(failure);setInterval(recordTick,500);
-  document.addEventListener('keydown',e=>{if(!routePlayer.route||flight.active||state.page!=='explore'||$('#modal').open||flightEditable(e.target))return;if(e.code==='Space'){e.preventDefault();routePlayer.playing?pauseRoute():resumeRoute();}if(e.code==='Escape')pauseRoute();});
+  document.addEventListener('keydown',e=>{if(!tourSurveyActive()||flight.active||$('#modal').open||flightEditable(e.target))return;if(e.code==='Space'){e.preventDefault();routePlayer.playing?pauseRoute():resumeRoute();}if(e.code==='Escape')pauseRoute();});
   const interrupt=()=>interruptTour();$('#aladin-lite-div').addEventListener('pointerdown',interrupt);$('#aladin-lite-div').addEventListener('wheel',interrupt,{passive:true});
   for(const id of ['#zoom-in','#zoom-out'])$(id).addEventListener('click',interrupt);
   window.addEventListener('blur',()=>interruptTour('Paused · window lost focus'));
