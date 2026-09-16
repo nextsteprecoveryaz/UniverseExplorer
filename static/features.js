@@ -1,6 +1,7 @@
 'use strict';
 const mapUI={enabled:false,featured:[],rows:[],selected:null,request:0,timer:null,frame:null,lastQuery:'',queryResult:null};
 let cloudConnection={configured:false,model:'gpt-image-2.5-sunburst'};
+let topazConnection={configured:false,model:'Standard V2',max_output_pixels:25000000};
 let enhancementRunning=false;
 
 function stopObjectVideo(){const video=document.querySelector('#object-detail video');if(video)video.pause();}
@@ -103,23 +104,30 @@ function showObjectDetail(o){
 function updateEnhancementControls(){
   const provider=$('#enhancement-provider').value;
   $('#cloud-options').hidden=provider!=='cloud';$('#chatgpt-options').hidden=provider!=='chatgpt';$('#enhance-button').hidden=provider==='chatgpt';
-  if(!enhancementRunning)$('#enhance-button').textContent=provider==='cloud'?'✧ Enhance with OpenAI':'✧ Enhance locally · 2×';
+  $('#topaz-settings').hidden=provider!=='topaz';
+  $('#cloud-connect').hidden=provider==='topaz';
+  if(!enhancementRunning)$('#enhance-button').textContent=provider==='cloud'?'✧ Enhance with OpenAI':provider==='topaz'?`✧ Upscale with Topaz · ${$('#topaz-scale').value}×`:'✧ Enhance locally · 2×';
   $('#cloud-status').textContent=cloudConnection.configured?`Connected · ${cloudConnection.model} · key in ${cloudConnection.storage}.`:'OpenAI is not connected. Add an API key using Cloud connection.';
+  $('#topaz-connection').textContent=topazConnection.configured?`Connected · ${topazConnection.model} · key in ${topazConnection.storage}.`:(topazConnection.problem||'Topaz is not connected. Add an API key using Topaz connection.');
+  const scale=Number($('#topaz-scale').value),image=state.image;
+  const size=image&&Number.isFinite(image.width)&&Number.isFinite(image.height)?` Output: ${image.width*scale} × ${image.height*scale} pixels.`:'';
+  $('#topaz-note').textContent=`Sends ${image?.scientific?'the selected FITS display stretch':'the original image or saved color-adjusted copy'} to Topaz when you click Upscale. Uses your Topaz API credits. Save an adjusted copy first to include Image Lab color changes. Standard V2; maximum 25 megapixels.${size}`;
   if(state.image)$('#handoff-download').href=`/api/images/${state.image.id}/handoff?stretch=${$('#fits-stretch').value}`;
 }
 function renderEnhancementComparison(preferred){
   const image=state.image;if(!image)return;
   const options=[];
   if(image.ai)options.push({value:'local',label:'Local · FSRCNN 2×',result:image.ai});
-  for(const result of [...(image.cloud_history||[])].reverse())options.push({value:result.variant,label:`${result.provider} · ${date(result.created_at)}`,result});
+  for(const result of [...(image.cloud_history||[])].reverse())options.push({value:result.variant,label:`${result.provider}${result.scale?' · '+result.scale+'×':''} · ${date(result.created_at)}`,result});
   const select=$('#ai-output-select');const selection=preferred||select.value;
   select.innerHTML=options.length?options.map(o=>`<option value="${esc(o.value)}">${esc(o.label)}</option>`).join(''):'<option value="none">No enhancement yet</option>';
   if(options.some(o=>o.value===selection))select.value=selection;
   const ai=options.find(o=>o.value===select.value)?.result;
   $('#ai-placeholder').hidden=Boolean(ai);$('#ai-image').hidden=!ai;$('#ai-download').hidden=!ai;
   if(ai){$('#ai-image').src=ai.url+'?v='+Date.now();$('#ai-download').href=ai.url+'?download=true';$('#ai-note').textContent=ai.note+` Preview ${ai.input_size.join(' × ')} → output ${ai.output_size.join(' × ')}.`;}
-  else $('#ai-note').textContent='Choose local enhancement, OpenAI cloud editing, or the ChatGPT handoff. Enhanced views are labeled visualizations; candidate detection always uses original FITS data.';
+  else $('#ai-note').textContent='Choose local enhancement, Topaz upscaling, OpenAI cloud editing, or the ChatGPT handoff. Enhanced views are labeled visualizations; candidate detection always uses original FITS data.';
   updateEnhancementControls();
+  if(typeof refreshImageLabColors==='function')refreshImageLabColors();
 }
 async function openCloudConnection(service='image'){
   cloudConnection=await api('/api/cloud/status');updateEnhancementControls();
@@ -133,17 +141,44 @@ async function openCloudConnection(service='image'){
   };
   if($('#cloud-disconnect'))$('#cloud-disconnect').onclick=async()=>{cloudConnection=await jsonPost('/api/cloud/disconnect',{});closeModal();updateEnhancementControls();toast(cloudConnection.configured?'Saved key removed. An environment key is still configured.':'OpenAI connection removed.');};
 }
+async function openTopazConnection(){
+  topazConnection=await api('/api/topaz/status');updateEnhancementControls();
+  modal('Topaz cloud connection',`<form id="topaz-key-form" class="note-form"><p class="small muted">Topaz upscaling uploads the selected image and uses your Topaz API credits. Your API key stays in this app’s backend and is sent only to Topaz. Connecting does not start an upscale.</p><p class="small">${topazConnection.configured?'Saved API connection · '+esc(topazConnection.storage):'Not connected'}</p><label for="topaz-api-key">Topaz API key</label><input id="topaz-api-key" type="password" autocomplete="off" spellcheck="false" required placeholder="Paste your API key privately here"><label class="remember-key"><input id="topaz-remember" type="checkbox">Remember on this Windows account (encrypted)</label><p id="topaz-key-message" class="small" role="status"></p><button id="topaz-key-save" class="button primary" type="submit">Verify & connect</button>${topazConnection.configured?'<button id="topaz-disconnect" class="button" type="button">Remove saved connection</button>':''}</form>`);
+  $('#topaz-key-form').onsubmit=async e=>{
+    e.preventDefault();const key=$('#topaz-api-key').value.trim();$('#topaz-api-key').value='';
+    const remember=$('#topaz-remember').checked;
+    await busy($('#topaz-key-save'),'Checking access…',async()=>{
+      topazConnection=await jsonPost('/api/topaz/connect',{api_key:key,remember});updateEnhancementControls();closeModal();toast('Topaz connected. Choose Upscale when you want to send an image.');
+    });
+  };
+  if($('#topaz-disconnect'))$('#topaz-disconnect').onclick=async()=>{
+    await busy($('#topaz-disconnect'),'Removing connection…',async()=>{
+      topazConnection=await jsonPost('/api/topaz/disconnect',{});closeModal();updateEnhancementControls();toast(topazConnection.configured?'Saved key removed. An environment key is still configured.':'Topaz connection removed.');
+    });
+  };
+}
 async function runEnhancement(){
   const provider=$('#enhancement-provider').value;if(provider==='chatgpt'||enhancementRunning||!state.image)return;
+  if(!['local','cloud','topaz'].includes(provider))return;
   if(provider==='cloud'&&!cloudConnection.configured){await openCloudConnection();return;}
-  const id=state.image.id;const button=$('#enhance-button');enhancementRunning=true;$('#enhancement-provider').disabled=true;
-  await busy(button,provider==='cloud'?'OpenAI is editing… this can take a few minutes':'Enhancing on this PC…',async()=>{
-    const body={quality:$('#cloud-quality').value,instructions:$('#cloud-instructions').value,stretch:$('#fits-stretch').value};
-    const result=await api(`/api/images/${id}/${provider==='cloud'?'enhance-cloud':'enhance'}`,provider==='cloud'?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(360000)}:{method:'POST'});
-    if(state.image?.id===id){state.image=result;renderEnhancementComparison(provider==='cloud'?result.cloud_ai.variant:'local');$('#image-provenance').textContent=JSON.stringify(result,null,2);}
-    toast('Enhancement saved. Original data preserved.');
-  });
-  enhancementRunning=false;$('#enhancement-provider').disabled=false;updateEnhancementControls();
+  if(provider==='topaz'&&!topazConnection.configured){await openTopazConnection();return;}
+  const scale=Number($('#topaz-scale').value);
+  if(provider==='topaz'&&![2,4].includes(scale))throw new Error('Choose a Topaz scale of 2× or 4×.');
+  const id=state.image.id;const button=$('#enhance-button');enhancementRunning=true;
+  $('#enhancement-provider').disabled=true;$('#topaz-scale').disabled=true;$('#topaz-connect').disabled=true;
+  const endpoint=provider==='cloud'?'enhance-cloud':provider==='topaz'?'enhance-topaz':'enhance';
+  const label=provider==='cloud'?'OpenAI is editing… this can take a few minutes':provider==='topaz'?'Topaz is upscaling… this can take a few minutes':'Enhancing on this PC…';
+  try{
+    await busy(button,label,async()=>{
+      const body=provider==='topaz'?{scale,stretch:$('#fits-stretch').value}:{quality:$('#cloud-quality').value,instructions:$('#cloud-instructions').value,stretch:$('#fits-stretch').value};
+      const options=provider==='local'?{method:'POST'}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(provider==='topaz'?450000:360000)};
+      const result=await api(`/api/images/${id}/${endpoint}`,options);
+      if(state.image?.id===id){state.image=result;renderEnhancementComparison(provider==='local'?'local':result.cloud_ai.variant);$('#image-provenance').textContent=JSON.stringify(result,null,2);}
+      toast(state.image?.id===id?'Enhancement saved. Original data preserved.':'Enhancement saved to the original image in your library.');
+    });
+  }finally{
+    enhancementRunning=false;$('#enhancement-provider').disabled=false;$('#topaz-scale').disabled=false;$('#topaz-connect').disabled=false;updateEnhancementControls();
+  }
 }
 function initObservatoryFeatures(){
   $('#mapping-toggle').onchange=e=>toggleMapping(e.target.checked);
@@ -164,6 +199,8 @@ function initObservatoryFeatures(){
   }).catch(failure);
   $('#enhancement-provider').onchange=updateEnhancementControls;
   $('#cloud-connect').onclick=()=>openCloudConnection().catch(failure);
+  $('#topaz-connect').onclick=()=>openTopazConnection().catch(failure);
+  $('#topaz-scale').onchange=updateEnhancementControls;
   $('#enhance-button').onclick=()=>runEnhancement().catch(failure);
   $('#ai-output-select').onchange=()=>renderEnhancementComparison();
   $('#enhancement-upload').onchange=async e=>{
@@ -176,4 +213,5 @@ function initObservatoryFeatures(){
     }catch(error){failure(error);}finally{e.target.disabled=false;e.target.value='';}
   };
   api('/api/cloud/status').then(s=>{cloudConnection=s;updateEnhancementControls();}).catch(failure);
+  api('/api/topaz/status').then(s=>{topazConnection=s;updateEnhancementControls();}).catch(error=>{topazConnection={...topazConnection,configured:false,problem:error.message};updateEnhancementControls();});
 }

@@ -12,9 +12,10 @@
   <link rel="stylesheet" href="/sdss.css?v=2">
   <link rel="stylesheet" href="/map-panels.css?v=2">
   <link rel="stylesheet" href="/telescope-live.css?v=3">
-  <link rel="stylesheet" href="/pixel-mapping.css?v=6">
+  <link rel="stylesheet" href="/pixel-mapping.css?v=7">
+  <link rel="stylesheet" href="/image-lab-colors.css?v=1">
   <script src="/vendor/aladin.js" charset="utf-8" defer></script>
-  <script src="/features.js?v=narration-2" defer></script>
+  <script src="/features.js?v=lab-3" defer></script>
   <script src="/journeys.js?v=fullsky-1" defer></script>
   <script src="/photometry.js" defer></script>
   <script src="/flight-math.js" defer></script>
@@ -32,9 +33,10 @@
   <script src="/sdss.js?v=fullsky-1" defer></script>
   <script src="/map-panels.js?v=3" defer></script>
   <script src="/pixel-mapping-math.js?v=4" defer></script>
-  <script src="/pixel-mapping.js?v=7" defer></script>
+  <script src="/pixel-mapping.js?v=8" defer></script>
+  <script src="/image-lab-colors.js?v=1" defer></script>
   <script src="/telescope-live.js?v=8" defer></script>
-  <script src="/app.js?v=surveys-4" defer></script>
+  <script src="/app.js?v=lab-5" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -168,10 +170,11 @@
     <section id="lab-page" class="page workspace-page">
       <div class="page-heading"><div><div class="overline">A CLOSER LOOK</div><h1>Image lab<span>.</span></h1><p>Explore detail. Keep the original evidence.</p></div><label class="button primary upload-button">+ Open an image<input id="image-upload" type="file" accept=".fits,.fit,.fts,.gz,.png,.jpg,.jpeg,.tif,.tiff,.webp"></label></div>
       <div id="image-library" class="image-library"></div>
-      <div id="lab-empty" class="empty-state lab-empty"><span class="empty-symbol">◈</span><h2>A universe of detail, on your PC.</h2><p>Capture the sky view, import a MAST product, or open a FITS / PNG / JPEG image.<br>Choose local enhancement, optional OpenAI cloud editing, or a ChatGPT handoff.</p><button id="lab-capture" class="button">Capture current sky view</button></div>
+      <div id="lab-empty" class="empty-state lab-empty"><span class="empty-symbol">◈</span><h2>A universe of detail, on your PC.</h2><p>Capture the sky view, import a MAST product, or open a FITS / PNG / JPEG image.<br>Choose local enhancement, Topaz upscaling, OpenAI cloud editing, or a ChatGPT handoff.</p><button id="lab-capture" class="button">Capture current sky view</button></div>
       <div id="lab-content" hidden>
         <div class="image-toolbar"><div><strong id="image-name"></strong><div id="image-info" class="small muted"></div></div><div class="flex"><label class="small">FITS display<select id="fits-stretch"><option value="asinh">Asinh</option><option value="linear">Linear</option><option value="log">Log</option></select></label><a id="original-download" class="button" download>↓ Original</a></div></div>
-        <div class="enhancement-tools"><div class="toolbar"><label>Enhancement provider<select id="enhancement-provider"><option value="local">Local · FSRCNN 2×</option><option value="cloud">OpenAI · cloud image editing</option><option value="chatgpt">ChatGPT · export & bring back</option></select></label><button id="enhance-button" class="button primary">✧ Enhance locally · 2×</button><button id="cloud-connect" class="button">Cloud connection</button></div>
+        <div class="enhancement-tools"><div class="toolbar"><label>Enhancement provider<select id="enhancement-provider"><option value="local">Local · FSRCNN 2×</option><option value="topaz">Topaz cloud &middot; upscale</option><option value="cloud">OpenAI · cloud image editing</option><option value="chatgpt">ChatGPT · export & bring back</option></select></label><button id="enhance-button" class="button primary">✧ Enhance locally · 2×</button><button id="cloud-connect" class="button">Cloud connection</button></div>
+          <div id="topaz-settings" hidden><div class="toolbar"><label>Upscale size<select id="topaz-scale"><option value="2">2&times; width &amp; height</option><option value="4">4&times; width &amp; height</option></select></label><button id="topaz-connect" class="button">Topaz connection</button></div><p id="topaz-connection" class="small muted"></p><p id="topaz-note" class="small muted">Upscale sends this image to Topaz and uses your Topaz API credits. Save an adjusted copy first to include Image Lab color changes. Results are separate AI visualizations; the original stays unchanged.</p></div>
           <div id="cloud-options" hidden><div class="toolbar"><label>Cloud quality<select id="cloud-quality"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></label><label class="cloud-prompt-label">Visual preferences (optional)<input id="cloud-instructions" maxlength="2000" placeholder="For example: gentle denoising, preserve the colors"></label></div><p id="cloud-status" class="small muted"></p><p class="small muted">Enhance sends this image’s display preview to OpenAI. API usage is billed to your OpenAI account. Generative editing can change objects and structures.</p></div>
           <div id="chatgpt-options" hidden><p class="small muted">Download a ZIP containing the image and an enhancement prompt. Extract it and attach the PNG in ChatGPT, then bring the result back here for comparison. This handoff does not call the API or automatically send a message.</p><div class="toolbar"><a id="handoff-download" class="button">↓ Image + prompt for ChatGPT</a><label class="button upload-button">Import returned enhancement<input id="enhancement-upload" type="file" accept=".png,.jpg,.jpeg,.webp"></label></div></div>
           <div class="ai-output-picker"><label for="ai-output-select">Compare with</label><select id="ai-output-select"><option value="local">Local AI result</option></select></div>

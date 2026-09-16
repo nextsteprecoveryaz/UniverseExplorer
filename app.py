@@ -22,6 +22,7 @@ import integrations as remote
 import science
 import object_map
 import cloud_ai
+import topaz_ai
 import recent_archive
 import webb_gallery
 import photometry
@@ -135,6 +136,32 @@ async def connect_cloud(body:CloudConnection):
 @app.post('/api/cloud/disconnect')
 def disconnect_cloud():
     return cloud_ai.disconnect()
+
+@app.get('/api/topaz/status')
+def topaz_status():
+    return topaz_ai.status()
+
+class TopazConnection(BaseModel):
+    api_key:SecretStr
+    remember:bool=False
+
+@app.post('/api/topaz/connect')
+async def connect_topaz(body:TopazConnection):
+    return await topaz_ai.connect(body.api_key.get_secret_value(),body.remember)
+
+@app.post('/api/topaz/disconnect')
+def disconnect_topaz():
+    return topaz_ai.disconnect()
+
+class TopazEdit(BaseModel):
+    scale:Literal[2,4]=2
+    stretch:Literal['asinh','linear','log']='asinh'
+
+@app.post('/api/images/{image_id}/enhance-topaz')
+async def enhance_topaz(image_id:str,body:TopazEdit):
+    if CLOUD_BUSY.locked():raise HTTPException(409,'A cloud enhancement is already running. Wait for it to finish before starting another.')
+    async with CLOUD_BUSY:
+        return await topaz_ai.enhance(image_id,body.scale,body.stretch)
 
 class CloudEdit(BaseModel):
     quality:Literal['low','medium','high']='medium'
@@ -273,8 +300,11 @@ async def upload(file:UploadFile=File(...),context:str=Form(default='')):
     if context:
         info=json.loads(context)
         if not isinstance(info,dict): raise ValueError('Invalid image context.')
+    source='Sky view capture' if info else 'Local upload'
+    if info.get('kind')=='telescope-live-capture':source='Telescope Live capture'
+    if info.get('kind')=='image-lab-color-adjustment' or info.get('schema')=='universe-explorer-image-lab-colors-v1':source='Image Lab color adjustment'
     async with HEAVY:
-        return await run_in_threadpool(science.import_image,content,file.filename or 'image','Sky view capture' if info else 'Local upload',info)
+        return await run_in_threadpool(science.import_image,content,file.filename or 'image',source,info)
 
 class ImportProduct(BaseModel):
     uri:str=Field(max_length=1000)

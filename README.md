@@ -34,6 +34,10 @@ Checks: `.venv\Scripts\python.exe -m pytest tests/test_live_feed.py -q` and `nod
 
 **Save PNG** exports the visible Telescope Live map with its current levels, palette and color adjustments. Catalog markers keep their original colors. A source-credit strip is added below the map, and survey URLs, coordinates and full display settings are embedded in the PNG. **Settings JSON** saves that information separately. **Show original** also applies to exports; neither action changes the source imagery.
 
+**Open in Image Lab** sends that same adjusted map to your local image library. It keeps the map area free of a footer while embedding its survey credit, coordinates and display settings in the PNG and provenance. The Lab starts its color controls at zero because the imported pixels already include your Telescope Live adjustments.
+
+Image Lab has **Red, Yellow, Green and Blue** intensity sliders for either the original preview or the selected enhanced result, with independent settings for each image. **Show unadjusted** and **Reset colors** let you compare or start over. **Download adjusted PNG** exports the selected view; **Save adjusted copy** opens a separate local image whose colors can be used by an enhancement provider. The original download and FITS measurements remain unchanged. Raster exports use the original resolution where the browser supports the format; FITS and unsupported raster formats use the displayed preview and record that provenance.
+
 ## Start exploring
 
 1. The app opens to a **360° all-sky overview** in the visible-light survey. Drag to pan and scroll to zoom into any region; no destination is required. **All sky** returns to this overview at any time. The destination cards are optional shortcuts, and the search accepts object names or decimal `RA, Dec`.
@@ -180,6 +184,12 @@ The complete official **CDS Aladin Desktop 12.060** distribution is installed in
 Use **Send current sky position** to point Aladin at the explorer's current field, **Send table to Aladin** to load VizieR measurements, and **Image lab → Open original in Aladin** to load the saved original. These use SAMP locally and address the Aladin application. All FITS HDUs remain in the original handoff. For some multi-extension FITS files, Aladin omits a completion acknowledgement; the bridge checks its actual loaded image planes and never automatically resends the file after a timeout.
 
 The official application JAR, original source archive, GPLv3 license, download provenance and checksums are retained. A private Eclipse Temurin Java 21 runtime is included and its download checksum was verified against the Adoptium API. No global Java or PATH changes are needed. **Stop.cmd** stops the explorer server; close Aladin separately when finished. On a fresh installation, **Setup.cmd** also installs this desktop package.
+
+## Optional Topaz upscaling
+
+In **Image Lab**, choose **Topaz cloud · upscale**, connect your Topaz API key with **Topaz connection**, and select **2×** or **4×**. **Upscale with Topaz** explicitly sends the saved image to Topaz and uses your API credits. To include the Lab's color adjustments, first choose **Save adjusted copy**. Local enhancement remains the default, and connecting a key never uploads an image.
+
+The integration uses Topaz's standard **Standard V2** precision model with face enhancement disabled. It sends the full raster original or a stretched FITS display image, with a 25-million-pixel output limit. Results join the comparison picker as labeled AI visualizations; original files and source detection remain unchanged. Failed submissions are not automatically retried. Keys can be kept in backend memory or encrypted for your Windows account using DPAPI; `TOPAZ_API_KEY` is also supported. Keys are never returned to the browser or committed to Git. [Topaz API documentation](https://developer.topazlabs.com/)
 
 ## Optional OpenAI enhancement
 

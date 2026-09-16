@@ -31,7 +31,7 @@ class PixelMappingController {
       <div class="pm-presets"><span>Presets</span><button type="button" data-look="faint">Lift faint detail</button><button type="button" data-look="crisp">Crisp contrast</button></div></section>
       <section class="pm-section pm-colors"><h3>Color intensity</h3><p class="pm-help">Adjust each color channel. Yellow adjusts red and green together. Zero keeps the original intensity.</p>${['red','yellow','green','blue'].map(name=>`<label><span class="pm-color-dot pm-color-${name}"></span>${name[0].toUpperCase()+name.slice(1)}<output data-output="${name}">0%</output><input type="range" min="-1" max="1" step="0.01" value="0" data-setting="${name}" aria-label="${name[0].toUpperCase()+name.slice(1)} color intensity"></label>`).join('')}</section>
       <details class="pm-advanced"><summary>Fine adjustment</summary>${['brightness','contrast','saturation'].map(name=>`<label>${name[0].toUpperCase()+name.slice(1)}<output data-output="${name}">0</output><input type="range" min="-1" max="1" step="0.01" value="0" data-setting="${name}" aria-label="Pixel mapping ${name}"></label>`).join('')}</details>
-      <div class="pm-actions"><div class="pm-action-row"><button type="button" class="button" data-action="original" aria-pressed="false">Show original</button><button type="button" class="button" data-action="reset">Reset display</button></div><div class="pm-action-row"><button type="button" class="button pm-save" data-action="save">Save PNG</button><button type="button" class="button pm-settings" data-action="settings" title="Download display settings and source information as JSON">Settings JSON</button></div><p class="pm-caption pm-save-status" data-pm="save-status" role="status">Saves this view with its display settings and source credit.</p></div>
+      <div class="pm-actions"><div class="pm-action-row"><button type="button" class="button" data-action="original" aria-pressed="false">Show original</button><button type="button" class="button" data-action="reset">Reset display</button></div><div class="pm-action-row"><button type="button" class="button pm-save" data-action="save">Save PNG</button><button type="button" class="button pm-settings" data-action="settings" title="Download display settings and source information as JSON">Settings JSON</button></div><button type="button" class="button pm-lab" data-action="lab">Open in Image Lab</button><p class="pm-caption pm-save-status" data-pm="save-status" role="status">Saves this view with its display settings and source credit.</p></div>
       <p data-pm="status" class="pm-caption" role="status"></p><p class="pm-provenance">CDS Aladin display controls. Sampled luminance is derived from survey colors, not calibrated photometry.</p></div>`;
     this.host.append(this.el('.pm-actions'));
     this.el('.pm-close').onclick=()=>this.setOpen(false);
@@ -50,6 +50,7 @@ class PixelMappingController {
     this.el('[data-action="sample"]').onclick=()=>this.sample();
     this.el('[data-action="auto"]').onclick=()=>this.sample(true);
     this.el('[data-action="save"]').onclick=()=>this.savePNG();
+    this.el('[data-action="lab"]').onclick=()=>this.openInImageLab();
     this.el('[data-action="settings"]').onclick=()=>this.saveSettings();
   }
   setOpen(open) {
@@ -155,17 +156,40 @@ class PixelMappingController {
     this.download(new Blob([JSON.stringify(metadata,null,2)+'\n'],{type:'application/json'}),`universe-${this.key}-display.json`);
     this.el('[data-pm="save-status"]').textContent='Settings JSON saved with survey source and coordinates.';
   }
-  async savePNG() {
+  async savePNG() { return this.exportView(false); }
+  async openInImageLab() { return this.exportView(true); }
+  async exportView(toLab) {
     if(this.exporting)return;
-    const status=this.el('[data-pm="save-status"]'),button=this.el('[data-action="save"]');
+    const status=this.el('[data-pm="save-status"]'),buttons=['save','lab'].map(action=>this.el(`[data-action="${action}"]`));
     if(!this.layer||this.layer!==this.sky.getBaseImageLayer()){status.textContent='Wait for the survey to load, then save the view.';return;}
-    this.exporting=true;button.disabled=true;status.textContent='Preparing PNG with source credit…';
-    const generation=this.generation,view=this.viewGeneration,edits=this.editGeneration;
+    this.exporting=true;buttons.forEach(button=>button.disabled=true);
+    status.textContent=toLab?'Preparing this view for Image Lab…':'Preparing PNG with source credit…';
     try {
+      const {blob,metadata}=await this.capturePNG({creditFooter:!toLab});
+      if(toLab){
+        const form=new FormData();
+        form.append('file',blob,`Telescope Live - ${metadata.survey.name}.png`);
+        form.append('context',JSON.stringify({kind:'telescope-live-capture',ra:metadata.view.ra_deg,dec:metadata.view.dec_deg,fov:metadata.view.fov_deg,
+          survey:metadata.survey.id,survey_url:metadata.survey.url,captured_at:metadata.created_at,calibrated:false,pixel_mapping:metadata}));
+        status.textContent='Saving this view to your local Image Lab…';
+        const image=await api('/api/images/upload',{method:'POST',body:form});
+        openImage(image);
+        status.textContent='Opened in Image Lab with colors, coordinates and source credit preserved.';
+      }else{
+        this.download(blob,`universe-${metadata.survey.id}-${metadata.created_at.replace(/[:.]/g,'-')}.png`);
+        status.textContent=`Saved ${metadata.export.width} × ${metadata.export.height} PNG · source and settings included.`;
+      }
+    } catch(error) {
+      status.textContent=error?.name==='SecurityError'?'The browser blocked this image export. Reload the survey and try again.':(error?.message||'Unable to save this view. Let the survey load and try again.');
+    } finally {this.exporting=false;buttons.forEach(button=>button.disabled=false);}
+  }
+  async capturePNG({creditFooter=true}={}) {
+    const generation=this.generation,view=this.viewGeneration,edits=this.editGeneration;
+    const assertCurrent=()=>{if(generation!==this.generation||view!==this.viewGeneration||edits!==this.editGeneration)throw Error('The view changed while saving. Save again when the map is still.');};
       if(!this.apply())throw Error('Wait for the survey display to finish loading, then save again.');
       // Allow native cuts/colormap changes to reach the renderer before its own capture.
       await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-      if(generation!==this.generation||view!==this.viewGeneration||edits!==this.editGeneration)throw Error('The view changed while saving. Save again when the map is still.');
+      assertCurrent();
       const metadata=this.exportMetadata(),s=metadata.display;
       // This is the same image snapshot API used by Aladin's built-in export.
       this.sky.view.wasm.update(0);
@@ -185,16 +209,14 @@ class PixelMappingController {
       const overlay=this.sky.aladinDiv.querySelector('.aladin-catalogCanvas');
       if(overlay)ctx.drawImage(overlay,0,0,width,height);
       metadata.image={width,height};
-      const output=PixelMappingController.addCreditFooter(canvas,metadata);
-      metadata.export={width:output.width,height:output.height,format:'image/png',credit_footer:true};
+      const output=creditFooter?PixelMappingController.addCreditFooter(canvas,metadata):canvas;
+      metadata.export={width:output.width,height:output.height,format:'image/png',credit_footer:creditFooter};
       let blob=await new Promise(resolve=>output.toBlob(resolve,'image/png'));
+      assertCurrent();
       if(!blob||blob.type!=='image/png')throw Error('The browser could not create the PNG.');
       blob=await PixelMappingController.withPngMetadata(blob,metadata);
-      this.download(blob,`universe-${metadata.survey.id}-${metadata.created_at.replace(/[:.]/g,'-')}.png`);
-      status.textContent=`Saved ${output.width} × ${output.height} PNG · source and settings included.`;
-    } catch(error) {
-      status.textContent=error?.name==='SecurityError'?'The browser blocked this image export. Reload the survey and try again.':(error?.message||'Unable to save this view. Let the survey load and try again.');
-    } finally {this.exporting=false;button.disabled=false;}
+      assertCurrent();
+      return {blob,metadata};
   }
   static addCreditFooter(image,metadata) {
     const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');

@@ -103,7 +103,7 @@ function harness({saved, storageError = false} = {}) {
   }
   return {
     controller, Controller, host, sky, node, storage, writes, resize, frames, timers, flushFrames, advanceTimers,
-    imageCanvas, catalogCanvas, document: context.document,
+    imageCanvas, catalogCanvas, context, document: context.document,
     setCurrent(next) { currentLayer = next; },
     async bind(key, next) { currentLayer = next; await controller.bind(key, next); },
   };
@@ -616,4 +616,106 @@ test('settings JSON exports reproducible values and source coordinates without a
   assert.equal(saved.view.ra_deg,83.82208);assert.equal(saved.survey.id,'optical');
   assert.equal(saved.survey.url,'https://alasky.cds.unistra.fr/DSS/DSSColor');
   assert.equal(h.downloads[0].blob.type,'application/json');assert.equal(h.controller.layer.calls.length,calls);
+});
+
+function labExportHarness() {
+  const h=exportHarness(),uploads=[],opened=[];
+  h.context.FormData=class {
+    constructor(){this.entries=new Map();this.filenames=new Map();}
+    append(key,value,filename){this.entries.set(key,value);if(filename)this.filenames.set(key,filename);}
+    get(key){return this.entries.get(key);}
+  };
+  h.context.api=async(url,options)=>{uploads.push({url,...options});return {id:'lab-capture',name:'Imported view.png'};};
+  h.context.openImage=image=>opened.push(image);
+  return {...h,uploads,opened};
+}
+
+test('Open in Image Lab transfers the current adjusted map with metadata and no added footer',async()=>{
+  const h=labExportHarness();await h.bind('2mass',layer('2mass'));
+  h.controller.change({...PixelMappingMath.defaults(),red:-.5,yellow:.5,green:.5,blue:1,brightness:.1});h.flushFrames();
+  const pending=h.controller.openInImageLab();h.flushFrames();await pending;
+  assert.equal(h.uploads.length,1);assert.equal(h.opened.length,1);assert.equal(h.opened[0].id,'lab-capture');
+  const upload=h.uploads[0],form=upload.body,context=JSON.parse(form.get('context'));
+  assert.equal(upload.url,'/api/images/upload');assert.equal(upload.method,'POST');assert.equal(form.get('file').type,'image/png');
+  assert.match(form.filenames.get('file'),/^Telescope Live - 2MASS/);
+  assert.equal(h.canvases.length,1,'The lab receives image pixels without a credit footer occupying the image');
+  assert.deepEqual([...h.canvases[0].pixels.slice(8,12)],[19,104,122,128]);
+  assert.equal(h.canvases[0].draws[0].filter,'brightness(1.1) contrast(1) saturate(1)');
+  assert.equal(h.canvases[0].draws[1].image,h.catalogCanvas);assert.equal(h.canvases[0].draws[1].filter,'none');
+  assert.equal(context.kind,'telescope-live-capture');assert.equal(context.ra,83.82208);assert.equal(context.dec,-5.39111);
+  assert.equal(context.fov,.5);assert.equal(context.survey,'2mass');assert.equal(context.calibrated,false);
+  assert.equal(context.pixel_mapping.display.blue,1);assert.equal(context.pixel_mapping.export.credit_footer,false);
+  assert.deepEqual(context.pixel_mapping.export,{width:400,height:240,format:'image/png',credit_footer:false});
+  assert.match(context.pixel_mapping.survey.credit,/CDS/);
+  const png=Buffer.from(await form.get('file').arrayBuffer());
+  assert.ok(png.includes(Buffer.from(JSON.stringify(context.pixel_mapping))),'PNG metadata matches the saved Image Lab provenance');
+  assert.equal(h.downloads.length,0);assert.equal(h.controller.exporting,false);
+  for(const action of ['save','lab'])assert.equal(h.node(`[data-action="${action}"]`).disabled,false);
+});
+
+test('an Image Lab transfer blocks a second transfer or PNG capture until its upload finishes',async()=>{
+  const h=labExportHarness(),uploadStarted=deferred(),uploadResult=deferred();await h.bind('optical',layer('optical'));
+  h.context.api=()=>{uploadStarted.resolve();return uploadResult.promise;};
+  const pending=h.controller.openInImageLab();
+  await h.controller.openInImageLab();await h.controller.savePNG();
+  h.flushFrames();await uploadStarted.promise;
+  assert.deepEqual(h.updates,[0]);assert.equal(h.canvases.length,1);assert.equal(h.opened.length,0);
+  for(const action of ['save','lab'])assert.equal(h.node(`[data-action="${action}"]`).disabled,true);
+  await h.controller.openInImageLab();assert.equal(h.canvases.length,1);
+  uploadResult.resolve({id:'only-capture'});await pending;
+  assert.equal(h.opened.length,1);assert.equal(h.opened[0].id,'only-capture');assert.equal(h.downloads.length,0);
+});
+
+test('Image Lab transfer honors Show original while preserving saved color settings',async()=>{
+  const h=labExportHarness();await h.bind('optical',layer('optical'));
+  h.controller.change({...PixelMappingMath.defaults(),red:.5,blue:1,brightness:.4});h.flushFrames();
+  h.node('[data-action="original"]').onclick();h.flushFrames();
+  const pending=h.controller.openInImageLab();h.flushFrames();await pending;
+  const metadata=JSON.parse(h.uploads[0].body.get('context')).pixel_mapping;
+  assert.equal(metadata.original_preview,true);assert.equal(metadata.display.red,0);assert.equal(metadata.display.blue,0);
+  assert.equal(metadata.saved_adjustments.red,.5);assert.equal(metadata.saved_adjustments.blue,1);
+  assert.equal(h.canvases[0].draws[0].filter,'none');assert.deepEqual([...h.canvases[0].pixels.slice(8,12)],[25,46,61,128]);
+  assert.equal(h.controller.settings.blue,1);assert.equal(h.controller.original,true);
+});
+
+for(const change of ['view','settings','survey'])test(`Image Lab transfer is cancelled when ${change} changes before capture`,async()=>{
+  const h=labExportHarness();await h.bind('2mass',layer('2mass'));
+  const pending=h.controller.openInImageLab();
+  if(change==='view')h.controller.invalidateView();
+  if(change==='settings')h.controller.change({...PixelMappingMath.defaults(),blue:.3});
+  if(change==='survey')await h.bind('optical',layer('optical'));
+  h.flushFrames();await pending;
+  assert.equal(h.uploads.length,0);assert.equal(h.opened.length,0);assert.equal(h.canvases.length,0);
+  assert.match(h.node('[data-pm="save-status"]').textContent,/view changed/i);
+  assert.equal(h.node('[data-action="lab"]').disabled,false);
+});
+
+test('changes during asynchronous PNG encoding cancel an Image Lab upload',async()=>{
+  const h=labExportHarness(),encoding=deferred();await h.bind('2mass',layer('2mass'));
+  const create=h.document.createElement;
+  h.document.createElement=tag=>{const canvas=create(tag);canvas.toBlob=callback=>encoding.resolve(callback);return canvas;};
+  const pending=h.controller.openInImageLab();h.flushFrames();const finish=await encoding.promise;
+  h.controller.change({...PixelMappingMath.defaults(),green:.4});
+  finish(new Blob([h.png],{type:'image/png'}));await pending;
+  assert.equal(h.uploads.length,0);assert.equal(h.opened.length,0);
+  assert.match(h.node('[data-pm="save-status"]').textContent,/view changed/i);
+});
+
+test('changes while embedding PNG metadata cancel an Image Lab upload',async()=>{
+  const h=labExportHarness(),embedding=deferred(),result=deferred();await h.bind('2mass',layer('2mass'));
+  h.Controller.withPngMetadata=blob=>{embedding.resolve(blob);return result.promise;};
+  const pending=h.controller.openInImageLab();h.flushFrames();const blob=await embedding.promise;
+  h.controller.invalidateView();result.resolve(blob);await pending;
+  assert.equal(h.uploads.length,0);assert.equal(h.opened.length,0);
+  assert.match(h.node('[data-pm="save-status"]').textContent,/view changed/i);
+});
+
+test('upload failures restore both export buttons and allow a successful retry',async()=>{
+  const h=labExportHarness();await h.bind('2mass',layer('2mass'));let attempts=0;
+  h.context.api=async()=>{attempts++;if(attempts===1)throw Error('Local image store is unavailable');return {id:'retry-capture'};};
+  let pending=h.controller.openInImageLab();h.flushFrames();await pending;
+  assert.equal(h.opened.length,0);assert.match(h.node('[data-pm="save-status"]').textContent,/Local image store is unavailable/);
+  assert.equal(h.controller.exporting,false);for(const action of ['save','lab'])assert.equal(h.node(`[data-action="${action}"]`).disabled,false);
+  pending=h.controller.openInImageLab();h.flushFrames();await pending;
+  assert.equal(attempts,2);assert.equal(h.opened.length,1);assert.equal(h.opened[0].id,'retry-capture');
 });

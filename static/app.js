@@ -214,6 +214,7 @@ function openImage(image){
   $('#candidate-results').textContent=image.scientific?'Ready to search the original FITS data.':'Source detection requires original FITS data. Use a MAST science product or open a local FITS image.';
   $('#detect-button').disabled=!image.scientific;
   renderAI();
+  bindImageLabColors(image);
   $('#image-provenance').textContent=JSON.stringify(image,null,2);
 }
 function renderAI(){
@@ -343,6 +344,7 @@ async function boot(){
     $('#capture-button').onclick=()=>busy($('#capture-button'),'Capturing…',captureSky);$('#lab-capture').onclick=()=>busy($('#lab-capture'),'Capturing…',captureSky);
     $('#image-upload').onchange=async e=>{try{e.target.disabled=true;await uploadImage(e.target.files[0]);}catch(error){failure(error);}finally{e.target.disabled=false;e.target.value='';}};
     initObservatoryFeatures();
+    initImageLabColors();
     initImageJourneys();
     initPhotometry();
     initFlight();
@@ -354,7 +356,7 @@ async function boot(){
     initSDSS();
     initTelescopeLive();
     initMapPanels();
-    $('#fits-stretch').onchange=e=>{$('#original-image').src=state.image.preview_url+'?stretch='+e.target.value;updateEnhancementControls();};
+    $('#fits-stretch').onchange=e=>{$('#original-image').src=state.image.preview_url+'?stretch='+e.target.value;updateEnhancementControls();refreshImageLabColors();};
     $('#save-image').onclick=()=>{const m=state.image;const center=m.center||m.extra;noteDialog({title:m.name,ra:center.ra??center.s_ra??null,dec:center.dec??center.s_dec??null,body:'Saved image for visual exploration and follow-up.',provenance:{image_id:m.id,input_sha256:m.sha256,source:m.source,filter:m.filter,ai:m.ai,observation:m.extra}});};
     $('#detect-button').onclick=()=>busy($('#detect-button'),'Analyzing original FITS…',detect);
     $('#export-candidates').onclick=()=>download(state.candidates,'source-candidates.json');
