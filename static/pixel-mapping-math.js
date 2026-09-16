@@ -10,14 +10,14 @@
   const MID_MIN = .01;
   const MID_MAX = .93;
   const stretches = new Set(['linear', 'asinh', 'log', 'sqrt', 'pow2']);
-  const colormaps = new Set(['native', 'grayscale', 'viridis', 'magma', 'cividis']);
+  const colormaps = new Set(['native', 'grayscale', 'viridis', 'magma', 'cividis', 'red', 'green', 'blue', 'yellow', 'inferno', 'plasma', 'rainbow']);
   const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
   const finite = value => typeof value === 'number' && Number.isFinite(value);
   const numberOr = (value, fallback) => finite(value) ? value : fallback;
 
   function defaults() {
     return {black: 0, mid: .5, white: 1, stretch: 'linear', colormap: 'native',
-      reversed: false, saturation: 0, brightness: 0, contrast: 0};
+      reversed: false, saturation: 0, brightness: 0, contrast: 0, red: 0, yellow: 0, green: 0};
   }
 
   function normalize(input) {
@@ -37,7 +37,26 @@
       reversed: value.reversed === true,
       saturation: clamp(numberOr(value.saturation, 0), -1, 1),
       brightness: clamp(numberOr(value.brightness, 0), -1, 1),
-      contrast: clamp(numberOr(value.contrast, 0), -1, 1)};
+      contrast: clamp(numberOr(value.contrast, 0), -1, 1),
+      red: clamp(numberOr(value.red, 0), -1, 1),
+      yellow: clamp(numberOr(value.yellow, 0), -1, 1),
+      green: clamp(numberOr(value.green, 0), -1, 1)};
+  }
+
+  // Display-only selective intensity. Masks measure channel differences, so neutral
+  // gray and blue are unchanged. The SVG preview uses the same masks and blend order.
+  // Settings should be normalized once before processing a complete image.
+  function selectiveColor(red, green, blue, settings) {
+    const masks = [Math.max(red-green, 0)*Math.max(red-blue, 0),
+      Math.max(red-blue, 0)*Math.max(green-blue, 0),
+      Math.max(green-red, 0)*Math.max(green-blue, 0)];
+    let values = [red, green, blue];
+    for (let i = 0; i < 3; i += 1) {
+      const gain = settings[['red', 'yellow', 'green'][i]] || 0, weight = masks[i];
+      if (gain && weight) values = values.map(value =>
+        clamp(value*(1+gain), 0, 1)*weight + value*(1-weight));
+    }
+    return values;
   }
 
   function gamma(settings) {
@@ -113,5 +132,5 @@
     return {black, mid: (black + white) / 2, white};
   }
 
-  return Object.freeze({defaults, normalize, gamma, moveHandle, histogram, autoLevels});
+  return Object.freeze({defaults, normalize, gamma, moveHandle, histogram, autoLevels, selectiveColor});
 });

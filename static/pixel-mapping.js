@@ -7,6 +7,7 @@ class PixelMappingController {
     this.settings=PixelMappingMath.defaults(); this.profiles={}; this.key=null; this.layer=null;
     this.original=false; this.generation=0; this.viewGeneration=0; this.sampleGeneration=0; this.editGeneration=0;
     this.histogram=null; this.sampleTimer=null; this.frame=null; this.sampling=false; this.persistent=true; this.emptyRetries=0;
+    this.filterId='pixel-color-'+(++PixelMappingController.serial); this.exporting=false;
     try { const saved=JSON.parse(localStorage.getItem(storageKey)||'{}'); for(const key of ['2mass','optical']) if(saved?.[key]) this.profiles[key]=PixelMappingMath.normalize(saved[key]); } catch { this.persistent=false; }
     this.build(); this.render();
   }
@@ -25,11 +26,12 @@ class PixelMappingController {
       <div class="pm-numbers">${['black','mid','white'].map((name,i)=>`<label><span class="pm-level-label">${['Black point','Midtones (gamma)','White point'][i]}</span><input data-level="${name}" type="number" min="0" max="255" step="0.1" aria-label="${['Black point value','Midtones (gamma) value','White point value'][i]}"></label>`).join('')}</div>
       <div class="pm-sample-row"><button type="button" class="button" data-action="sample">Refresh histogram</button><button type="button" class="button" data-action="auto">Auto levels</button></div>
       <p data-pm="sample-status" class="pm-caption" role="status">Sampled from unadjusted survey pixels.</p></section>
-      <section class="pm-section"><h3>Color &amp; stretch</h3><div class="pm-options"><label>Stretch<select data-setting="stretch" aria-label="Pixel mapping stretch"><option value="linear">Linear</option><option value="asinh">Asinh</option><option value="log">Logarithmic</option><option value="sqrt">Square root</option><option value="pow2">Squared</option></select></label><label>Color map<select data-setting="colormap" aria-label="Pixel mapping color map"><option value="native">Survey colors</option><option value="grayscale">Grayscale</option><option value="viridis">Viridis</option><option value="magma">Magma</option><option value="cividis">Cividis</option></select></label></div>
+      <section class="pm-section"><h3>Color &amp; stretch</h3><div class="pm-options"><label>Stretch<select data-setting="stretch" aria-label="Pixel mapping stretch"><option value="linear">Linear</option><option value="asinh">Asinh</option><option value="log">Logarithmic</option><option value="sqrt">Square root</option><option value="pow2">Squared</option></select></label><label>Color map<select data-setting="colormap" aria-label="Pixel mapping color map">${[['native','Survey colors'],['grayscale','Grayscale'],['red','Red'],['yellow','Yellow'],['green','Green'],['blue','Blue'],['viridis','Viridis'],['magma','Magma'],['cividis','Cividis'],['inferno','Inferno'],['plasma','Plasma'],['rainbow','Rainbow']].map(([value,label])=>`<option value="${value}">${label}</option>`).join('')}</select></label></div>
       <div class="pm-gamma"><span>Midtone gamma <output data-pm="gamma">1.00</output></span><label><input type="checkbox" data-setting="reversed"> Invert colors</label></div>
       <div class="pm-presets"><span>Presets</span><button type="button" data-look="faint">Lift faint detail</button><button type="button" data-look="crisp">Crisp contrast</button></div></section>
+      <section class="pm-section pm-colors"><h3>Color intensity</h3><p class="pm-help">Brighten or darken existing red, yellow and green tones.</p>${['red','yellow','green'].map(name=>`<label><span class="pm-color-dot pm-color-${name}"></span>${name[0].toUpperCase()+name.slice(1)}<output data-output="${name}">0</output><input type="range" min="-1" max="1" step="0.01" value="0" data-setting="${name}" aria-label="${name[0].toUpperCase()+name.slice(1)} color intensity"></label>`).join('')}</section>
       <details class="pm-advanced"><summary>Fine adjustment</summary>${['brightness','contrast','saturation'].map(name=>`<label>${name[0].toUpperCase()+name.slice(1)}<output data-output="${name}">0</output><input type="range" min="-1" max="1" step="0.01" value="0" data-setting="${name}" aria-label="Pixel mapping ${name}"></label>`).join('')}</details>
-      <div class="pm-actions"><button type="button" class="button" data-action="original" aria-pressed="false">Show original</button><button type="button" class="button" data-action="reset">Reset display</button></div>
+      <div class="pm-actions"><div class="pm-action-row"><button type="button" class="button" data-action="original" aria-pressed="false">Show original</button><button type="button" class="button" data-action="reset">Reset display</button></div><div class="pm-action-row"><button type="button" class="button pm-save" data-action="save">Save PNG</button><button type="button" class="button pm-settings" data-action="settings" title="Download display settings and source information as JSON">Settings JSON</button></div><p class="pm-caption pm-save-status" data-pm="save-status" role="status">Saves this view with its display settings and source credit.</p></div>
       <p data-pm="status" class="pm-caption" role="status"></p><p class="pm-provenance">CDS Aladin display controls. Sampled luminance is derived from survey colors, not calibrated photometry.</p></div>`;
     this.host.append(this.el('.pm-actions'));
     this.el('.pm-close').onclick=()=>this.setOpen(false);
@@ -47,6 +49,8 @@ class PixelMappingController {
     this.el('[data-action="original"]').onclick=()=>{this.original=!this.original;this.editGeneration++;this.render();this.scheduleApply();};
     this.el('[data-action="sample"]').onclick=()=>this.sample();
     this.el('[data-action="auto"]').onclick=()=>this.sample(true);
+    this.el('[data-action="save"]').onclick=()=>this.savePNG();
+    this.el('[data-action="settings"]').onclick=()=>this.saveSettings();
   }
   setOpen(open) {
     this.host.hidden=!open; this.host.parentElement.classList.toggle('pixel-mapping-open',open);
@@ -90,20 +94,163 @@ class PixelMappingController {
     this.frame=requestAnimationFrame(()=>{this.frame=null; this.apply();});
   }
   apply() {
-    if(!this.layer||this.layer!==this.sky.getBaseImageLayer())return;
+    if(!this.layer||this.layer!==this.sky.getBaseImageLayer())return false;
     const s=this.original?PixelMappingMath.defaults():this.settings;
     try {
       // JPEG/PNG color surveys in Aladin 3.8.2 take byte-valued cuts, unlike FITS intensities.
       this.layer.setCuts(s.black*255,s.white*255);
-      this.layer.setColormap(s.colormap,{stretch:s.stretch,reversed:s.reversed});
+      // Yellow is a local two-stop LUT registered through Aladin's public custom-colormap API.
+      if(s.colormap==='yellow'&&!this.yellowRegistered){this.sky.addColormap('universe-yellow',['#000000','#ffff00']);this.yellowRegistered=true;}
+      this.layer.setColormap(s.colormap==='yellow'?'universe-yellow':s.colormap,{stretch:s.stretch,reversed:s.reversed});
       this.layer.setGamma(PixelMappingMath.gamma(s));
       // This Aladin release can feed negative graded RGB into pow(), producing a black frame.
       // Use the browser's clamped GPU color filters only on imagery; catalogue markers stay intact.
       this.layer.setBrightness(0); this.layer.setContrast(0); this.layer.setSaturation(0);
       const canvas=this.sky.aladinDiv.querySelector('.aladin-imageCanvas');
-      if(canvas)canvas.style.filter=s.brightness||s.contrast||s.saturation?`brightness(${1+s.brightness}) contrast(${1+s.contrast}) saturate(${1+s.saturation})`:'none';
+      if(canvas)canvas.style.filter=this.displayFilter(s);
       this.el('[data-pm="status"]').textContent=this.original?'Showing original · your adjustments are kept':(this.persistent?'Saved for this survey in this browser':'Session settings · browser storage unavailable');
-    } catch { this.el('[data-pm="status"]').textContent='Survey is still loading. Try the control again when imagery appears.'; }
+      return true;
+    } catch { this.el('[data-pm="status"]').textContent='Survey is still loading. Try the control again when imagery appears.';return false; }
+  }
+  static basicFilter(s) {
+    return s.brightness||s.contrast||s.saturation?`brightness(${1+s.brightness}) contrast(${1+s.contrast}) saturate(${1+s.saturation})`:'none';
+  }
+  displayFilter(s) {
+    const basic=PixelMappingController.basicFilter(s);
+    if(!s.red&&!s.yellow&&!s.green)return basic;
+    if(!this.colorFilter) {
+      this.colorFilter=document.createElementNS('http://www.w3.org/2000/svg','svg');
+      this.colorFilter.setAttribute('class','pm-filter-defs'); this.colorFilter.setAttribute('aria-hidden','true');
+      this.colorFilter.setAttribute('width','0'); this.colorFilter.setAttribute('height','0');
+      // Keep SVG outside the hideable panel: display:none would disable its filter.
+      this.sky.aladinDiv.append(this.colorFilter);
+    }
+    const channel=(name,row)=>`<feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${row} 0 0" result="${name}"/>`;
+    const difference=(a,b)=>`<feComposite in="${a}" in2="${b}" operator="arithmetic" k2="1" k3="-1" result="${a}${b}"/>`;
+    let primitives=channel('r','1 0 0')+channel('g','0 1 0')+channel('b','0 0 1')+
+      difference('r','g')+difference('r','b')+difference('g','r')+difference('g','b')+
+      '<feComposite in="rg" in2="rb" operator="in" result="red"/>'+
+      '<feComposite in="rb" in2="gb" operator="in" result="yellow"/>'+
+      '<feComposite in="gr" in2="gb" operator="in" result="green"/>';
+    let current='SourceGraphic';
+    for(const name of ['red','yellow','green']) {
+      if(!s[name])continue;
+      primitives+=`<feComponentTransfer in="${current}" result="${name}-candidate">${['R','G','B'].map(c=>`<feFunc${c} type="linear" slope="${1+s[name]}"/>`).join('')}</feComponentTransfer>`+
+        `<feComposite in="${name}-candidate" in2="${name}" operator="in" result="${name}-selected"/>`+
+        `<feComposite in="${current}" in2="${name}" operator="out" result="${name}-rest"/>`+
+        `<feComposite in="${name}-selected" in2="${name}-rest" operator="arithmetic" k2="1" k3="1" result="${name}-graded"/>`;
+      current=name+'-graded';
+    }
+    this.colorFilter.innerHTML=`<defs><filter id="${this.filterId}" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">${primitives}</filter></defs>`;
+    return (basic==='none'?'':basic+' ')+`url("#${this.filterId}")`;
+  }
+  exportMetadata() {
+    const info=this.key==='2mass'?{name:'2MASS near-infrared color survey',url:'https://alasky.cds.unistra.fr/2MASS/Color',credit:'2MASS / University of Massachusetts / IPAC-Caltech; HiPS by CDS'}:
+      {name:'Digitized Sky Survey 2 color',url:'https://alasky.cds.unistra.fr/DSS/DSSColor',credit:'DSS2 / STScI / ESO; color HiPS by CDS'};
+    const center=this.sky.getRaDec(),fov=this.sky.getFov();
+    return {schema:'universe-explorer-pixel-mapping-v1',created_at:new Date().toISOString(),
+      survey:{id:this.key,...info},view:{ra_deg:center[0],dec_deg:center[1],fov_deg:fov[0],coordinate_frame:'ICRS'},
+      original_preview:this.original,display:PixelMappingMath.normalize(this.original?PixelMappingMath.defaults():this.settings),
+      saved_adjustments:PixelMappingMath.normalize(this.settings),renderer:'CDS Aladin Lite 3.8.2',
+      processing:'Survey display visualization. Native cuts, stretch, colormap and gamma; browser brightness, contrast and saturation; selective red/yellow/green intensity. Not calibrated photometry.',
+      image_kind:'Ground-based survey context; not a Hubble or Webb exposure.'};
+  }
+  download(blob,filename) {
+    const url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;link.download=filename;document.body.append(link);
+    try{link.click();}finally{link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+  }
+  saveSettings() {
+    if(!this.key||!this.layer)return;
+    const metadata=this.exportMetadata();
+    this.download(new Blob([JSON.stringify(metadata,null,2)+'\n'],{type:'application/json'}),`universe-${this.key}-display.json`);
+    this.el('[data-pm="save-status"]').textContent='Settings JSON saved with survey source and coordinates.';
+  }
+  async savePNG() {
+    if(this.exporting)return;
+    const status=this.el('[data-pm="save-status"]'),button=this.el('[data-action="save"]');
+    if(!this.layer||this.layer!==this.sky.getBaseImageLayer()){status.textContent='Wait for the survey to load, then save the view.';return;}
+    this.exporting=true;button.disabled=true;status.textContent='Preparing PNG with source credit…';
+    const generation=this.generation,view=this.viewGeneration,edits=this.editGeneration;
+    try {
+      if(!this.apply())throw Error('Wait for the survey display to finish loading, then save again.');
+      // Allow native cuts/colormap changes to reach the renderer before its own capture.
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      if(generation!==this.generation||view!==this.viewGeneration||edits!==this.editGeneration)throw Error('The view changed while saving. Save again when the map is still.');
+      const metadata=this.exportMetadata(),s=metadata.display;
+      // This is the same image snapshot API used by Aladin's built-in export.
+      this.sky.view.wasm.update(0);
+      const source=this.sky.view.wasm.canvas(),width=source.width,height=source.height;
+      if(!width||!height||width*height>25000000)throw Error('Open the map at a smaller size before saving.');
+      const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+      const ctx=canvas.getContext('2d',{willReadFrequently:true});
+      ctx.filter=PixelMappingController.basicFilter(s);ctx.drawImage(source,0,0,width,height);ctx.filter='none';
+      if(s.red||s.yellow||s.green) {
+        const pixels=ctx.getImageData(0,0,width,height),data=pixels.data;
+        for(let p=0;p<data.length;p+=4) {
+          const rgb=PixelMappingMath.selectiveColor(data[p]/255,data[p+1]/255,data[p+2]/255,s);
+          data[p]=Math.round(rgb[0]*255);data[p+1]=Math.round(rgb[1]*255);data[p+2]=Math.round(rgb[2]*255);
+        }
+        ctx.putImageData(pixels,0,0);
+      }
+      const overlay=this.sky.aladinDiv.querySelector('.aladin-catalogCanvas');
+      if(overlay)ctx.drawImage(overlay,0,0,width,height);
+      metadata.image={width,height};
+      const output=PixelMappingController.addCreditFooter(canvas,metadata);
+      metadata.export={width:output.width,height:output.height,format:'image/png',credit_footer:true};
+      let blob=await new Promise(resolve=>output.toBlob(resolve,'image/png'));
+      if(!blob||blob.type!=='image/png')throw Error('The browser could not create the PNG.');
+      blob=await PixelMappingController.withPngMetadata(blob,metadata);
+      this.download(blob,`universe-${metadata.survey.id}-${metadata.created_at.replace(/[:.]/g,'-')}.png`);
+      status.textContent=`Saved ${output.width} × ${output.height} PNG · source and settings included.`;
+    } catch(error) {
+      status.textContent=error?.name==='SecurityError'?'The browser blocked this image export. Reload the survey and try again.':(error?.message||'Unable to save this view. Let the survey load and try again.');
+    } finally {this.exporting=false;button.disabled=false;}
+  }
+  static addCreditFooter(image,metadata) {
+    const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+    const scale=Math.max(1,Math.min(2,image.width/1000)),font=Math.round(12*scale),pad=Math.round(14*scale),lineHeight=Math.round(18*scale);
+    ctx.font=`${font}px sans-serif`;
+    const source=[`${metadata.survey.name} · ${metadata.renderer} · ${metadata.original_preview?'Original preview':'Display visualization'}`,
+      `${metadata.survey.credit} | ${metadata.survey.url}`,
+      `RA ${metadata.view.ra_deg.toFixed(5)}° · Dec ${metadata.view.dec_deg.toFixed(5)}° · Field ${metadata.view.fov_deg.toFixed(4)}° · ${metadata.created_at}`,
+      'Ground-based survey context. Source and full display settings are embedded in this PNG.'];
+    const lines=[];
+    for(const text of source) {
+      let line='';
+      for(let word of text.split(' ')) {
+        // Long source URLs also wrap on narrow exports, preserving the full credit.
+        if(ctx.measureText(word).width>image.width-pad*2) {
+          if(line){lines.push(line);line='';}
+          let part='';
+          for(const character of word) {
+            if(part&&ctx.measureText(part+character).width>image.width-pad*2){lines.push(part);part=character;}else part+=character;
+          }
+          line=part;continue;
+        }
+        const next=line?line+' '+word:word;
+        if(line&&ctx.measureText(next).width>image.width-pad*2){lines.push(line);line=word;}else line=next;
+      }
+      if(line)lines.push(line);
+    }
+    canvas.width=image.width;canvas.height=image.height+pad*2+lineHeight*lines.length;
+    ctx.fillStyle='#09131e';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0);
+    ctx.font=`${font}px sans-serif`;ctx.fillStyle='#d5e0e6';ctx.textBaseline='top';
+    lines.forEach((line,i)=>ctx.fillText(line,pad,image.height+pad+i*lineHeight));
+    return canvas;
+  }
+  static async withPngMetadata(blob,metadata) {
+    const bytes=new Uint8Array(await blob.arrayBuffer());
+    const signature=[137,80,78,71,13,10,26,10];
+    if(!signature.every((value,i)=>bytes[i]===value)||bytes.length<33)throw Error('The browser returned an invalid PNG.');
+    // PNG iTXt: keyword, compression flag/method, empty language and translated keyword.
+    const data=new TextEncoder().encode('Universe Explorer\0\0\0\0\0'+JSON.stringify(metadata));
+    const chunk=new Uint8Array(data.length+12),view=new DataView(chunk.buffer);
+    view.setUint32(0,data.length);chunk.set([105,84,88,116],4);chunk.set(data,8);
+    let crc=0xffffffff;
+    for(let i=4;i<chunk.length-4;i++){crc^=chunk[i];for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}
+    view.setUint32(chunk.length-4,(crc^0xffffffff)>>>0);
+    return new Blob([bytes.subarray(0,33),chunk,bytes.subarray(33)],{type:'image/png'});
   }
   invalidateView() {
     this.viewGeneration++; this.sampleGeneration++; this.sampling=false; this.histogram=null; this.emptyRetries=0;
@@ -172,7 +319,7 @@ class PixelMappingController {
       const handle=this.el(`[data-handle="${name}"]`); handle.style.left=(s[name]*100)+'%'; handle.setAttribute('aria-valuenow',(s[name]*255).toFixed(1));
       const input=this.el(`[data-level="${name}"]`); if(document.activeElement!==input)input.value=(s[name]*255).toFixed(1);
     }
-    for(const key of ['stretch','colormap','reversed','brightness','contrast','saturation']) {
+    for(const key of ['stretch','colormap','reversed','brightness','contrast','saturation','red','yellow','green']) {
       const input=this.el(`[data-setting="${key}"]`); if(input.type==='checkbox')input.checked=s[key]; else input.value=s[key];
       const output=this.el(`[data-output="${key}"]`); if(output)output.textContent=(s[key]>0?'+':'')+s[key].toFixed(2);
     }
@@ -183,3 +330,4 @@ class PixelMappingController {
     this.el('[data-pm="curve"]').setAttribute('d',Array.from({length:129},(_,i)=>{const x=i/128;let y=Math.max(0,Math.min(1,(x-s.black)/(s.white-s.black)));if(s.stretch==='sqrt')y=Math.sqrt(y);else if(s.stretch==='pow2')y*=y;else if(s.stretch==='asinh')y=Math.asinh(10*y)/3;else if(s.stretch==='log')y=Math.log(1000*y+1)/Math.log(1000);if(s.reversed)y=1-y;y=Math.pow(Math.max(0,Math.min(1,y)),gamma);y=Math.max(0,Math.min(1,.5+(1+s.contrast)*(y*(1+s.brightness)-.5)));return `${i?'L':'M'}${x*256} ${(1-y)*112}`;}).join(''));
   }
 }
+PixelMappingController.serial=0;

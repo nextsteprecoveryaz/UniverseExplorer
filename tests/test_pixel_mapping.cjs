@@ -28,7 +28,7 @@ function harness({saved, storageError = false} = {}) {
   let serial = 0, currentLayer = null;
   if (saved !== undefined) storage.set('test-pixel-profile', saved);
   function node(selector) {
-    if (/^\[data-output=/.test(selector) && !/brightness|contrast|saturation/.test(selector)) return null;
+    if (/^\[data-output=/.test(selector) && !/brightness|contrast|saturation|red|yellow|green/.test(selector)) return null;
     if (!nodes.has(selector)) {
       const dataset = {};
       for (const name of ['handle', 'level', 'setting', 'look']) {
@@ -38,7 +38,7 @@ function harness({saved, storageError = false} = {}) {
       const attributes = new Map();
       nodes.set(selector, {
         dataset, style: {}, textContent: '', hidden: false, disabled: false, value: '', checked: false,
-        type: dataset.setting === 'reversed' ? 'checkbox' : ['brightness', 'contrast', 'saturation'].includes(dataset.setting) ? 'range' : 'select',
+        type: dataset.setting === 'reversed' ? 'checkbox' : ['brightness', 'contrast', 'saturation', 'red', 'yellow', 'green'].includes(dataset.setting) ? 'range' : 'select',
         setAttribute(name, value) { attributes.set(name, String(value)); },
         getAttribute(name) { return attributes.get(name); },
         getBoundingClientRect() { return {left: 20, top: 0, width: 320, height: 12}; },
@@ -55,7 +55,7 @@ function harness({saved, storageError = false} = {}) {
       const sets = {
         '[data-handle]': ['black', 'mid', 'white'].map(name => `[data-handle="${name}"]`),
         '[data-level]': ['black', 'mid', 'white'].map(name => `[data-level="${name}"]`),
-        '[data-setting]': ['stretch', 'colormap', 'reversed', 'brightness', 'contrast', 'saturation'].map(name => `[data-setting="${name}"]`),
+        '[data-setting]': ['stretch', 'colormap', 'reversed', 'brightness', 'contrast', 'saturation', 'red', 'yellow', 'green'].map(name => `[data-setting="${name}"]`),
         '[data-look]': ['faint', 'crisp'].map(name => `[data-look="${name}"]`),
       };
       return (sets[selector] || []).map(node);
@@ -72,7 +72,7 @@ function harness({saved, storageError = false} = {}) {
     },
   };
   const context = vm.createContext({
-    console, PixelMappingMath, document: {activeElement: null},
+    console, PixelMappingMath, Blob, TextEncoder, document: {activeElement: null},
     localStorage: {
       getItem(key) { if (storageError) throw new Error('Storage blocked'); return storage.get(key) || null; },
       setItem(key, value) { if (storageError) throw new Error('Storage blocked'); writes.push({key, value}); storage.set(key, value); },
@@ -460,4 +460,141 @@ test('numeric entry previews without replacing active text and commits the clamp
   input.value = '999'; input.valueAsNumber = 999; input.onchange(); h.flushFrames();
   assert.ok(image.cuts[0] < image.cuts[1]);
   assert.equal(input.value, (h.controller.settings.black * 255).toFixed(1));
+});
+
+function exportHarness() {
+  const h=harness(),canvases=[],downloads=[],updates=[],svg=[];
+  const source={width:400,height:240,name:'native-image'};
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6ZAAAAABJRU5ErkJggg==','base64');
+  h.sky.getRaDec=()=>[83.82208,-5.39111];h.sky.getFov=()=>[.5,.3];
+  h.sky.view={wasm:{update:time=>updates.push(time),canvas:()=>source}};
+  h.sky.addColormap=(name,colors)=>{h.sky.palette={name,colors};};
+  h.sky.aladinDiv.append=element=>svg.push(element);
+  h.document.createElementNS=()=>({attributes:{},setAttribute(name,value){this.attributes[name]=value;},innerHTML:''});
+  h.document.createElement=tag=>{
+    assert.equal(tag,'canvas');
+    const canvas={width:0,height:0,draws:[],labels:[],pixels:new Uint8ClampedArray([128,0,0,255,0,128,0,255])};
+    const ctx={filter:'none',drawImage(image,...args){canvas.draws.push({image,args,filter:this.filter});},
+      fillRect(){},fillText(text,x,y){canvas.labels.push({text,x,y});},
+      measureText(text){return {width:text.length*6};},
+      getImageData(){return {data:canvas.pixels};},putImageData(pixels){canvas.pixels=pixels.data;}};
+    canvas.getContext=()=>ctx;
+    canvas.toBlob=(callback,type)=>{canvas.mime=type;callback(new Blob([png],{type}));};
+    canvases.push(canvas);return canvas;
+  };
+  h.controller.download=(blob,name)=>downloads.push({blob,name});
+  return {...h,canvases,downloads,updates,source,svg,png};
+}
+
+test('selective controls persist, affect imagery only, and original/reset remove their filter', async () => {
+  const h=exportHarness();await h.bind('2mass',layer('2mass'));
+  for(const [name,value] of [['red',-.7],['yellow',.5],['green',.3]]) {
+    const input=h.node(`[data-setting="${name}"]`);input.value=String(value);input.oninput();
+  }
+  h.flushFrames();
+  assert.match(h.imageCanvas.style.filter,/url\("#pixel-color-\d+"\)/);
+  assert.equal(h.catalogCanvas.style.filter,'none');assert.equal(h.sky.aladinDiv.style.filter,'none');
+  assert.equal(h.svg.length,1);assert.match(h.svg[0].innerHTML,/color-interpolation-filters="sRGB"/);
+  assert.match(h.svg[0].innerHTML,/result="red-graded"/);assert.match(h.svg[0].innerHTML,/result="yellow-graded"/);
+  const stored=h.storage.get('test-pixel-profile'),filter=h.imageCanvas.style.filter;
+  h.node('[data-action="original"]').onclick();h.flushFrames();assert.equal(h.imageCanvas.style.filter,'none');
+  assert.equal(h.storage.get('test-pixel-profile'),stored);
+  h.node('[data-action="original"]').onclick();h.flushFrames();assert.equal(h.imageCanvas.style.filter,filter);
+  h.node('[data-action="reset"]').onclick();h.flushFrames();assert.equal(h.imageCanvas.style.filter,'none');
+  assert.equal(h.controller.settings.red,0);assert.equal(h.controller.settings.green,0);
+});
+
+test('yellow palette is registered through the renderer API once and other palettes remain native', async () => {
+  const h=exportHarness(),image=layer('2mass');await h.bind('2mass',image);
+  h.controller.change({...PixelMappingMath.defaults(),colormap:'yellow'});h.flushFrames();
+  assert.equal(h.sky.palette.name,'universe-yellow');assert.equal(h.sky.palette.colors.join(','),'#000000,#ffff00');
+  assert.equal(image.colormap,'universe-yellow');
+  h.sky.addColormap=()=>{throw Error('Already registered');};h.controller.apply();
+  for(const colormap of ['red','green','blue','inferno','plasma','rainbow']) {
+    h.controller.change({...PixelMappingMath.defaults(),colormap});h.flushFrames();assert.equal(image.colormap,colormap);
+  }
+});
+
+test('PNG export redraws and grades imagery, keeps overlays neutral, and adds credit below the map', async () => {
+  const h=exportHarness();await h.bind('2mass',layer('2mass'));
+  h.controller.change({...PixelMappingMath.defaults(),red:.8,brightness:.2,contrast:.1,saturation:.3});h.flushFrames();
+  const saved=h.storage.get('test-pixel-profile'),writes=h.writes.length;
+  const pending=h.controller.savePNG();assert.equal(h.node('[data-action="save"]').disabled,true);
+  h.flushFrames();await pending;
+  assert.deepEqual(h.updates,[0]);assert.equal(h.downloads.length,1);
+  const [image,output]=h.canvases;
+  assert.equal(image.draws[0].image,h.source);
+  assert.equal(image.draws[0].filter,'brightness(1.2) contrast(1.1) saturate(1.3)');
+  assert.equal(image.draws[1].image,h.catalogCanvas);assert.equal(image.draws[1].filter,'none');
+  assert.ok(image.pixels[0]>128);assert.equal(image.pixels[3],255);assert.equal(image.pixels[5],128);
+  assert.equal(output.width,400);assert.ok(output.height>240);assert.equal(output.draws[0].image,image);
+  assert.ok(output.labels.every(line=>line.y>=240),'Credit must never cover map pixels');
+  assert.ok(output.labels.some(line=>/2MASS/.test(line.text)));
+  assert.equal(output.mime,'image/png');assert.equal(h.downloads[0].blob.type,'image/png');
+  const png=Buffer.from(await h.downloads[0].blob.arrayBuffer());
+  assert.equal(png.subarray(37,41).toString(),'iTXt');
+  assert.ok(png.includes(Buffer.from('alasky.cds.unistra.fr/2MASS/Color')));
+  assert.ok(png.includes(Buffer.from('"red":0.8')));assert.ok(png.includes(Buffer.from('"width":400')));
+  assert.match(h.downloads[0].name,/^universe-2mass-.*\.png$/);
+  assert.match(h.node('[data-pm="save-status"]').textContent,/Saved 400/);
+  assert.equal(h.node('[data-action="save"]').disabled,false);
+  assert.equal(h.storage.get('test-pixel-profile'),saved);assert.equal(h.writes.length,writes);
+});
+
+test('original preview PNG uses neutral rendering and retains saved adjustments in metadata', async () => {
+  const h=exportHarness();await h.bind('optical',layer('optical'));
+  h.controller.change({...PixelMappingMath.defaults(),green:.7,brightness:.4});h.flushFrames();
+  h.node('[data-action="original"]').onclick();h.flushFrames();
+  const pending=h.controller.savePNG();h.flushFrames();await pending;
+  assert.equal(h.canvases[0].draws[0].filter,'none');assert.equal(h.canvases[0].pixels[5],128);
+  const text=Buffer.from(await h.downloads[0].blob.arrayBuffer()).toString();
+  assert.match(text,/"original_preview":true/);assert.match(text,/"saved_adjustments":\{[^}]+"green":0.7/);
+  assert.match(text,/DSS2/);assert.equal(h.controller.settings.green,.7);assert.equal(h.controller.original,true);
+});
+
+test('changed view cancels pending PNG instead of attaching stale source information', async () => {
+  const h=exportHarness();await h.bind('2mass',layer('2mass'));
+  const pending=h.controller.savePNG();h.controller.invalidateView();h.flushFrames();await pending;
+  assert.equal(h.downloads.length,0);assert.equal(h.canvases.length,0);
+  assert.match(h.node('[data-pm="save-status"]').textContent,/view changed/i);
+  assert.equal(h.node('[data-action="save"]').disabled,false);
+});
+
+test('blocked or empty native capture is reported and saving can be retried', async () => {
+  const h=exportHarness();await h.bind('2mass',layer('2mass'));
+  h.sky.view.wasm.canvas=()=>{const error=new Error('tainted');error.name='SecurityError';throw error;};
+  let pending=h.controller.savePNG();h.flushFrames();await pending;
+  assert.equal(h.downloads.length,0);assert.match(h.node('[data-pm="save-status"]').textContent,/browser blocked/i);
+  h.sky.view.wasm.canvas=()=>({width:0,height:0});
+  pending=h.controller.savePNG();h.flushFrames();await pending;
+  assert.equal(h.downloads.length,0);assert.equal(h.controller.exporting,false);
+  h.sky.view.wasm.canvas=()=>h.source;
+  pending=h.controller.savePNG();h.flushFrames();await pending;assert.equal(h.downloads.length,1);
+});
+
+test('PNG metadata chunk has a valid CRC and preserves every original image chunk', async () => {
+  const h=exportHarness(),metadata={source:'https://example.test/source',display:{red:.5},credit:'2MASS · CDS'};
+  const blob=await h.Controller.withPngMetadata(new Blob([h.png],{type:'image/png'}),metadata);
+  const bytes=Buffer.from(await blob.arrayBuffer()),length=bytes.readUInt32BE(33);
+  assert.deepEqual(bytes.subarray(0,33),h.png.subarray(0,33));
+  assert.deepEqual(bytes.subarray(33+12+length),h.png.subarray(33));
+  assert.equal(bytes.subarray(41,41+length).toString(),'Universe Explorer\0\0\0\0\0'+JSON.stringify(metadata));
+  let crc=0xffffffff;
+  for(const byte of bytes.subarray(37,41+length)) {
+    crc^=byte;for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);
+  }
+  assert.equal(bytes.readUInt32BE(41+length),(crc^0xffffffff)>>>0);
+  await assert.rejects(h.Controller.withPngMetadata(new Blob(['not a PNG']),metadata),/invalid PNG/);
+});
+
+test('settings JSON exports reproducible values and source coordinates without altering the view', async () => {
+  const h=exportHarness();await h.bind('optical',layer('optical'));
+  h.controller.change({...PixelMappingMath.defaults(),yellow:-.3,colormap:'yellow'});h.flushFrames();
+  const calls=h.controller.layer.calls.length;
+  h.node('[data-action="settings"]').onclick();
+  const saved=JSON.parse(await h.downloads[0].blob.text());
+  assert.equal(saved.display.yellow,-.3);assert.equal(saved.display.colormap,'yellow');
+  assert.equal(saved.view.ra_deg,83.82208);assert.equal(saved.survey.id,'optical');
+  assert.equal(saved.survey.url,'https://alasky.cds.unistra.fr/DSS/DSSColor');
+  assert.equal(h.downloads[0].blob.type,'application/json');assert.equal(h.controller.layer.calls.length,calls);
 });

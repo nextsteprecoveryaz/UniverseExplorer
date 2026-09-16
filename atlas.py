@@ -102,7 +102,13 @@ def read_remote(url,params=None,max_bytes=16*1024*1024):
 def view_key(view):
     return cache.key('survey-view-v1:'+json.dumps({k:view[k] for k in ('ra','dec','fov','survey')},sort_keys=True))
 
+def require_rendered_views(survey_id):
+    survey=SURVEYS.get(survey_id,{})
+    if survey.get('rendered_views') is False:
+        raise HTTPException(409,'Prepared tour views are unavailable for '+survey.get('name',survey_id)+'. Interactive survey tiles remain available and are cached as you explore.')
+
 def survey_view(view,pin=None):
+    require_rendered_views(view['survey'])
     ident=view_key(view);item=cache.get(ident)
     if item:
         if pin:cache.pin(pin,ident)
@@ -163,6 +169,7 @@ def prepare(request:Cutout):
 
 @router.post('/view')
 def prepare_view(view:ViewRequest):
+    require_rendered_views(view.survey)
     params=view.model_dump();ident=view_key(params);item=cache.get(ident)
     if item:return {'id':ident,'state':'complete','result':public(item)}
     if CACHED_ONLY:raise HTTPException(409,'This rendered view is not cached.')
@@ -182,6 +189,7 @@ def cancel(ident:str):
 def download_pack(route_id:str):
     route=expeditions.read(route_id)
     if route['kind']!='waypoints' or not route['stops']:raise HTTPException(400,'Choose a waypoint tour with at least one stop. Continuous recordings can use the visited-tile cache.')
+    for stop in route['stops']:require_rendered_views(stop.get('survey','optical'))
     if CACHED_ONLY:raise HTTPException(409,'Turn off cached-only mode before downloading a tour.')
     ident=cache.key('pack:'+route_id+':'+str(route['revision']))
     def work(job):
@@ -229,6 +237,36 @@ def tile_path(path):
     if path in ('properties','Moc.fits','metadata.xml','preview.jpg'):return True
     return bool(re.fullmatch(r'Norder(?:[0-9]|[12][0-9])/(?:Allsky\.(?:jpg|png|fits)|Dir\d{1,18}/Npix\d{1,18}\.(?:jpg|png|fits|webp))',path))
 
+def rewrite_survey_properties(survey_id,raw):
+    value=raw.decode('utf-8')
+    if survey_id=='cefca-virgo':
+        # CEFCA's published 2015 survey uses Aladin's legacy property names.
+        # Lite 3.8.2 requires hips_frame/hips_order. Translate this configured
+        # survey only, retaining the provider's order, frame and formats.
+        properties={k.strip():v.strip() for line in value.splitlines()
+                    if '=' in line and not line.lstrip().startswith('#')
+                    for k,v in [line.split('=',1)]}
+        additions={}
+        if not properties.get('hips_frame'):
+            if properties.get('coordsys')!='C':raise ValueError('CEFCA survey coordinate frame is unsupported.')
+            additions['hips_frame']='equatorial'
+        if not properties.get('hips_order'):
+            order=properties.get('maxOrder','')
+            if not re.fullmatch(r'\d{1,2}',order) or not 0<=int(order)<=29:
+                raise ValueError('CEFCA survey tile order is invalid.')
+            additions['hips_order']=str(int(order))
+        if not properties.get('hips_tile_format'):
+            formats=properties.get('format','').lower().split()
+            if not formats or any(v not in ('jpeg','png','fits','webp') for v in formats):
+                raise ValueError('CEFCA survey tile format is unsupported.')
+            additions['hips_tile_format']=' '.join(formats)
+        if not properties.get('dataproduct_type'):additions['dataproduct_type']='image'
+        if not properties.get('obs_title'):additions['obs_title']='CEFCA Virgo Cluster'
+        value+='\n'+'\n'.join(k+' = '+v for k,v in additions.items())
+    value=re.sub(r'^hips_service_url(?:_\d+)?\s*=.*$', '',value,flags=re.M)
+    return (value+'\nhips_service_url = http://127.0.0.1:8765/api/atlas/surveys/'+survey_id+'\n').encode()
+
+
 def fetch_tile(survey_id,part,url,ident,refresh=False):
     """Concurrent map/preview requests for one tile share a single transfer."""
     with TILE_LOCK:
@@ -245,8 +283,7 @@ def fetch_tile(survey_id,part,url,ident,refresh=False):
         if result is None:
             raw,mime=read_remote(url)
             if part=='properties':
-                value=re.sub(r'^hips_service_url(?:_\d+)?\s*=.*$', '',raw.decode('utf-8'),flags=re.M)
-                raw=(value+'\nhips_service_url = http://127.0.0.1:8765/api/atlas/surveys/'+survey_id+'\n').encode()
+                raw=rewrite_survey_properties(survey_id,raw)
             metadata={'source_url':url,'created_at':now()}
             cache.put(ident,raw,mime,metadata)
             result=(raw,mime,metadata)
@@ -288,6 +325,8 @@ def survey_tile(survey_id:str,part:str):
             stale=age>86400
             if stale and not CACHED_ONLY:refresh_tile(survey_id,part,url,ident)
         else:data,mime,metadata=fetch_tile(survey_id,part,url,ident)
+        # A cached legacy response must also work after this compatibility update.
+        if survey_id=='cefca-virgo' and part=='properties':data=rewrite_survey_properties(survey_id,data)
         return Response(data,media_type='text/plain' if part=='properties' else mime,headers={
             'Cache-Control':'public, max-age='+('60' if stale else '86400'),
             'X-Atlas-Retrieved':metadata['created_at'],'X-Atlas-Stale':str(stale).lower(),

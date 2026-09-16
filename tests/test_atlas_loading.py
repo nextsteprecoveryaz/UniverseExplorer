@@ -126,3 +126,81 @@ def test_cache_size_reduction_refuses_to_delete_existing_files(isolated_cache,mo
     with pytest.raises(ValueError,match='already stored'):cache.set_limit(1)
     assert cache.get(ident)['path'].read_bytes()==b'1234567890'
     assert not (cache.ROOT/'settings.json').exists()
+
+
+CEFCA_LEGACY=(b'processingDate = 22/06/15 12:21:43\ncoordsys = C\nisColored = true\n'
+              b'HiPSBuilder = Aladin/HipsGen v8.040\nlabel = web_in\nmaxOrder = 10\nformat = jpeg\n')
+
+
+def parsed_properties(raw):
+    return {k.strip():v.strip() for line in raw.decode().splitlines()
+            if '=' in line for k,v in [line.split('=',1)]}
+
+
+def test_cefca_legacy_properties_are_compatible_without_inventing_higher_detail():
+    result=parsed_properties(atlas.rewrite_survey_properties('cefca-virgo',CEFCA_LEGACY))
+    assert result['hips_frame']=='equatorial'
+    assert result['hips_order']=='10'  # The legacy web viewer incorrectly hardcodes order 11.
+    assert result['hips_tile_format']=='jpeg'
+    assert result['maxOrder']=='10' and result['coordsys']=='C'
+    assert result['processingDate']=='22/06/15 12:21:43'
+    assert result['hips_service_url']=='http://127.0.0.1:8765/api/atlas/surveys/cefca-virgo'
+    assert result['obs_title']=='CEFCA Virgo Cluster'
+    other=parsed_properties(atlas.rewrite_survey_properties('optical',CEFCA_LEGACY))
+    assert 'hips_frame' not in other and 'hips_order' not in other
+
+
+def test_cefca_modern_properties_are_preserved_and_remote_mirrors_cannot_bypass_cache():
+    raw=CEFCA_LEGACY+(b'hips_frame = equatorial\nhips_order = 9\nhips_tile_format = png\n'
+                      b'obs_title = Published updated title\n'
+                      b'hips_service_url = https://www.cefca.es/img/aladin/VirgoCluster\n'
+                      b'hips_service_url_1 = https://mirror.example.test\n')
+    rewritten=atlas.rewrite_survey_properties('cefca-virgo',raw)
+    result=parsed_properties(rewritten)
+    assert result['hips_order']=='9' and result['hips_tile_format']=='png'
+    assert result['obs_title']=='Published updated title'
+    assert 'hips_service_url_1' not in result
+    assert 'https://' not in result['hips_service_url']
+    assert parsed_properties(atlas.rewrite_survey_properties('cefca-virgo',rewritten))==result
+
+
+@pytest.mark.parametrize('raw',[
+    CEFCA_LEGACY.replace(b'coordsys = C',b'coordsys = G'),
+    CEFCA_LEGACY.replace(b'maxOrder = 10',b'maxOrder = 99'),
+    CEFCA_LEGACY.replace(b'format = jpeg',b'format = svg'),
+])
+def test_invalid_cefca_legacy_metadata_is_not_silently_guessed(raw):
+    with pytest.raises(ValueError):atlas.rewrite_survey_properties('cefca-virgo',raw)
+
+
+def test_cefca_cached_legacy_properties_work_offline_without_rewriting_image_pixels(isolated_cache,monkeypatch):
+    base='https://www.cefca.es/img/aladin/VirgoCluster'
+    monkeypatch.setitem(atlas.SURVEYS,'cefca-virgo',{'id':'cefca-virgo','url':base,'name':'CEFCA Virgo Cluster','rendered_views':False})
+    metadata={'created_at':'2000-01-01T00:00:00+00:00'}
+    cache.put(cache.key('tile:'+base+'/properties'),CEFCA_LEGACY,'text/plain',metadata)
+    tile='Norder10/Dir7100000/Npix7108082.jpg';pixels=b'publisher-jpeg-bytes'
+    cache.put(cache.key('tile:'+base+'/'+tile),pixels,'image/jpeg',metadata)
+    monkeypatch.setattr(atlas,'CACHED_ONLY',True)
+    monkeypatch.setattr(atlas,'read_remote',lambda *a,**kw:pytest.fail('Cached-only mode must not fetch'))
+    result=atlas.survey_tile('cefca-virgo','properties')
+    assert parsed_properties(result.body)['hips_order']=='10'
+    assert parsed_properties(result.body)['hips_frame']=='equatorial'
+    assert result.headers['X-Atlas-Cache']=='stale'
+    assert atlas.survey_tile('cefca-virgo',tile).body==pixels
+
+
+def test_unsupported_rendered_views_and_mixed_tour_packs_fail_before_queueing(isolated_cache,monkeypatch):
+    survey={'id':'cefca-virgo','url':'https://www.cefca.es/img/aladin/VirgoCluster',
+            'name':'CEFCA Virgo Cluster','rendered_views':False}
+    monkeypatch.setitem(atlas.SURVEYS,'cefca-virgo',survey)
+    monkeypatch.setattr(atlas.expeditions,'SURVEYS',atlas.expeditions.SURVEYS|{'cefca-virgo'})
+    monkeypatch.setattr(atlas,'begin',lambda *a,**kw:pytest.fail('Unsupported downloads must not be queued'))
+    monkeypatch.setattr(atlas,'read_remote',lambda *a,**kw:pytest.fail('Unsupported downloads must not fetch'))
+    route={'kind':'waypoints','stops':[{'survey':'optical'},{'survey':'cefca-virgo'}]}
+    monkeypatch.setattr(atlas.expeditions,'read',lambda _:route)
+    with TestClient(app) as client:
+        for response in [client.post('/api/atlas/view',json={'ra':187.7,'dec':12.4,'fov':.2,'survey':'cefca-virgo'}),
+                         client.post('/api/atlas/packs/test-route')]:
+            assert response.status_code==409
+            assert 'Interactive survey tiles remain available' in response.json()['detail']
+    assert cache.status()['files']==0

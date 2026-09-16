@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 import coverage_guide as coverage
+import cefca_tours
 import recent_archive as archive
 import webb_gallery as gallery
 import object_map
@@ -17,7 +18,7 @@ from integrations import now
 
 PATH=Path(__file__).parent/'data'/'flight-routes.sqlite3'
 router=APIRouter(prefix='/api/navigation')
-SURVEYS={'optical','webb-color','hubble-color','webb-200','webb-444','hydrogen','hst-ha','oxygen','sulfur','nitrogen','h2','dust'}
+SURVEYS={'optical','webb-color','hubble-color','webb-200','webb-444','hydrogen','hst-ha','oxygen','sulfur','nitrogen','h2','dust','cefca-virgo'}
 
 class Strict(BaseModel):
     model_config=ConfigDict(extra='forbid',allow_inf_nan=False)
@@ -35,7 +36,7 @@ class View(Strict):
         return self
 
 class Reference(Strict):
-    kind:Literal['featured','gallery','mast']
+    kind:Literal['featured','gallery','mast','cefca']
     id:str=Field(min_length=1,max_length=80,pattern=r'^[A-Za-z0-9_-]+$')
 
 class Stop(View):
@@ -97,6 +98,7 @@ def resolve_source(ref):
             obj=next(o for o in object_map.FEATURED if o['id']==ref['id'])
             return {**obj,'title':obj['name'],'description':obj['summary'],'kind':'featured','preview_url':None,'available':True,'location_note':'Curated catalog target and published guide. The selected sky survey is credited on the map.'}
         if ref['kind']=='mast':return coverage.observation_media(archive.observation(ref['id']))
+        if ref['kind']=='cefca':return cefca_tours.source(ref['id'])
         return coverage.gallery_media(gallery.photo(ref['id']))
     except (ValueError,StopIteration,KeyError):return {'kind':ref['kind'],'id':ref['id'],'available':False,'description':'This source is no longer in the local index. Saved waypoint coordinates remain available.'}
 
@@ -148,6 +150,8 @@ def templates():
                 chosen.append(coverage.observation_media(o))
                 if len(chosen)>=6:break
             if chosen:result.append(preset('recent-'+mission.lower(),'Recent public '+label+' fields','Six distinct fields selected from the latest 1,500 observation records in this local telescope index. Actual MAST previews, instrument filters and exposure dates accompany the sky context.',chosen))
+    cefca=cefca_tours.template_metadata()
+    result.append({**preset(cefca['id'],cefca['title'],cefca['description'],cefca_tours.media_items()),**cefca})
     return result
 
 @router.get('/templates')

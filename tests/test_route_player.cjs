@@ -67,3 +67,59 @@ test('Next while paused lands on the target rather than labeling the departure v
   assert.equal(p.run('routePlayer.lastView.ra'),210);
   assert.equal(p.run('routePlayer.playing'),false);
 });
+
+test('route pause/resume and Next call narration lifecycle hooks',()=>{
+  const p=player(),events=[];
+  p.context.pauseTourNarration=()=>events.push('pause');
+  p.context.resumeTourNarration=()=>events.push('resume');
+  p.context.resetTourNarration=()=>events.push('reset');
+  p.run('resumeRoute();pauseRoute()');
+  assert.deepEqual(events,['resume','pause']);
+  p.run(`routePlayer.route.stops.push({...stop,title:'Next',ra:210});routePlayer.route.media.push(null);routePlayer.timeline=RouteTimeline.build(routePlayer.route,stop);skipRouteStop(1);`);
+  assert.ok(events.includes('reset'));
+  assert.equal(p.run('routePlayer.index'),1);
+  const before=events.filter(event=>event==='reset').length;
+  p.run('closeRoutePlayer()');
+  assert.equal(events.filter(event=>event==='reset').length,before+1);
+  assert.equal(p.run('routePlayer.route'),null);
+});
+
+test('narration starts once after arrival and waits at the end of the hold before advancing',()=>{
+  const p=player();let starts=0,pending=true;
+  p.context.startTourNarration=()=>{starts++;};
+  p.context.tourNarrationPending=()=>pending;
+  p.run(`routePlayer.route.stops.push({...stop,title:'Next',ra:210});routePlayer.route.media.push(null);routePlayer.timeline=RouteTimeline.build(routePlayer.route,stop);routePlayer.elapsed=30.99;resumeRoute();`);
+  for(let i=0;i<8;i++)p.advance();
+  assert.equal(starts,1);
+  assert.equal(p.run('routePlayer.index'),0);assert.equal(p.run('routePlayer.elapsed'),30.99);
+  assert.match(p.$('#route-play-status').textContent,/Listening to narration/);
+  pending=false;p.advance();
+  assert.equal(p.run('routePlayer.index'),1);
+  assert.ok(p.run('routePlayer.elapsed')>31);
+});
+
+test('the last stop waits for narration before marking the journey complete',()=>{
+  const p=player();let pending=true;
+  p.context.startTourNarration=()=>{};
+  p.context.tourNarrationPending=()=>pending;
+  p.run('routePlayer.elapsed=30.99;resumeRoute()');p.advance();
+  assert.equal(p.run('routePlayer.playing'),true);
+  assert.equal(p.run('routePlayer.elapsed'),30.99);
+  pending=false;p.advance();
+  assert.equal(p.run('routePlayer.playing'),false);
+  assert.equal(p.run('routePlayer.elapsed'),31);
+  assert.match(p.$('#route-play-status').textContent,/Journey complete/);
+});
+
+test('explicit Next can leave a stop while narration is pending',()=>{
+  const p=player();let resets=0;
+  p.context.startTourNarration=()=>{};
+  p.context.tourNarrationPending=()=>true;
+  p.context.resetTourNarration=()=>{resets++;};
+  p.run(`routePlayer.route.stops.push({...stop,title:'Next',ra:210});routePlayer.route.media.push(null);routePlayer.timeline=RouteTimeline.build(routePlayer.route,stop);routePlayer.elapsed=30.99;resumeRoute();`);
+  p.advance();p.run('skipRouteStop(1)');
+  assert.equal(p.run('routePlayer.index'),1);
+  assert.equal(p.run('routePlayer.elapsed'),31);
+  assert.equal(p.run('routePlayer.playing'),true);
+  assert.equal(resets,1);
+});

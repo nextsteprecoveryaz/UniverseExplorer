@@ -6,33 +6,34 @@
   <title>Universe Explorer — Your personal observatory</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/flight.css">
-  <link rel="stylesheet" href="/navigation.css">
+  <link rel="stylesheet" href="/navigation.css?v=cefca-1">
   <link rel="stylesheet" href="/atlas.css">
   <link rel="stylesheet" href="/research.css">
   <link rel="stylesheet" href="/sdss.css?v=2">
   <link rel="stylesheet" href="/map-panels.css?v=2">
   <link rel="stylesheet" href="/telescope-live.css?v=3">
-  <link rel="stylesheet" href="/pixel-mapping.css?v=4">
+  <link rel="stylesheet" href="/pixel-mapping.css?v=5">
   <script src="/vendor/aladin.js" charset="utf-8" defer></script>
-  <script src="/features.js" defer></script>
+  <script src="/features.js?v=narration-2" defer></script>
   <script src="/journeys.js" defer></script>
   <script src="/photometry.js" defer></script>
   <script src="/flight-math.js" defer></script>
   <script src="/flight.js" defer></script>
   <script src="/route-timeline.js" defer></script>
-  <script src="/navigation.js" defer></script>
-  <script src="/route-player.js" defer></script>
-  <script src="/atlas.js?v=sdss-recovery-1" defer></script>
+  <script src="/navigation.js?v=cefca-1" defer></script>
+  <script src="/narration.js?v=2" defer></script>
+  <script src="/route-player.js?v=narration-1" defer></script>
+  <script src="/atlas.js?v=cefca-1" defer></script>
   <script src="/comparison.js" defer></script>
   <script src="/spatial-math.js" defer></script>
   <script src="/stellar-flight.js" defer></script>
   <script src="/research.js" defer></script>
   <script src="/sdss.js?v=timeout-recovery-1" defer></script>
   <script src="/map-panels.js?v=3" defer></script>
-  <script src="/pixel-mapping-math.js?v=2" defer></script>
-  <script src="/pixel-mapping.js?v=5" defer></script>
+  <script src="/pixel-mapping-math.js?v=3" defer></script>
+  <script src="/pixel-mapping.js?v=6" defer></script>
   <script src="/telescope-live.js?v=8" defer></script>
-  <script src="/app.js?v=telescope-live-2" defer></script>
+  <script src="/app.js?v=cefca-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -118,6 +119,7 @@
     </section>
     <section id="routes-page" class="page workspace-page">
       <div class="page-heading"><div><div class="overline">FOLLOW YOUR CURIOSITY</div><h1>Tours & routes<span>.</span></h1><p>Guided image journeys. Your own paths through the observed sky.</p></div><div class="flex"><button id="record-flight" class="button">● Record a flight</button><button id="new-route" class="button primary">+ New route</button></div></div>
+      <section id="cefca-tour-section" class="cefca-tour-section" aria-labelledby="cefca-tour-heading" hidden><div class="cefca-collection-heading"><div><div class="overline">JAVALAMBRE OBSERVATORY</div><h2 id="cefca-tour-heading">Explore with CEFCA</h2></div><a href="https://www.cefca.es/outreach/images_tours" target="_blank" rel="noopener">CEFCA tour collection ↗</a></div><div id="cefca-guided-tours"></div></section>
       <div id="guided-tours" class="guided-tours"><p class="small muted">Loading guided image journeys…</p></div>
       <div class="route-workbench"><aside class="route-library"><div class="overline">SAVED ON THIS PC</div><label class="field-label" for="route-filter">Find a route</label><input id="route-filter" type="search" placeholder="Search saved routes"><label class="button upload-button route-import-label">↑ Import route<input id="route-import" type="file" accept=".json"></label><div id="saved-route-list"></div></aside><div class="route-editor-space">
         <div id="route-editor-empty" class="empty-state"><span class="empty-symbol">⌁</span><h2>A path worth returning to.</h2><p>Customize a guided tour, add stops from nearby image suggestions, or record your own flight.</p></div>

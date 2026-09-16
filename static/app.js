@@ -77,6 +77,8 @@ function chooseSurvey(id){
   $$('#lens-chips button').forEach(b=>b.classList.toggle('selected',b.dataset.survey===id));
   $('#sky-stretch').value='native';
   $('#sky-credit').textContent=`${survey.name} · CDS Aladin / HiPS`;
+  if(survey.credit&&survey.source_url)$('#sky-credit').innerHTML=`${esc(survey.name)} · <a href="${esc(survey.source_url)}" target="_blank" rel="noopener">${esc(survey.credit)} ↗</a> · CDS Aladin / HiPS`;
+  if(survey.auto_science===false)atlasClear();
   if(state.sky){
     try{state.sky.setImageSurvey(atlasSurveyURL(survey));$('#sky-status').innerHTML='<i></i> '+esc(survey.tag)+' · SKY ATLAS';}
     catch(e){failure(e);}

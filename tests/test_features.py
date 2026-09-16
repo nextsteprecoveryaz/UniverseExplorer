@@ -34,6 +34,34 @@ def test_cloud_requires_connection_and_does_not_expose_secrets():
  assert science.metadata(m['id']).get('cloud_ai') is None
  assert c.post('/api/cloud/connect',headers={'Origin':'https://other.example'},json={'api_key':'x'*25}).status_code==403
 
+@pytest.mark.parametrize('service,model',[('speech','gpt-4o-mini-tts'),('image',cloud_ai.MODEL)])
+def test_connection_checks_the_requested_capability_without_exposing_key(monkeypatch,service,model):
+ calls=[]
+ class Client:
+  def __init__(self,**kwargs):pass
+  async def __aenter__(self):return self
+  async def __aexit__(self,*args):pass
+  async def get(self,url,**kwargs):
+   calls.append(url);return httpx.Response(200,json={'id':model})
+ monkeypatch.setattr(cloud_ai.httpx,'AsyncClient',Client)
+ response=TestClient(app).post('/api/cloud/connect',json={'api_key':'test-narration-connection-key','service':service})
+ assert response.status_code==200 and response.json()['configured']
+ assert calls==['https://api.openai.com/v1/models/'+model]
+ assert 'test-narration-connection-key' not in response.text
+
+def test_failed_speech_access_preserves_the_existing_connection(monkeypatch):
+ monkeypatch.setattr(cloud_ai,'SESSION_KEY','existing-session-key')
+ class Client:
+  def __init__(self,**kwargs):pass
+  async def __aenter__(self):return self
+  async def __aexit__(self,*args):pass
+  async def get(self,*args,**kwargs):return httpx.Response(403,json={'error':'unavailable'})
+ monkeypatch.setattr(cloud_ai.httpx,'AsyncClient',Client)
+ response=TestClient(app).post('/api/cloud/connect',json={'api_key':'test-narration-connection-key','service':'speech'})
+ assert response.status_code==403
+ assert 'speech access' in response.json()['detail']
+ assert cloud_ai.SESSION_KEY=='existing-session-key'
+
 def test_cloud_edit_sends_preview_once_and_preserves_local_original(monkeypatch):
  original=raster();m=science.import_image(original,'original.png')
  m['ai']={'note':'Existing local output'};science.save_metadata(m)

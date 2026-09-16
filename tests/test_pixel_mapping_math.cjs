@@ -19,7 +19,7 @@ test('UMD exports the same public contract to a browser global', () => {
 test('defaults are neutral and each caller receives an independent object', () => {
   const first = math.defaults();
   assert.deepEqual(first, {black: 0, mid: .5, white: 1, stretch: 'linear', colormap: 'native',
-    reversed: false, saturation: 0, brightness: 0, contrast: 0});
+    reversed: false, saturation: 0, brightness: 0, contrast: 0, red: 0, yellow: 0, green: 0});
   first.black = .3;
   assert.equal(math.defaults().black, 0);
   assert.equal(math.gamma(math.defaults()), 1);
@@ -55,7 +55,7 @@ test('missing midpoint defaults to the centre of supplied cuts', () => {
 
 test('accepted stretches and colormaps survive with clamped display controls', () => {
   for (const stretch of ['linear', 'asinh', 'log', 'sqrt', 'pow2']) {
-    for (const colormap of ['native', 'grayscale', 'viridis', 'magma', 'cividis']) {
+    for (const colormap of ['native', 'grayscale', 'viridis', 'magma', 'cividis', 'red', 'green', 'blue', 'yellow', 'inferno', 'plasma', 'rainbow']) {
       const value = math.normalize({stretch, colormap, reversed: true, saturation: 2, brightness: -5, contrast: .7});
       assert.equal(value.stretch, stretch);
       assert.equal(value.colormap, colormap);
@@ -66,6 +66,34 @@ test('accepted stretches and colormaps survive with clamped display controls', (
     }
   }
   assert.equal(math.normalize({stretch: 'pow'}).stretch, 'linear');
+});
+
+test('older profiles gain neutral selective colors and malformed intensities are bounded', () => {
+  const restored=math.normalize({black:.2,mid:.55,white:.9,colormap:'magma'});
+  assert.equal(restored.red,0);assert.equal(restored.yellow,0);assert.equal(restored.green,0);
+  const clipped=math.normalize({red:100,yellow:-4,green:'1'});
+  assert.equal(clipped.red,1);assert.equal(clipped.yellow,-1);assert.equal(clipped.green,0);
+  for(const value of [NaN,Infinity,null,[],{},true])assert.equal(math.normalize({red:value}).red,0);
+});
+
+test('selective intensity changes matching color tones without changing gray, white or blue', () => {
+  const adjusted=math.normalize({red:-.8,yellow:.7,green:-.5});
+  for(const rgb of [[0,0,0],[.5,.5,.5],[1,1,1],[0,0,1],[0,.5,.5]])
+    assert.deepEqual(math.selectiveColor(...rgb,adjusted),rgb);
+  assert.ok(math.selectiveColor(.7,0,0,adjusted)[0]<.7);
+  assert.ok(math.selectiveColor(.5,.5,0,adjusted)[0]>.5);
+  assert.ok(math.selectiveColor(0,.8,0,adjusted)[1]<.8);
+  assert.deepEqual(math.selectiveColor(.7,.4,.2,math.defaults()),[.7,.4,.2]);
+});
+
+test('selective intensity uses smoothly weighted hue masks with clipping before blend', () => {
+  const red=math.normalize({red:1});
+  // Red mask at (.8,.1,0) is (.8-.1)*(.8-0)=.56; candidate clips .8*2 to 1.
+  const result=math.selectiveColor(.8,.1,0,red);
+  close(result[0],1*.56+.8*.44);close(result[1],.2*.56+.1*.44);close(result[2],0);
+  for(let r=0;r<=1;r+=.1)for(let g=0;g<=1;g+=.1)for(let b=0;b<=1;b+=.1)
+    for(const gain of [-1,1])for(const value of math.selectiveColor(r,g,b,math.normalize({red:gain,yellow:gain,green:gain})))
+      assert.ok(Number.isFinite(value)&&value>=0&&value<=1);
 });
 
 test('gamma maps the chosen relative midpoint to half brightness', () => {

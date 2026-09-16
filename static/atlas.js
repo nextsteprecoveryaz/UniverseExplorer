@@ -2,6 +2,7 @@
 const atlasUI={enabled:true,busy:false,timer:null,serial:0,layer:null,loaded:null,lastAttempt:null,cachedOnly:false,prefetched:new Set(),prefetchTimer:null,detailPriority:true,pack:null,packLayer:null,packIndex:-1,autoPack:null,warm:null,warmSurvey:null,warmAt:0};
 function atlasMapBusy(){return atlasUI.detailPriority&&state.sky?.isStillActive?.();}
 function atlasSurveyURL(s){return location.origin+'/api/atlas/surveys/'+s.id;}
+function atlasSurveyAllows(survey,capability){return state.config?.surveys?.find(s=>s.id===survey)?.[capability]!==false;}
 function atlasMessage(text){$('#atlas-message').textContent=text;}
 const scienceTrail=new Map();let scienceRefineTimer;
 function clearScienceTrail(){for(const key of scienceTrail.keys())state.sky?.removeImageLayer(key);scienceTrail.clear();}
@@ -12,6 +13,7 @@ function onAtlasViewChanged(){
   clearTimeout(scienceRefineTimer);
   try{atlasWarmFlight();}catch(e){$('#atlas-prefetch').checked=false;toast('Preloading paused: '+e.message,true);}
   if(!atlasUI.enabled||atlasUI.cachedOnly||atlasUI.pack)return;
+  if(!atlasSurveyAllows(state.survey,'auto_science')){atlasMessage('CEFCA survey imagery · use Load here to add an archive cutout.');return;}
   if(state.fov>1){atlasMessage('Zoom below 1° to load an original science cutout.');return;}
   atlasUI.timer=setTimeout(()=>loadAutomaticScience().catch(e=>atlasMessage(e.message)),1200);
 }
@@ -46,6 +48,7 @@ async function awaitAtlasJob(job,stillWanted=()=>true,onProgress=()=>{}){
 }
 async function loadAutomaticScience(force=false,quality=512){
   if(!state.sky||atlasUI.busy||(!atlasUI.enabled&&!force)||atlasUI.cachedOnly||atlasUI.pack||state.page!=='explore')return;
+  if(!force&&!atlasSurveyAllows(state.survey,'auto_science'))return;
   if(!force&&atlasMapBusy()){
     clearTimeout(atlasUI.timer);
     atlasUI.timer=setTimeout(()=>loadAutomaticScience().catch(e=>atlasMessage(e.message)),500);
@@ -65,7 +68,7 @@ async function loadAutomaticScience(force=false,quality=512){
     const item=await awaitAtlasJob(job,()=>serial===atlasUI.serial);
     if(!item||serial!==atlasUI.serial)return;
     const current=currentField();
-    if(state.page!=='explore'||!atlasUI.enabled||FlightMath.separation(current,view)>Math.max(item.fov*.45,view.fov*.2)){atlasMessage('Cutout cached. Move back to its field to view it.');return;}
+    if(state.page!=='explore'||!atlasUI.enabled||(!force&&!atlasSurveyAllows(state.survey,'auto_science'))||FlightMath.separation(current,view)>Math.max(item.fov*.45,view.fov*.2)){atlasMessage('Cutout cached. Move back to its field to view it.');return;}
     if(atlasUI.loaded&&atlasUI.loaded.source_uri!==item.source_uri)clearScienceTrail();
     const trailKey='science-trail-'+item.id;
     if(scienceTrail.has(trailKey)){state.sky.removeImageLayer(trailKey);scienceTrail.delete(trailKey);}
@@ -92,6 +95,7 @@ function atlasPrefetch(route,index){
     return;
   }
   for(const stop of route.stops.slice(index+1,index+3)){
+    if(!atlasSurveyAllows(stop.survey,'rendered_views'))continue;
     const key=JSON.stringify([stop.ra,stop.dec,stop.fov,stop.survey]);if(atlasUI.prefetched.has(key))continue;
     atlasUI.prefetched.add(key);if(atlasUI.prefetched.size>200)atlasUI.prefetched.delete(atlasUI.prefetched.values().next().value);
     jsonPost('/api/atlas/view',Object.fromEntries(['ra','dec','fov','survey','projection','roll'].filter(k=>stop[k]!==undefined).map(k=>[k,stop[k]]))).then(job=>awaitAtlasJob(job)).catch(()=>atlasUI.prefetched.delete(key));
@@ -104,6 +108,7 @@ async function atlasShowPackView(route,index){
   if(!pack&&atlasUI.detailPriority)return;
   if(!pack&&$('#atlas-prefetch').checked&&!atlasUI.cachedOnly){
     const stop=route.stops[index];if(!stop)return;
+    if(!atlasSurveyAllows(stop.survey,'rendered_views'))return;
     try{const job=await jsonPost('/api/atlas/view',Object.fromEntries(['ra','dec','fov','survey','projection','roll'].filter(k=>stop[k]!==undefined).map(k=>[k,stop[k]])));entry={view:await awaitAtlasJob(job,()=>routePlayer.route===route&&routePlayer.index===index)};}catch{return;}
     if(routePlayer.route!==route||routePlayer.index!==index)return;
   }

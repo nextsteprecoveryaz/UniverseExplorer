@@ -77,6 +77,64 @@ test('map priority skips online rendered previews but retains downloaded tour im
   await p.run('atlasStopPack();atlasUI.pack={route_id:"tour",revision:1,views:[{index:0,view:{url:"/saved",survey_name:"Optical",wcs:{}}}]};atlasShowPackView(route,0)');
   assert.equal(p.layers.length,1);assert.equal(p.layers[0].url,'/saved');
 });
+test('tour prefetch skips surveys without rendered views while continuing supported upcoming stops',async()=>{
+  const p=automatic(),requests=[];
+  p.c.state.config={surveys:[{id:'cefca-virgo',rendered_views:false},{id:'optical'}]};
+  p.c.jsonPost=async(url,body)=>{requests.push({url,body});return {state:'complete',result:{}};};
+  p.c.route={kind:'waypoints',stops:[
+    {ra:1,dec:0,fov:.2,survey:'optical'},
+    {ra:187.7,dec:12.3,fov:.2,survey:'cefca-virgo'},
+    {ra:2,dec:0,fov:.2,survey:'optical'},
+  ]};
+  p.run('atlasPrefetch(route,0)');
+  assert.equal(requests.length,1);
+  assert.equal(requests[0].url,'/api/atlas/view');
+  assert.equal(requests[0].body.survey,'optical');
+  assert.equal(requests[0].body.ra,2);
+  assert.equal(p.run('atlasUI.prefetched.size'),1);
+});
+
+test('unsupported online rendered views are skipped even when map detail priority is disabled',async()=>{
+  const p=automatic(),requests=[];
+  p.c.state.config={surveys:[{id:'cefca-virgo',rendered_views:false}]};
+  p.c.jsonPost=async(url,body)=>{requests.push({url,body});return {state:'complete',result:{}};};
+  p.c.route={id:'cefca-tour',revision:1,stops:[{ra:187.7,dec:12.3,fov:.2,survey:'cefca-virgo'}]};
+  p.c.routePlayer={route:p.c.route,index:0};
+  p.run('atlasUI.detailPriority=false');
+  await p.run('atlasShowPackView(route,0)');
+  assert.equal(requests.length,0);
+  assert.equal(p.layers.length,0);
+  await p.run('atlasStopPack();atlasUI.pack={route_id:"cefca-tour",revision:1,views:[{index:0,view:{url:"/saved-cefca",survey_name:"CEFCA",wcs:{}}}]};atlasShowPackView(route,0)');
+  assert.equal(p.layers.length,1);
+  assert.equal(p.layers[0].url,'/saved-cefca');
+});
+
+test('a survey opting out of automatic science schedules no download but manual loading remains available',async()=>{
+  const p=automatic(),timers=[],queries=[];
+  p.c.state.config={surveys:[{id:'cefca-virgo',auto_science:false}]};
+  p.c.state.survey='cefca-virgo';p.c.state.fov=p.view.fov;
+  p.c.setTimeout=fn=>{timers.push(fn);return timers.length;};
+  const api=p.c.api;p.c.api=async url=>{queries.push(url);return api(url);};
+  p.run('onAtlasViewChanged()');
+  await p.run('loadAutomaticScience()');
+  assert.equal(queries.length,0);assert.equal(timers.length,0);
+  assert.match(p.$('#atlas-message').textContent,/Load here/);
+  const pending=p.run('loadAutomaticScience(true)');await p.queued;p.finish();await pending;
+  assert.equal(queries.length,1);
+  assert.equal(p.layers.length,1);
+});
+
+test('a late automatic cutout cannot cover a newly selected survey that opts out',async()=>{
+  const p=automatic();
+  p.c.state.config={surveys:[{id:'optical'},{id:'cefca-virgo',auto_science:false}]};
+  p.c.state.survey='optical';
+  const pending=p.run('loadAutomaticScience()');await p.queued;
+  p.c.state.survey='cefca-virgo';p.finish();await pending;
+  assert.equal(p.layers.length,0);
+  assert.equal(p.run('atlasUI.busy'),false);
+  assert.match(p.$('#atlas-message').textContent,/cached/);
+});
+
 test('comparison steering synchronizes position, zoom and rotation without repeated writes',()=>{
   const frames=[],calls=[],nodes=new Map();const $=id=>{if(!nodes.has(id))nodes.set(id,{textContent:''});return nodes.get(id);};
   const left={getRaDec:()=>[359.99,89.9],getFov:()=>[.01,.01],getRotation:()=>31};

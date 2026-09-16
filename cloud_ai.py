@@ -62,13 +62,15 @@ def response_error(response):
  if response.status_code==429:return CloudError('OpenAI reported a quota or rate limit. Check API billing and limits before retrying.',429)
  return CloudError('OpenAI could not complete this image edit. No local original was changed. Check the request in your API dashboard before retrying.',502)
 
-async def connect(key,remember=False):
+async def connect(key,remember=False,service='image'):
  global SESSION_KEY
  key=key.strip()
  if not 20<=len(key)<=1000 or any(c.isspace() for c in key):raise CloudError('Enter a valid OpenAI API key in this form.')
  async with httpx.AsyncClient(timeout=25) as client:
-  response=await client.get('https://api.openai.com/v1/models/'+MODEL,headers={'Authorization':'Bearer '+key})
- if not response.is_success:raise response_error(response)
+  response=await client.get('https://api.openai.com/v1/models/'+('gpt-4o-mini-tts' if service=='speech' else MODEL),headers={'Authorization':'Bearer '+key})
+ if not response.is_success:
+  if service=='speech':raise CloudError('OpenAI could not verify speech access. Check the API key, project permissions and billing.',response.status_code if response.status_code in (401,403,429) else 502)
+  raise response_error(response)
  if remember:
   encrypted=protect(key.encode());KEY_FILE.write_bytes(encrypted)
  elif KEY_FILE.exists():KEY_FILE.unlink()

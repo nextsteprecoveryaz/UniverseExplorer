@@ -17,7 +17,7 @@ function pauseRouteForFlight(){
 }
 function pauseRoute(reason='Paused'){
   routePlayer.playing=false;cancelAnimationFrame(routePlayer.frame);routePlayer.frame=null;
-  if(window.speechSynthesis)window.speechSynthesis.cancel();
+  if(typeof pauseTourNarration==='function')pauseTourNarration();else if(window.speechSynthesis)window.speechSynthesis.cancel();
   $('#route-play-toggle').textContent='▶ Resume';$('#route-play-status').textContent=reason;
   if(routePlayer.route)saveRouteProgress();
 }
@@ -29,6 +29,7 @@ async function saveRouteProgress(){
 }
 function closeRoutePlayer(){
   atlasStopPack();
+  if(typeof resetTourNarration==='function')resetTourNarration();
   pauseRoute();routePlayer.route=null;routePlayer.timeline=null;$('#route-player').hidden=true;
   $('#explore-page').classList.remove('route-active');if(navigationUI.footprint){state.sky?.removeOverlay(navigationUI.footprint);navigationUI.footprint=null;}
   setNearbyVisible(navigationUI.nearbyPreference);
@@ -63,14 +64,17 @@ function resumeRoute(){
   const img=$('#route-stop-image'),media=routePlayer.route.media[routePlayer.index];
   if(img.dataset.loaded==='error'&&media?.preview_url){img.dataset.loaded='pending';img.hidden=false;img.src=media.preview_url;}
   $('#route-play-toggle').textContent='Ⅱ Pause';cancelAnimationFrame(routePlayer.frame);routePlayer.frame=requestAnimationFrame(tickRoute);
+  if(typeof resumeTourNarration==='function')resumeTourNarration();
 }
-function narrationFor(media,stop){return [stop?.title,media?.description||stop?.notes||''].filter(Boolean).join('. ').slice(0,900);}
+function narrationFor(media,stop){return [stop?.title,media?.description||stop?.notes||''].filter(Boolean).join('. ').replace(/\s+/g,' ').trim().slice(0,3500);}
 function speakRouteStop(){
+  if(typeof startTourNarration==='function'){void startTourNarration();return;}
   if(!$('#route-narration').checked||!window.speechSynthesis||!routePlayer.playing)return;
   window.speechSynthesis.cancel();const i=routePlayer.index,utterance=new SpeechSynthesisUtterance(narrationFor(routePlayer.route.media[i],routePlayer.route.stops[i]));
   utterance.rate=Math.min(1.6,Number($('#route-play-speed').value));window.speechSynthesis.speak(utterance);
 }
 function updateRouteGuide(index){
+  if(typeof resetTourNarration==='function')resetTourNarration();
   const p=routePlayer;p.index=index;p.waitSince=0;p.skipWait=false;
   if(p.route.kind==='recording'){
     $('#route-stop-title').textContent='Your recorded flight';$('#route-stop-description').textContent=p.route.description||'Replay of sampled sky positions, zoom, rotation and survey selection.';
@@ -93,6 +97,8 @@ function updateRouteGuide(index){
   const link=$('#route-stop-source');link.hidden=!media?.source_url;if(media?.source_url)link.href=media.source_url;
   $('#route-stop-credit').textContent=media?[media.location_note,media.credit].filter(Boolean).join(' '):'User-saved sky position.';
   $('#route-stop-actions').hidden=false;$('#route-stop-inspect').disabled=!media?.available;
+  $('#route-stop-inspect').textContent=media?.kind==='cefca'?'About this stop':'Inspect source image';
+  link.textContent=media?.kind==='cefca'?'Original CEFCA guide · Spanish ↗':'Publisher source & credits ↗';
   $('#route-stop-video').hidden=!media?.video_url;
   drawNavigationFootprint(media?.footprint);
   p.prefetch=p.route.media.slice(index+1,index+3).filter(m=>m?.preview_url).map(m=>{const image=new Image();image.src=m.preview_url;return image;});
@@ -130,6 +136,8 @@ function tickRoute(now){
     if(pending&&now-p.waitSince<10000){$('#route-play-status').textContent='Loading source imagery before continuing…';p.frame=requestAnimationFrame(tickRoute);return;}
     if(pending){pauseRoute('Image tiles are still loading · Resume to retry or choose Next');return;}
   }
+  const segment=p.timeline.segments[frame.index];
+  if(frame.phase==='hold'&&segment&&typeof tourNarrationPending==='function'&&tourNarrationPending()&&p.elapsed+dt>=segment.end){$('#route-play-status').textContent='Listening to narration before the next stop…';p.frame=requestAnimationFrame(tickRoute);return;}
   p.elapsed=Math.min(p.timeline.total,p.elapsed+dt);applyRouteFrame(RouteTimeline.at(p.timeline,p.elapsed));
   if(p.elapsed>=p.timeline.total){pauseRoute('Journey complete · replay or take the controls');return;}
   p.frame=requestAnimationFrame(tickRoute);
@@ -201,7 +209,7 @@ function initRoutePlayer(){
   $('#route-stop-inspect').onclick=()=>inspectNavigationMedia(routePlayer.route.media[routePlayer.index]);
   $('#route-stop-video').onclick=()=>{pauseRoute();const m=routePlayer.route.media[routePlayer.index];modal(m.video_title,`<video controls playsinline style="width:100%" src="${esc(m.video_url)}"></video><p>${esc(m.video_kind)}</p><a href="${esc(m.video_page)}" target="_blank" rel="noopener">Publisher credits ↗</a>`);};
   $('#route-narration').onchange=()=>{if($('#route-narration').checked)speakRouteStop();else window.speechSynthesis?.cancel();};
-  if(!window.speechSynthesis)$('#route-narration').disabled=true;
+  if(typeof initTourNarration==='function')initTourNarration();else if(!window.speechSynthesis)$('#route-narration').disabled=true;
   $('#record-flight').onclick=()=>beginRecording().catch(failure);$('#flight-record').onclick=()=>beginRecording().catch(failure);
   $('#recording-toggle').onclick=()=>{routeRecorder.paused=!routeRecorder.paused;routeRecorder.last=performance.now();$('#recording-toggle').textContent=routeRecorder.paused?'▶':'Ⅱ';recordingLabel();};
   $('#recording-stop').onclick=()=>finishRecording().catch(failure);setInterval(recordTick,500);

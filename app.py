@@ -30,6 +30,7 @@ import expeditions
 import atlas
 import research
 import sdss
+import narration
 
 ROOT=Path(__file__).parent
 DATA=ROOT/'data'
@@ -39,6 +40,7 @@ app.include_router(expeditions.router)
 app.include_router(atlas.router)
 app.include_router(research.router)
 app.include_router(sdss.router)
+app.include_router(narration.router)
 app.add_middleware(TrustedHostMiddleware,allowed_hosts=['127.0.0.1','localhost','testserver'])
 HEAVY=asyncio.Semaphore(1)
 CLOUD_BUSY=asyncio.Lock()
@@ -59,6 +61,7 @@ SURVEYS=[
  {'id':'dust','name':'Dust emission · 12 μm','tag':'WISE','url':'https://alasky.cds.unistra.fr/WSSA','group':'Gas & wavelength lenses','description':'WISE WSSA 12 μm diffuse dust map (Meisner & Finkbeiner). Traces dust-related infrared emission, not a single gas species.'},
 ]
 SURVEYS.extend([
+ {'id':'cefca-virgo','name':'CEFCA · Virgo Cluster','tag':'JAST80 · T80Cam','url':'https://www.cefca.es/img/aladin/VirgoCluster','group':'CEFCA tours','description':'Virgo Cluster color mosaic observed with JAST80 / T80Cam at the Javalambre Observatory. Coverage is limited to this field. Imagery: CEFCA Foundation. The original CEFCA tour is in Spanish.','source_url':'https://www.cefca.es/divulgacion/tour_cumulo_virgo','credit':'CEFCA Foundation','rendered_views':False,'auto_science':False},
  {'id':'sdss-color','name':'SDSS · galaxy color','tag':'DR9 · OPTICAL','url':'https://alasky.cds.unistra.fr/SDSS/DR9/color','group':'SDSS optical lenses','description':'SDSS DR9 optical imaging, combined from g/r/i bands and projected by CDS. Covers part of the sky. For SkyServer DR20 color cutouts and MaNGA DR17 gas maps, open SDSS galaxies.'},
  *[{'id':'sdss-'+band,'name':'SDSS · '+band+' band','tag':'DR9 · '+band,'url':'https://alasky.cds.unistra.fr/SDSS/DR9/band-'+band,'group':'SDSS optical lenses','description':'SDSS DR9 '+band+' broadband optical imaging through CDS HiPS. Includes continuum and spectral features; this is not an isolated gas-emission map.'} for band in ('g','r','i')],
 ])
@@ -123,10 +126,11 @@ def cloud_status():
 class CloudConnection(BaseModel):
     api_key:SecretStr
     remember:bool=False
+    service:Literal['image','speech']='image'
 
 @app.post('/api/cloud/connect')
 async def connect_cloud(body:CloudConnection):
-    return await cloud_ai.connect(body.api_key.get_secret_value(),body.remember)
+    return await cloud_ai.connect(body.api_key.get_secret_value(),body.remember,body.service)
 
 @app.post('/api/cloud/disconnect')
 def disconnect_cloud():
