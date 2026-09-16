@@ -44,6 +44,7 @@ HEAVY=asyncio.Semaphore(1)
 CLOUD_BUSY=asyncio.Lock()
 
 SURVEYS=[
+ {'id':'2mass','name':'2MASS · near-infrared survey','tag':'NEAR-INFRARED','url':'https://alasky.cds.unistra.fr/2MASS/Color','group':'Telescope views','description':'2MASS J/H/K near-infrared color survey from ground-based telescopes. Space Telescope Live uses this survey behind Webb pointings. Continuous sky context; these pixels are not JWST exposures.'},
  {'id':'webb-color','name':'Webb · released color','tag':'COMPOSITE','url':'https://alasky.cds.unistra.fr/JWST-outreach/CDS_P_JWST_EPO','group':'Telescope views','description':'Selected released JWST outreach composites. Assigned colors combine infrared filters. Coverage is limited to published fields; blank areas are unobserved in this layer.'},
  {'id':'hubble-color','name':'Hubble · released color','tag':'COMPOSITE','url':'https://alasky.cds.unistra.fr/HST-outreach/CDS_P_HST_EPO','group':'Telescope views','description':'Selected Hubble outreach composites, projected onto the sky by CDS. Sparse coverage of released images; not a complete or uniformly processed survey.'},
  {'id':'optical','name':'Visible sky · DSS2','tag':'OPTICAL','url':'https://alasky.cds.unistra.fr/DSS/DSSColor','group':'Telescope views','description':'Digitized Sky Survey from ground-based telescopes, color combined by CDS. Wide sky context; not a Hubble or Webb exposure.'},
@@ -190,6 +191,10 @@ async def live():
         except ValueError as e: return {'telescope':telescope,'error':str(e),'source_url':remote.LIVE+'/'+telescope}
     rows=await asyncio.gather(one('webb'),one('hubble'))
     return {'rows':rows,'checked_at':remote.now(),'refresh_seconds':60}
+
+@app.get('/api/live-at/{telescope}')
+async def observation_at(telescope:Literal['webb','hubble'],at:str=Query(min_length=10,max_length=50)):
+    return await remote.live_at_time(telescope,at)
 
 @app.get('/api/live/{telescope}/{obs_id}')
 async def observation(telescope:Literal['webb','hubble'],obs_id:str):

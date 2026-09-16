@@ -11,6 +11,8 @@
   <link rel="stylesheet" href="/research.css">
   <link rel="stylesheet" href="/sdss.css?v=2">
   <link rel="stylesheet" href="/map-panels.css?v=2">
+  <link rel="stylesheet" href="/telescope-live.css?v=3">
+  <link rel="stylesheet" href="/pixel-mapping.css?v=4">
   <script src="/vendor/aladin.js" charset="utf-8" defer></script>
   <script src="/features.js" defer></script>
   <script src="/journeys.js" defer></script>
@@ -27,7 +29,10 @@
   <script src="/research.js" defer></script>
   <script src="/sdss.js?v=timeout-recovery-1" defer></script>
   <script src="/map-panels.js?v=3" defer></script>
-  <script src="/app.js?v=sdss-1" defer></script>
+  <script src="/pixel-mapping-math.js?v=2" defer></script>
+  <script src="/pixel-mapping.js?v=5" defer></script>
+  <script src="/telescope-live.js?v=8" defer></script>
+  <script src="/app.js?v=telescope-live-2" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -43,9 +48,10 @@
       <div class="overline">YOUR OBSERVATORY</div>
       <nav aria-label="Workspace">
         <button class="nav-item active" data-page="explore"><span>◎</span> Explore the sky <small>01</small></button>
-        <button class="nav-item" data-page="journeys"><span>✦</span> Image journeys <small>NEW</small></button>
-        <button class="nav-item" data-page="routes"><span>⌁</span> Tours & routes <small>NEW</small></button>
-        <button class="nav-item" data-page="photometry"><span>⌁</span> Photometry & Aladin <small>NEW</small></button>
+        <button class="nav-item" data-page="telescope-live"><span>◎</span> Telescope Live map</button>
+        <button class="nav-item" data-page="journeys"><span>✦</span> Image journeys</button>
+        <button class="nav-item" data-page="routes"><span>⌁</span> Tours & routes</button>
+        <button class="nav-item" data-page="photometry"><span>⌁</span> Photometry & Aladin</button>
         <button class="nav-item" data-page="archive"><span>▦</span> Telescope archive <small>02</small></button>
         <button class="nav-item" data-page="lab"><span>◈</span> Image lab <small>03</small></button>
         <button class="nav-item" data-page="transits"><span>⌁</span> Transit lab <small>04</small></button>

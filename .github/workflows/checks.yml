@@ -29,6 +29,6 @@ jobs:
           python setup_model.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Test Python application
-        run: python -m pytest -q
+        run: python -m pytest tests -q
       - name: Test JavaScript behavior
-        run: node --test tests/test_atlas_ui.cjs tests/test_flight.cjs tests/test_flight_controls.cjs tests/test_map_panels.cjs tests/test_route_timeline.cjs tests/test_route_player.cjs tests/spatial-math.test.js tests/test_sdss_ui.cjs
+        run: node --test tests/test_atlas_ui.cjs tests/test_flight.cjs tests/test_flight_controls.cjs tests/test_map_panels.cjs tests/test_route_timeline.cjs tests/test_route_player.cjs tests/spatial-math.test.js tests/test_sdss_ui.cjs tests/test_telescope_live.cjs tests/test_pixel_mapping_math.cjs tests/test_pixel_mapping.cjs

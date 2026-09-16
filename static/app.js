@@ -52,6 +52,7 @@ function showPage(page){
   if(page==='downloads')loadAtlasDownloads().catch(failure);
   if(page==='research')openResearch();
   if(page==='sdss')openSDSS();
+  if(page==='telescope-live')openTelescopeLive().catch(failure);
   if(page==='archive')$('#archive-position').textContent=`RA ${state.ra.toFixed(5)}°  DEC ${state.dec.toFixed(5)}°`;
   if(page==='explore')window.dispatchEvent(new Event('resize'));
   if(page!=='explore')stopObjectVideo();
@@ -131,7 +132,7 @@ function renderLive(){
 }
 function visitLive(o){
   if(o.ra===null||o.dec===null){toast('This record does not include usable sky coordinates.',true);return;}
-  flyTo({name:o.target,ra:o.ra,dec:o.dec,fov:.2,survey:'optical',type:(o.telescope==='webb'?'WEBB':'HUBBLE')+' · TELESCOPE POINTING',description:o.title+(o.moving_target?' Moving target: this fixed survey shows the background sky at the reported pointing.':'')});
+  flyTo({name:o.target,ra:o.ra,dec:o.dec,fov:.2,survey:o.telescope==='webb'?'2mass':'optical',type:(o.telescope==='webb'?'WEBB':'HUBBLE')+' · REPORTED TARGET',description:o.title+(o.moving_target?' Moving target: this fixed survey shows the background sky at the reported position.':'')});
   modal('Observation details',`<div class="modal-body"><span class="badge teal">${esc(o.status)}</span><h3>${esc(o.title)}</h3><p><strong>${esc(o.target)}</strong> · ${esc(o.target_category||o.category||'')}</p><p>Instruments: ${esc(o.instruments.join(', '))}<br>Program ${esc(o.program)} · ${esc(o.investigator)}<br>Start: ${esc(date(o.start))}<br>End: ${esc(date(o.end))}<br>Feed retrieved: ${esc(date(o.fetched_at))}${o.stale?' (stale saved copy)':''}</p><p class="help-strip">${esc(o.image_note)} ${o.moving_target?'The target moves. A fixed star atlas does not track the planet.':''}</p><a class="button" href="${esc(o.source_url)}" target="_blank" rel="noopener">Open official observation ↗</a> <button id="live-archive" class="button primary">Find released images here</button></div>`);
   $('#live-archive').onclick=()=>{closeModal();showPage('archive');searchArchive(1);};
 }
@@ -342,6 +343,7 @@ async function boot(){
     initComparison();
     initResearch();
     initSDSS();
+    initTelescopeLive();
     initMapPanels();
     $('#fits-stretch').onchange=e=>{$('#original-image').src=state.image.preview_url+'?stretch='+e.target.value;updateEnhancementControls();};
     $('#save-image').onclick=()=>{const m=state.image;const center=m.center||m.extra;noteDialog({title:m.name,ra:center.ra??center.s_ra??null,dec:center.dec??center.s_dec??null,body:'Saved image for visual exploration and follow-up.',provenance:{image_id:m.id,input_sha256:m.sha256,source:m.source,filter:m.filter,ai:m.ai,observation:m.extra}});};

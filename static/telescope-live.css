@@ -1,0 +1,109 @@
+.telescope-live-page {
+  --pixel-panel-width: 350px;
+  padding: 22px 26px 14px;
+  min-width: 0;
+  height: 100%;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+}
+.telescope-live-page.active { display: flex; }
+.telescope-live-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-shrink: 0; }
+.telescope-live-header h1 { font-size: 29px; margin: 4px 0; }
+.telescope-live-header p { color: #a7b8c5; font-size: 12px; margin: 0; }
+.telescope-live-header .overline { font-size: 9px; letter-spacing: 1.8px; }
+.telescope-live-heading-actions { display: flex; align-items: center; gap: 16px; }
+.telescope-live-layer { font-size: 12px; color: #b0ded6; padding: 6px 11px; border: 1px solid #30504f; border-radius: 20px; background: #142626; }
+.telescope-live-page .button { min-height: 36px; padding: 8px 12px; font-size: 12px; }
+.telescope-live-toolbar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 12px; border: 1px solid #263c49; border-radius: 10px; background: #101b25; flex-shrink: 0; }
+.telescope-live-mission-label { display: flex; align-items: center; gap: 9px; font-size: 12px; color: #acbdc9; }
+.telescope-live-mission-label select { width: 135px; min-height: 36px; padding: 7px 10px; background: #192b37; border-color: #3a5564; color: #f0f5f6; font-size: 13px; }
+.telescope-live-observation-controls, .telescope-live-view-controls, .telescope-live-stepper { display: flex; align-items: center; gap: 7px; }
+.telescope-live-stepper { gap: 0; }
+.telescope-live-stepper .button { width: 35px; font-size: 18px; padding: 3px; }
+.telescope-live-stepper .button:first-child { border-radius: 6px 0 0 6px; }
+.telescope-live-stepper .button:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
+.telescope-live-follow { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #afc4ce; cursor: pointer; }
+.telescope-live-follow input { accent-color: var(--accent); width: 15px; height: 15px; }
+.telescope-live-view-controls { margin-left: auto; flex-wrap: wrap; }
+#telescope-live-pixels[aria-expanded=true] { border-color: #609c93; background: #1b3736; color: #b9f1e8; }
+.telescope-live-search-row { display: flex; align-items: start; gap: 20px; flex-wrap: wrap; flex-shrink: 0; }
+.telescope-live-finder { flex: 1; min-width: 270px; }
+.telescope-live-finder summary { cursor: pointer; color: #b9dedb; font-size: 12px; padding: 1px 0; width: fit-content; }
+.telescope-live-finder summary span { color: #94a9b8; font-size: 11px; margin-left: 12px; }
+.telescope-live-finder[open] { flex-basis: 100%; }
+.telescope-live-find-fields { display: grid; grid-template-columns: minmax(320px, .8fr) minmax(360px, 1.2fr); gap: 20px; padding: 15px; margin-top: 10px; border: 1px solid #2b3e4b; border-radius: 8px; background: #111d27; }
+.telescope-live-find-fields label { display: block; font-size: 12px; color: #b7c7d0; margin-bottom: 7px; }
+.telescope-live-find-fields form>div { display: flex; gap: 8px; }
+.telescope-live-find-fields input { flex: 1; width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid #405867; border-radius: 5px; background: #0c1721; color: #e4edf2; font-size: 12px; }
+.telescope-live-feed-status { font-size: 11px; color: #9cafbd; padding: 2px 0; font-variant-numeric: tabular-nums; }
+#telescope-live-stage { position: relative; flex: 1; min-height: 440px; overflow: hidden; border: 1px solid #354d5b; border-radius: 12px; background: #02060b; }
+#telescope-live-sky { position: absolute; inset: 0; }
+#telescope-live-stage.pixel-mapping-open #telescope-live-sky { right: var(--pixel-panel-width); }
+.telescope-live-info { position: absolute; top: 16px; left: 16px; padding: 14px 16px; max-width: min(360px, calc(100% - 80px)); max-height: calc(100% - 90px); overflow: auto; font-size: 12px; background: #0a1621e8; border: 1px solid #51657088; border-radius: 9px; backdrop-filter: blur(10px); }
+#telescope-live-stage.pixel-mapping-open .telescope-live-info { max-width: min(320px, calc(100% - var(--pixel-panel-width) - 50px)); }
+.telescope-live-info .telescope-live-target-label { display: block; font-size: 9px; letter-spacing: 1.3px; color: #aec0cc; margin-bottom: 7px; }
+.telescope-live-info strong { display: block; font-size: 17px; font-family: var(--heading); font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+#telescope-live-status { display: block; font-size: 11px; color: #afc1cc; margin: 5px 0 10px; }
+.telescope-live-info details { font-size: 12px; color: #b3c5cf; }
+.telescope-live-info summary { cursor: pointer; color: var(--accent); }
+.telescope-live-info p { margin: 12px 0; }
+#telescope-live-time { font-size: 11px; white-space: pre-line; line-height: 1.8; font-variant-numeric: tabular-nums; }
+.telescope-live-zoom { position: absolute; right: 14px; bottom: 51px; display: flex; flex-direction: column; gap: 6px; }
+#telescope-live-stage.pixel-mapping-open .telescope-live-zoom { right: calc(var(--pixel-panel-width) + 14px); }
+.telescope-live-zoom .button { width: 38px; height: 38px; font-size: 22px; padding: 0; background: #142635e8; }
+#telescope-live-coordinates { position: absolute; left: 16px; bottom: 14px; max-width: calc(100% - 70px); padding: 5px 9px; background: #06101bdb; border-radius: 4px; font: 11px/1.6 Consolas, monospace; color: #d6e5ed; }
+#telescope-live-stage.pixel-mapping-open #telescope-live-coordinates { max-width: calc(100% - var(--pixel-panel-width) - 35px); }
+#telescope-live-sky .aladin-logo-container { bottom: 16px !important; right: 16px !important; }
+.telescope-live-footer { display: flex; gap: 10px 24px; justify-content: space-between; flex-wrap: wrap; font-size: 11px; color: #9cb1bf; flex-shrink: 0; }
+.telescope-live-footer>span { color: #acd7d1; }
+.telescope-live-footer p { margin: 0; max-width: 760px; }
+#telescope-live-page:fullscreen { background: var(--bg); padding: 18px; width: 100vw; height: 100dvh; }
+/* Explorer lenses adjust a different canvas. Keep this workspace's controls beside its own map. */
+main:has(#telescope-live-page.active) .sidebar>.sidebar-divider,
+main:has(#telescope-live-page.active) .sidebar>.sidebar-divider~:not(.sidebar-footer),
+main:has(#telescope-live-page.active) .sidebar>.navigation-launcher { display: none; }
+@media(max-width:1250px) {
+  .telescope-live-page { --pixel-panel-width: 320px; padding: 18px; }
+  .telescope-live-heading-actions { gap: 10px; }
+  .telescope-live-header h1 { font-size: 27px; }
+  .telescope-live-view-controls { margin-left: 0; }
+  .telescope-live-find-fields { grid-template-columns: 1fr; gap: 14px; }
+}
+@media(max-width:1000px) {
+  .telescope-live-heading-actions { flex-direction: column; align-items: end; }
+  .telescope-live-layer { font-size: 11px; }
+  .telescope-live-toolbar { gap: 10px; }
+  #telescope-live-stage { min-height: 600px; }
+  #telescope-live-stage.pixel-mapping-open { min-height: 950px; }
+  #telescope-live-stage.pixel-mapping-open #telescope-live-sky { right: 0; bottom: 510px; }
+  #telescope-live-stage.pixel-mapping-open .pixel-mapping { top: auto; left: 0; right: 0; bottom: 0; width: 100%; height: 510px; border-left: 0; border-top: 1px solid #354d5b; }
+  #telescope-live-stage.pixel-mapping-open .telescope-live-info { max-width: min(330px, calc(100% - 80px)); max-height: calc(100% - 590px); }
+  #telescope-live-stage.pixel-mapping-open .telescope-live-zoom { right: 14px; bottom: 560px; }
+  #telescope-live-stage.pixel-mapping-open #telescope-live-coordinates { bottom: 523px; max-width: calc(100% - 90px); }
+}
+@media(max-width:800px) {
+  .telescope-live-page { height: auto; padding: 15px 12px; gap: 12px; }
+  .telescope-live-header { align-items: start; gap: 12px; }
+  .telescope-live-header h1 { font-size: 24px; }
+  .telescope-live-header p { font-size: 11px; }
+  .telescope-live-header .overline { font-size: 8px; }
+  .telescope-live-heading-actions>.button { display: none; }
+  .telescope-live-layer { padding: 5px 8px; font-size: 10px; white-space: nowrap; }
+  .telescope-live-mission-label { font-size: 11px; }
+  .telescope-live-mission-label select { width: 120px; }
+  .telescope-live-toolbar { padding: 10px; }
+  .telescope-live-view-controls { width: 100%; gap: 5px; }
+  .telescope-live-page .button { font-size: 11px; padding: 7px 9px; }
+  .telescope-live-finder { min-width: 0; flex-basis: 100%; }
+  .telescope-live-find-fields { padding: 12px; }
+  .telescope-live-search-row { gap: 5px; }
+  .telescope-live-info { top: 12px; left: 12px; padding: 11px 13px; }
+  .telescope-live-info strong { font-size: 15px; }
+}
+@media(max-width:480px) {
+  .telescope-live-header { flex-direction: column; gap: 8px; }
+  .telescope-live-heading-actions { align-items: start; }
+  .telescope-live-find-fields form>div { flex-direction: column; }
+  .telescope-live-find-fields .button { align-self: start; }
+}

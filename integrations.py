@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import json
 import math
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -63,6 +64,14 @@ def normalize_live(payload, telescope):
         raise ValueError('No observation is available from the telescope feed.')
     target = (d.get('targets') or [{}])[0]
     p = d.get('proposal') or {}
+    pagination = d.get('_pagination') or payload.get('_pagination') or {}
+    def neighbor_id(name):
+        record = pagination.get(name) or {}
+        candidate = record.get('id') if isinstance(record, dict) else None
+        return candidate if isinstance(candidate, str) and re.fullmatch(r'[A-Z0-9]{26}', candidate) else None
+    def coordinate(*values):
+        # A coordinate on the equator or prime meridian is valid, not absent.
+        return next((number(value) for value in values if value is not None and number(value) is not None), None)
     start = next((d.get(k) for k in ['executedStartTime','scheduledStartTime','predictedStartTime','startTime'] if d.get(k)), None)
     end = next((d.get(k) for k in ['executedEndTime','scheduledEndTime','predictedEndTime','endTime'] if d.get(k)), None)
     status = (d.get('executionStatus') or {}).get('title')
@@ -73,10 +82,14 @@ def normalize_live(payload, telescope):
             status = 'Scheduled / execution unconfirmed'
     return {
         'telescope': telescope, 'id': d['id'],
-        'target': target.get('name') or d.get('targetName') or 'Unnamed target',
-        'ra': number(target.get('rightAscensionInDegrees') or d.get('targetRightAscensionInDegrees') or d.get('boreSightRightAscensionInDegrees')),
-        'dec': number(target.get('declinationInDegrees') or d.get('targetDeclinationInDegrees') or d.get('boreSightDeclinationInDegrees')),
-        'moving_target': bool(d.get('isMovingTarget')), 'start': start, 'end': end, 'status': status,
+        'target': d.get('targetName') or target.get('name') or target.get('standardName') or 'Unnamed target',
+        'ra': coordinate(d.get('targetRightAscensionInDegrees'), target.get('rightAscensionInDegrees'), d.get('boreSightRightAscensionInDegrees')),
+        'dec': coordinate(d.get('targetDeclinationInDegrees'), target.get('declinationInDegrees'), d.get('boreSightDeclinationInDegrees')),
+        'moving_target': bool(d.get('isMovingTarget')) or str(target.get('type', '')).upper() == 'MOVING',
+        'start': start, 'end': end, 'status': status,
+        'scheduled_start': d.get('predictedStartTime') or d.get('scheduledStartTime') or d.get('startTime'),
+        'scheduled_end': d.get('predictedEndTime') or d.get('scheduledEndTime') or d.get('endTime'),
+        'previous_id': neighbor_id('previousRecord'), 'next_id': neighbor_id('nextRecord'),
         'title': p.get('title'), 'program': p.get('proposalID'),
         'investigator': (p.get('primaryInvestigator') or {}).get('formalName'),
         'instruments': [i.get('code', i.get('title')) for i in p.get('instruments', [])],
@@ -89,6 +102,23 @@ def normalize_live(payload, telescope):
 async def live_observation(telescope, obs_id='current'):
     result = await remote_json(f'{LIVE}/api/get/{telescope}', headers={'endpoint': obs_id}, ttl=60)
     return {**{k:v for k,v in result.items() if k != 'data'}, **normalize_live(result['data'], telescope)}
+
+async def live_at_time(telescope, at):
+    if telescope not in ('webb', 'hubble'):
+        raise ValueError('Select Webb or Hubble.')
+    try:
+        if not isinstance(at, str) or len(at) > 64:
+            raise ValueError
+        instant = datetime.fromisoformat(at.replace('Z', '+00:00'))
+        if instant.tzinfo is None or instant.utcoffset() is None:
+            raise ValueError
+        requested = instant.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise ValueError('Use an ISO date and time including Z or a UTC offset.') from exc
+    result = await remote_json(f'{LIVE}/api/get/{telescope}', headers={'endpoint': f'startTime/{requested}'}, ttl=300)
+    return {**{k:v for k,v in result.items() if k != 'data'}, **normalize_live(result['data'], telescope),
+            'requested_at': requested,
+            'lookup_note': 'Observation selected by the official schedule for this time. Actual execution times can differ.'}
 
 async def mast(service, params, page=1, pagesize=60):
     req = {'service': service, 'params': params, 'format': 'json', 'page': page, 'pagesize': pagesize}

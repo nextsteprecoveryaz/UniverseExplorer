@@ -16,6 +16,20 @@ For Python in a custom location, run `Setup.cmd -Python "C:\path\to\python.exe"`
 
 This repository distributes the application for people to run on their own PCs. It is not a hosted, multi-user website. To update an installation, stop the app, update the source files, rerun Setup.cmd, then launch again. Preserve and back up your `data/` folder. See [third-party notices](THIRD_PARTY.md) for downloaded components and image credits.
 
+## Telescope Live map
+
+Open **Telescope Live map** in the sidebar to browse the same continuous sky surveys used by [Space Telescope Live](https://spacetelescopelive.org/user-guide): **2MASS near-infrared color** for Webb and **DSS2 visible color** for Hubble. Both apps use Aladin Lite; this app bundles version 3.8.2 locally. These are ground-based survey images around telescope pointings, not freshly captured Hubble or Webb exposures.
+
+Choose **Latest observation** or step through **Previous/Next observation**. Expand **Find an observation** to select a **Schedule date & time (UTC)** or paste an official Webb or Hubble observation link. Date lookup follows the official schedule; reported execution times may differ. Observation and feed-retrieval times are shown in UTC. The target marker, program, times and source link come from the official feed. Its latest record is not always an observation confirmed to be executing at this instant.
+
+Drag and zoom across the sky, use **Center target** to restore the observation's 0.5-degree field, or select **All sky**. **Follow updates** checks the feed once per minute while this page is visible; refreshes preserve your view until the target changes. The original **Explore the sky** workspace keeps its separate position and layers. The image wall is no longer in the navigation; existing cached images and saved layouts are preserved.
+
+Open **Pixel mapping** to adjust the survey display. Drag the three triangles for black point, midtone gamma, and white point; arrow keys and numeric inputs provide precise changes. Unlike Aladin Desktop's two-segment midpoint curve, the middle handle uses Aladin Lite's native gamma correction. The histogram samples up to 640 unadjusted RGB pixels across the visible field; its brightness scale is 0–255 and bar heights use logarithmic counts. Unavailable or transparent samples are excluded; valid black pixels are included. **Refresh histogram** resamples the view; **Auto levels** uses its 1st and 99.5th percentile brightness to choose cut levels. Sampling is an approximate display aid, not photometry or calibrated detector intensity.
+
+Choose linear, asinh, logarithmic, square-root or squared stretch; survey colors, grayscale or a scientific color map; inversion; or a quick look. Expand **Fine adjustment** for brightness, contrast and saturation. **Show original** temporarily shows the untouched survey display; **Show adjustments** restores your edits, and **Reset display** clears this survey's adjustments. Settings save separately for Webb/2MASS and Hubble/DSS2 in this browser. These controls affect the Telescope Live map and never alter source files or the original explorer's layers. Cut levels, stretch, color maps and gamma use CDS Aladin; additional color grading uses GPU filters on the image canvas to avoid a negative-color gamma issue in Aladin 3.8.2. Catalog markers remain unchanged.
+
+Checks: `.venv\Scripts\python.exe -m pytest tests/test_live_feed.py -q` and `node --test tests/test_telescope_live.cjs tests/test_pixel_mapping_math.cjs tests/test_pixel_mapping.cjs`.
+
 ## Start exploring
 
 1. The app opens to a **360° all-sky overview** in the visible-light survey. Drag to pan and scroll to zoom into any region; no destination is required. **All sky** returns to this overview at any time. The destination cards are optional shortcuts, and the search accepts object names or decimal `RA, Dec`.
