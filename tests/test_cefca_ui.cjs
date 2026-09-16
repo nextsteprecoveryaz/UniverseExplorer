@@ -117,7 +117,8 @@ test('card text and source/cover attributes escape markup',()=>{
     assert.doesNotMatch(html,/"\s+(onerror|onclick)="attack/);
   }
   assert.ok(p.$('#cefca-guided-tours').innerHTML.includes('href="'+escape(cefca.source_url)+'"'));
-  assert.ok(p.$('#cefca-guided-tours').innerHTML.includes('src="'+escape(cefca.cover_url)+'"'));
+  assert.doesNotMatch(p.$('#cefca-guided-tours').innerHTML,/<img\b/);
+  assert.doesNotMatch(p.$('#guided-tours').innerHTML,/<img\b/);
 });
 
 test('removing the CEFCA collection hides its section without leaving stale action buttons',()=>{

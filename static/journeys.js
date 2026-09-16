@@ -1,5 +1,12 @@
 'use strict';
-const journeys={tab:'gallery',galleryPage:1,recentPage:1,galleryRequest:0,recentRequest:0,mapRequest:0,mapTimer:null,mapEnabled:true,markers:[],galleryMarkers:[],recentStatus:null,galleryStatus:null,lastCount:'',near:null,footprint:null,overlay:null};
+const journeys={tab:'gallery',galleryPage:1,recentPage:1,galleryRequest:0,recentRequest:0,mapRequest:0,mapTimer:null,mapEnabled:true,markers:[],galleryMarkers:[],recentStatus:null,galleryStatus:null,lastCount:'',near:null,footprint:null,overlay:null,projectionSerial:0};
+
+function cancelTourImageOverlays(){
+  journeys.projectionSerial++;journeys.overlay?.setOpacity(0);journeys.overlay=null;
+  if($('#clear-science-overlay'))$('#clear-science-overlay').hidden=true;
+  if(typeof clearResearchImageOverlay==='function')clearResearchImageOverlay();
+  if(typeof sdssRemoveOverlay==='function')sdssRemoveOverlay();
+}
 
 function shortCount(n){return n>=1000?(n/1000).toFixed(n>=10000?0:1)+'k':String(n);}
 function postedDate(p){return p.posted?new Date(p.posted*1000).toLocaleDateString():'Date not supplied';}
@@ -99,14 +106,19 @@ function visitObservation(o){
   }
 }
 async function projectObservation(o,button){
+  if(typeof tourSurveyActive==='function'&&tourSurveyActive()){toast('Close the guided tour before projecting an individual image.');return;}
   if(!o.dataURL)throw new Error('This record has no direct science-image URL. Open its data products.');
+  const serial=++journeys.projectionSerial;
+  const current=()=>serial===journeys.projectionSerial&&!(typeof tourSurveyActive==='function'&&tourSurveyActive());
   const filename=o.dataURL.split('/').pop();
   const m=await jsonPost('/api/images/import',{uri:o.dataURL,filename,observation:o});
+  if(!current())return;
   if(!m.wcs)throw new Error('The downloaded image has no supported celestial WCS. It was saved to the image lab.');
   visitObservation(o);
+  if(!current())return;
   try{
-    journeys.overlay=A.image(m.original_url,{name:o.obs_id,imgFormat:'fits',colormap:'grayscale',stretch:'asinh',successCallback:(ra,dec,fov)=>{cancelAnimationFrame(travelFrame);state.sky.gotoRaDec(ra,dec);state.sky.setFoV(Math.max(.005,fov*1.4));toast('Original FITS image projected using its celestial WCS.');},errorCallback:()=>toast('The sky renderer could not project this FITS product. Its original is saved in Image lab.',true)});
-    state.sky.setOverlayImageLayer(journeys.overlay,'selected-science-image');
+    const layer=A.image(m.original_url,{name:o.obs_id,imgFormat:'fits',colormap:'grayscale',stretch:'asinh',opacity:0,successCallback:(ra,dec,fov)=>{if(!current())return;layer.setOpacity(1);cancelAnimationFrame(travelFrame);state.sky.gotoRaDec(ra,dec);state.sky.setFoV(Math.max(.005,fov*1.4));toast('Original FITS image projected using its celestial WCS.');},errorCallback:()=>{if(current())toast('The sky renderer could not project this FITS product. Its original is saved in Image lab.',true);}});
+    journeys.overlay?.setOpacity(0);journeys.overlay=layer;state.sky.setOverlayImageLayer(layer,'selected-science-image');
     $('#clear-science-overlay').hidden=false;
   }catch(e){throw new Error('The original is saved in Image lab, but this FITS could not be projected: '+e.message);}
 }
@@ -174,7 +186,7 @@ function initImageJourneys(){
   try{journeys.mapEnabled=localStorage.getItem('universe-image-map')!=='false';}catch{}
   const setEnabled=enabled=>{journeys.mapEnabled=enabled;$('#image-map-toggle').checked=enabled;$('#image-markers').hidden=!enabled;$('#image-index-card').hidden=!enabled;$('#image-map-source').disabled=!enabled;journeys.mapRequest++;if(enabled)refreshImageMap().catch(failure);try{localStorage.setItem('universe-image-map',String(enabled));}catch{}};
   $('#image-map-toggle').onchange=e=>setEnabled(e.target.checked);$('#image-map-source').onchange=()=>refreshImageMap().catch(failure);setEnabled(journeys.mapEnabled);
-  const clear=document.createElement('button');clear.id='clear-science-overlay';clear.className='text-button';clear.textContent='× Clear projected FITS';clear.hidden=true;$('.image-map-control').append(clear);clear.onclick=()=>{if(state.sky&&journeys.overlay)state.sky.removeImageLayer('selected-science-image');journeys.overlay=null;clear.hidden=true;};
+  const clear=document.createElement('button');clear.id='clear-science-overlay';clear.className='text-button';clear.textContent='× Clear projected FITS';clear.hidden=true;$('.image-map-control').append(clear);clear.onclick=()=>{journeys.projectionSerial++;journeys.overlay?.setOpacity(0);if(state.sky&&journeys.overlay)state.sky.removeImageLayer('selected-science-image');journeys.overlay=null;clear.hidden=true;};
   refreshImageStatus().catch(()=>{ $('#image-index-summary').textContent='Image index unavailable. Restart the local app to load the new endpoints.';});
   setInterval(()=>{if(!document.hidden)refreshImageStatus().catch(()=>{});},4000);
   setInterval(()=>{if(!document.hidden)positionImageMarkers();},300);

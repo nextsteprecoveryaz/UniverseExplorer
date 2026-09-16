@@ -1,5 +1,5 @@
 'use strict';
-const sdssUI={config:null,image:null,map:null,imageSerial:0,mapSerial:0,searchSerial:0,overlay:null,tab:'images'};
+const sdssUI={config:null,image:null,map:null,imageSerial:0,mapSerial:0,searchSerial:0,overlay:null,overlaySerial:0,tab:'images'};
 function sdssField(){
   const ra=Number($('#sdss-ra').value),dec=Number($('#sdss-dec').value),fov=Number($('#sdss-field').value)/60,size=Number($('#sdss-size').value);
   if(!Number.isFinite(ra)||ra<0||ra>=360||!Number.isFinite(dec)||Math.abs(dec)>90||!Number.isFinite(fov)||fov<.01||fov>2||![1024,2048].includes(size))throw Error('Enter valid sky coordinates and a field from 0.6 to 120 arcminutes.');
@@ -94,13 +94,17 @@ async function sdssLoadMap(){
   }catch(e){if(serial===sdssUI.mapSerial)$('#sdss-map-status').textContent=e.message;}
   finally{if(serial===sdssUI.mapSerial)$('#sdss-map-load').disabled=false;}
 }
-function sdssRemoveOverlay(){if(sdssUI.overlay)state.sky?.removeImageLayer('sdss-manga');sdssUI.overlay=null;$('#sdss-remove-overlay').disabled=true;}
+function sdssRemoveOverlay(){sdssUI.overlaySerial++;sdssUI.overlay?.setOpacity(0);if(sdssUI.overlay)state.sky?.removeImageLayer('sdss-manga');sdssUI.overlay=null;$('#sdss-remove-overlay').disabled=true;}
 function sdssGalaxyPhoto(){const d=sdssUI.map;if(!d)return;sdssSetField({ra:d.ra,dec:d.dec,fov:Math.max(.03,d.width*d.pixel_scale_arcsec/3600*3)});sdssTab('images');sdssLoadImage().catch(failure);}
 function sdssOverlay(){
+  const tourActive=()=>typeof tourSurveyActive==='function'&&tourSurveyActive();
+  if(tourActive()){toast('Close the guided tour before projecting a measured map.');return;}
   const d=sdssUI.map;if(!d||!state.sky)return;
-  sdssRemoveOverlay();
+  sdssRemoveOverlay();const serial=sdssUI.overlaySerial;
   flyTo({name:'MaNGA '+d.plateifu,type:'MEASURED SPECTRAL MAP',ra:d.ra,dec:d.dec,fov:Math.max(.01,d.width*d.pixel_scale_arcsec/3600*2),survey:'sdss-color',description:d.label+' · '+d.processing});
-  const layer=A.image(d.url,{name:'MaNGA DR17 · '+d.label,imgFormat:'png',wcs:d.wcs,opacity:1,successCallback:()=>toast('MaNGA map registered to the sky. Remove it from SDSS galaxies.'),errorCallback:()=>toast('The MaNGA overlay could not render.',true)});
+  if(tourActive())return;
+  const current=()=>serial===sdssUI.overlaySerial&&!tourActive();
+  const layer=A.image(d.url,{name:'MaNGA DR17 · '+d.label,imgFormat:'png',wcs:d.wcs,opacity:0,successCallback:()=>{if(!current())return;layer.setOpacity(1);toast('MaNGA map registered to the sky. Remove it from SDSS galaxies.');},errorCallback:()=>{if(current())toast('The MaNGA overlay could not render.',true);}});
   sdssUI.overlay=layer;state.sky.setOverlayImageLayer(layer,'sdss-manga');$('#sdss-remove-overlay').disabled=false;
 }
 async function openSDSS(){

@@ -109,7 +109,7 @@ def media_items():
 def template_metadata():
     return {
         'id': TOUR_ID, 'title': 'Virgo Cluster with CEFCA',
-        'description': 'Discover the stories behind 23 CEFCA sky stops: giant black holes, colliding galaxies, stripped gas and distant quasars. Explore the original JAST80 / T80Cam mosaic with researched English narration and sources for every stop. Voice narration pauses the journey until each story finishes.',
+        'description': 'Discover the stories behind 23 CEFCA sky stops: giant black holes, colliding galaxies, stripped gas and distant quasars. Explore their positions on your chosen full-sky survey with researched English narration and sources for every stop. The journey waits until each story finishes.',
         'collection': 'cefca', 'source_url': SOURCE_URL, 'source_language': 'es',
         'credit': CREDIT, 'cover_url': '/assets/cefca-virgo.jpg',
     }

@@ -6,7 +6,7 @@
   <title>Universe Explorer — Your personal observatory</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/flight.css">
-  <link rel="stylesheet" href="/navigation.css?v=stories-1">
+  <link rel="stylesheet" href="/navigation.css?v=fullsky-1">
   <link rel="stylesheet" href="/atlas.css">
   <link rel="stylesheet" href="/research.css">
   <link rel="stylesheet" href="/sdss.css?v=2">
@@ -15,25 +15,26 @@
   <link rel="stylesheet" href="/pixel-mapping.css?v=5">
   <script src="/vendor/aladin.js" charset="utf-8" defer></script>
   <script src="/features.js?v=narration-2" defer></script>
-  <script src="/journeys.js" defer></script>
+  <script src="/journeys.js?v=fullsky-1" defer></script>
   <script src="/photometry.js" defer></script>
   <script src="/flight-math.js" defer></script>
   <script src="/flight.js" defer></script>
   <script src="/route-timeline.js" defer></script>
-  <script src="/navigation.js?v=stories-2" defer></script>
+  <script src="/tour-display.js?v=1" defer></script>
+  <script src="/navigation.js?v=fullsky-1" defer></script>
   <script src="/narration.js?v=2" defer></script>
-  <script src="/route-player.js?v=stories-1" defer></script>
-  <script src="/atlas.js?v=cefca-1" defer></script>
+  <script src="/route-player.js?v=fullsky-2" defer></script>
+  <script src="/atlas.js?v=fullsky-1" defer></script>
   <script src="/comparison.js" defer></script>
   <script src="/spatial-math.js" defer></script>
   <script src="/stellar-flight.js" defer></script>
-  <script src="/research.js" defer></script>
-  <script src="/sdss.js?v=timeout-recovery-1" defer></script>
+  <script src="/research.js?v=fullsky-1" defer></script>
+  <script src="/sdss.js?v=fullsky-1" defer></script>
   <script src="/map-panels.js?v=3" defer></script>
   <script src="/pixel-mapping-math.js?v=3" defer></script>
   <script src="/pixel-mapping.js?v=6" defer></script>
   <script src="/telescope-live.js?v=8" defer></script>
-  <script src="/app.js?v=cefca-1" defer></script>
+  <script src="/app.js?v=fullsky-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -96,7 +97,7 @@
         <button id="requested-observation" class="text-button pinned-link">↗ Visit your linked Webb observation</button>
       </div>
       <aside id="nearby-panel" class="nearby-panel" aria-label="Nearby telescope coverage"><div class="nearby-head"><span class="overline">WHERE TO NEXT?</span><button id="nearby-refresh" class="text-button" aria-label="Refresh nearby suggestions">↻</button><button id="nearby-close" class="text-button" aria-label="Hide nearby suggestions">×</button></div><h2>Follow the observations.</h2><div class="nearby-controls"><label>Telescope<select id="nearby-mission"><option value="both">Hubble + Webb</option><option value="webb">Webb</option><option value="hubble">Hubble</option></select></label><label>Search radius<select id="nearby-radius"><option value="auto">Follow zoom</option><option value="1">1 degree</option><option value="5">5 degrees</option><option value="15">15 degrees</option><option value="180">Entire sky</option></select></label></div><p id="nearby-status" role="status">Suggestions update as you explore.</p><div id="nearby-results"></div><button id="nearby-tour" class="button" disabled>▶ Tour these observations</button><details><summary>Coverage & source details</summary><p id="nearby-provenance"></p></details></aside>
-      <section id="route-player" class="route-player" aria-label="Guided route player" hidden><div class="route-player-head"><span class="overline" id="route-playing-title">GUIDED JOURNEY</span><button id="route-play-close" class="text-button" aria-label="Close route player">×</button></div><h2 id="route-stop-title"></h2><img id="route-stop-image" alt="Source image for this route stop" hidden><p id="route-image-message"></p><p id="route-stop-description"></p><div id="route-story-sources"></div><p id="route-stop-facts" class="route-stop-facts"></p><a id="route-stop-source" href="#" target="_blank" rel="noopener" hidden>Publisher source & credits ↗</a><p id="route-stop-credit"></p><div class="route-progress-track"><div id="route-play-progress"></div></div><input id="route-play-seek" type="range" min="0" max="1" step="0.1" value="0" aria-label="Route playback position"><div class="route-clock"><span id="route-play-status" role="status">Ready</span><span id="route-play-time">0:00</span></div><div class="route-play-buttons"><button id="route-play-prev" class="button" aria-label="Previous route stop">⏮</button><button id="route-play-toggle" class="button primary">Ⅱ Pause</button><button id="route-play-next" class="button" aria-label="Next route stop">⏭</button><button id="route-play-manual" class="button">Take controls</button></div><div class="route-player-options"><label>Speed <select id="route-play-speed" aria-label="Playback speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label><label><input id="route-narration" type="checkbox"> Read guide aloud</label></div><div id="route-stop-actions"><button id="route-stop-inspect" class="text-button">Inspect source image</button><button id="route-stop-video" class="text-button" hidden>▶ Source video</button></div></section>
+      <section id="route-player" class="route-player" aria-label="Guided route player" hidden><div class="route-player-head"><span class="overline" id="route-playing-title">GUIDED JOURNEY</span><button id="route-play-close" class="text-button" aria-label="Close route player">×</button></div><label class="route-tour-sky">Tour sky<select data-tour-sky aria-label="Tour sky survey"></select></label><h2 id="route-stop-title"></h2><img id="route-stop-image" alt="Source image for this route stop" hidden><p id="route-image-message"></p><p id="route-stop-description"></p><div id="route-story-sources"></div><p id="route-stop-facts" class="route-stop-facts"></p><a id="route-stop-source" href="#" target="_blank" rel="noopener" hidden>Publisher source & credits ↗</a><p id="route-stop-credit"></p><div class="route-progress-track"><div id="route-play-progress"></div></div><input id="route-play-seek" type="range" min="0" max="1" step="0.1" value="0" aria-label="Route playback position"><div class="route-clock"><span id="route-play-status" role="status">Ready</span><span id="route-play-time">0:00</span></div><div class="route-play-buttons"><button id="route-play-prev" class="button" aria-label="Previous route stop">⏮</button><button id="route-play-toggle" class="button primary">Ⅱ Pause</button><button id="route-play-next" class="button" aria-label="Next route stop">⏭</button><button id="route-play-manual" class="button">Take controls</button></div><div class="route-player-options"><label>Speed <select id="route-play-speed" aria-label="Playback speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label><label><input id="route-narration" type="checkbox"> Read guide aloud</label></div><div id="route-stop-actions"><button id="route-stop-inspect" class="text-button">Inspect source image</button><button id="route-stop-video" class="text-button" hidden>▶ Source video</button></div></section>
       <div class="sky-tools"><button id="zoom-in" class="icon-button" aria-label="Zoom in">+</button><button id="zoom-out" class="icon-button" aria-label="Zoom out">−</button><button id="reset-view" class="icon-button" aria-label="Reset current destination">⟲</button><button id="fullscreen" class="icon-button" aria-label="Fullscreen sky">⛶</button></div>
       <div id="flight-reticle" class="flight-reticle" hidden aria-hidden="true"></div>
       <section id="flight-panel" class="flight-panel" aria-label="Sky flight controls" hidden>
@@ -118,7 +119,8 @@
       <div class="coordinate-bar"><span id="coordinates">RA 0.00000° &nbsp; DEC 0.00000°</span><span id="fov-readout">FIELD 360°</span><span id="sky-credit">Visible sky · DSS2 · CDS Aladin / HiPS</span></div>
     </section>
     <section id="routes-page" class="page workspace-page">
-      <div class="page-heading"><div><div class="overline">FOLLOW YOUR CURIOSITY</div><h1>Tours & routes<span>.</span></h1><p>Guided image journeys. Your own paths through the observed sky.</p></div><div class="flex"><button id="record-flight" class="button">● Record a flight</button><button id="new-route" class="button primary">+ New route</button></div></div>
+      <div class="page-heading"><div><div class="overline">FOLLOW YOUR CURIOSITY</div><h1>Tours & routes<span>.</span></h1><p>Guided sky journeys. One continuous survey through every stop.</p></div><div class="flex"><button id="record-flight" class="button">● Record a flight</button><button id="new-route" class="button primary">+ New route</button></div></div>
+      <section class="tour-sky-controls" aria-label="Tour sky settings"><label>Sky survey for all tours<select data-tour-sky aria-label="Sky survey for all tours"></select></label><p>One sky layer for the whole journey. Visible and near-infrared retain stars and galaxies; H-alpha and dust show broader emission. Narration and source links accompany the map.</p></section>
       <section id="cefca-tour-section" class="cefca-tour-section" aria-labelledby="cefca-tour-heading" hidden><div class="cefca-collection-heading"><div><div class="overline">JAVALAMBRE OBSERVATORY</div><h2 id="cefca-tour-heading">Explore with CEFCA</h2></div><a href="https://www.cefca.es/outreach/images_tours" target="_blank" rel="noopener">CEFCA tour collection ↗</a></div><div id="cefca-guided-tours"></div></section>
       <div id="guided-tours" class="guided-tours"><p class="small muted">Loading guided image journeys…</p></div>
       <div class="route-workbench"><aside class="route-library"><div class="overline">SAVED ON THIS PC</div><label class="field-label" for="route-filter">Find a route</label><input id="route-filter" type="search" placeholder="Search saved routes"><label class="button upload-button route-import-label">↑ Import route<input id="route-import" type="file" accept=".json"></label><div id="saved-route-list"></div></aside><div class="route-editor-space">

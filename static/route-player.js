@@ -14,6 +14,7 @@ function pauseRouteForFlight(){
   if(!atlasUI.pack)atlasStopPack();
   interruptTour('Paused · manual exploration');
   if(routePlayer.route){$('#route-player').hidden=true;$('#explore-page').classList.remove('route-active');}
+  syncTourSkyControls();
 }
 function pauseRoute(reason='Paused'){
   routePlayer.playing=false;cancelAnimationFrame(routePlayer.frame);routePlayer.frame=null;
@@ -33,6 +34,7 @@ function closeRoutePlayer(){
   pauseRoute();routePlayer.route=null;routePlayer.timeline=null;$('#route-player').hidden=true;
   $('#explore-page').classList.remove('route-active');if(navigationUI.footprint){state.sky?.removeOverlay(navigationUI.footprint);navigationUI.footprint=null;}
   setNearbyVisible(navigationUI.nearbyPreference);
+  syncTourSkyControls();
 }
 async function playSavedRoute(id,resume=false){
   if(routeRecorder.active){toast('Stop and save the recording before playing a route.',true);return;}
@@ -42,13 +44,15 @@ async function playSavedRoute(id,resume=false){
 async function startRouteDocument(route,pack=null,resume=false){
   if(routeRecorder.active){toast('Stop and save the recording before playing a route.',true);return;}
   atlasStopPack();
+  atlasClear();clearTourImageOverlays();route=tourSurveyRoute(route);
   if(pack){atlasUI.pack=pack;atlasClear();}
   if(route.kind==='recording'?route.track.length<2:!route.stops.length){toast('Add at least one waypoint, or record at least two samples.',true);return;}
   pauseRoute();if(flight.active)exitFlight();showPage('explore');setNearbyVisible(false);
   const progress=resume?route.progress:null;
-  const origin=progress?.origin||skyView();
+  const origin=tourSurveyView(progress?.origin||skyView());
   Object.assign(routePlayer,{route,timeline:RouteTimeline.build(route,origin),elapsed:progress?.elapsed||0,index:-1,waitKey:'',waitSince:0,skipWait:false,projection:null,survey:null});
   $('#route-player').hidden=false;$('#explore-page').classList.add('route-active');$('#route-playing-title').textContent=route.title;
+  syncTourSkyControls();
   $('#route-play-seek').max=routePlayer.timeline.total;$('#route-play-seek').value=routePlayer.elapsed;
   $('#route-play-prev').disabled=route.kind==='recording';$('#route-play-next').disabled=route.kind==='recording';
   applyRouteFrame(RouteTimeline.at(routePlayer.timeline,routePlayer.elapsed));resumeRoute();
@@ -56,13 +60,15 @@ async function startRouteDocument(route,pack=null,resume=false){
 function resumeRoute(){
   if(!routePlayer.route||!state.sky)return;
   if(state.page!=='explore')showPage('explore');if(flight.active)exitFlight();
+  atlasClear();clearTourImageOverlays();
   if(routePlayer.elapsed>=routePlayer.timeline.total)routePlayer.elapsed=0;
   routePlayer.playing=true;routePlayer.last=performance.now();routePlayer.waitSince=0;routePlayer.waitKey='';
   routePlayer.projection=null;routePlayer.survey=null;
   routePlayer.lastView=null;
   $('#route-player').hidden=false;$('#explore-page').classList.add('route-active');setNearbyVisible(false);
-  const img=$('#route-stop-image'),media=routePlayer.route.media[routePlayer.index];
-  if(img.dataset.loaded==='error'&&media?.preview_url){img.dataset.loaded='pending';img.hidden=false;img.src=media.preview_url;}
+  syncTourSkyControls();
+  applyRouteFrame(RouteTimeline.at(routePlayer.timeline,routePlayer.elapsed));
+  if(routePlayer.route.kind==='waypoints'&&routePlayer.index>=0)atlasShowPackView(routePlayer.route,routePlayer.index);
   $('#route-play-toggle').textContent='Ⅱ Pause';cancelAnimationFrame(routePlayer.frame);routePlayer.frame=requestAnimationFrame(tickRoute);
   if(typeof resumeTourNarration==='function')resumeTourNarration();
 }
@@ -78,7 +84,7 @@ function updateRouteGuide(index){
   const p=routePlayer;p.index=index;p.waitSince=0;p.skipWait=false;
   $('#route-story-sources').innerHTML=storySourcesMarkup(p.route.kind==='recording'?null:p.route.media[index]);
   if(p.route.kind==='recording'){
-    $('#route-stop-title').textContent='Your recorded flight';$('#route-stop-description').textContent=p.route.description||'Replay of sampled sky positions, zoom, rotation and survey selection.';
+    $('#route-stop-title').textContent='Your recorded flight';$('#route-stop-description').textContent=p.route.description||'Replay of sampled sky positions, zoom and rotation in your selected full-sky survey.';
     $('#route-stop-facts').textContent='';$('#route-image-message').textContent='';
     $('#route-stop-image').hidden=true;$('#route-stop-source').hidden=true;$('#route-stop-credit').textContent='Recorded camera path · interpolated between samples';$('#route-stop-actions').hidden=true;return;
   }
@@ -86,29 +92,27 @@ function updateRouteGuide(index){
   atlasPrefetch(p.route,index);
   atlasShowPackView(p.route,index);
   $('#route-stop-title').textContent=stop.title;$('#route-stop-description').textContent=[media?.description,stop.notes?'Your notes: '+stop.notes:''].filter(Boolean).join('\n\n')||'Saved sky waypoint.';
-  const facts=[`Saved view: RA ${stop.ra.toFixed(5)}°, Dec ${stop.dec.toFixed(5)}° · field ${stop.fov.toFixed(4)}°`,state.config.surveys.find(s=>s.id===stop.survey)?.name||stop.survey];
-  if(media?.observed_at)facts.push('Exposure: '+media.observed_at.replace('T',' ').replace(/Z$/,'')+' UTC');
-  if(media?.filters)facts.push('Filter: '+media.filters);
+  const facts=[`Sky position: RA ${stop.ra.toFixed(5)}°, Dec ${stop.dec.toFixed(5)}° · field ${stop.fov.toFixed(4)}°`,state.config.surveys.find(s=>s.id===tourSkySurvey())?.name||tourSkySurvey()];
+  if(media?.observed_at)facts.push('Source exposure: '+media.observed_at.replace('T',' ').replace(/Z$/,'')+' UTC');
+  if(media?.filters)facts.push('Source filter: '+media.filters);
   if(Number.isFinite(media?.ra)&&FlightMath.separation(stop,media)>.001)facts.push('Waypoint edited: its center differs from the linked source position.');
   $('#route-stop-facts').textContent=facts.join('\n');
-  const img=$('#route-stop-image');img.hidden=!media?.preview_url;img.dataset.loaded=media?.preview_url?'pending':'none';
-  img.onload=()=>{img.dataset.loaded='yes';};img.onerror=()=>{img.dataset.loaded='error';img.hidden=true;$('#route-image-message').textContent='Preview unavailable. The waypoint and source link remain available.';};
-  $('#route-image-message').textContent=media?.available===false?'Source unavailable in the current index.':media?.kind==='mast'?'Actual archive preview · the map shows sky context':media?.kind==='gallery'?'Published NASA image · target location on the map':'';
-  if(media?.preview_url)img.src=media.preview_url;else img.removeAttribute('src');
+  const img=$('#route-stop-image');img.hidden=true;img.dataset.loaded='none';img.onload=null;img.onerror=null;img.removeAttribute('src');
+  $('#route-image-message').textContent=media?.available===false?'Story source unavailable in the current index.':'';
   const link=$('#route-stop-source');link.hidden=!media?.source_url;if(media?.source_url)link.href=media.source_url;
   $('#route-stop-credit').textContent=media?[media.location_note,media.credit].filter(Boolean).join(' '):'User-saved sky position.';
   $('#route-stop-actions').hidden=false;$('#route-stop-inspect').disabled=!media?.available;
-  $('#route-stop-inspect').textContent=media?.kind==='cefca'?'About this stop':'Inspect source image';
+  $('#route-stop-inspect').textContent='About this stop';
   link.textContent=media?.kind==='cefca'?'Original CEFCA guide · Spanish ↗':'Publisher source & credits ↗';
-  $('#route-stop-video').hidden=!media?.video_url;
+  $('#route-stop-video').hidden=true;
   drawNavigationFootprint(media?.footprint);
-  p.prefetch=p.route.media.slice(index+1,index+3).filter(m=>m?.preview_url).map(m=>{const image=new Image();image.src=m.preview_url;return image;});
+  p.prefetch=[];
   if(window.speechSynthesis)window.speechSynthesis.cancel();
   saveRouteProgress();
 }
 function applyRouteFrame(frame){
   if(!frame)return;
-  const p=routePlayer,v=frame.view;p.writing=true;
+  const p=routePlayer,v=tourSurveyView(frame.view);p.writing=true;
   try{
     if(p.projection!==v.projection){state.sky.setProjection(v.projection);p.projection=v.projection;}
     if(p.survey!==v.survey){chooseSurvey(v.survey);p.survey=v.survey;}
@@ -131,10 +135,8 @@ function tickRoute(now){
   if(frame.phase==='hold'&&!p.skipWait){
     const key='stop-'+frame.index;
     if(p.waitKey!==key){p.waitKey=key;p.waitSince=now;speakRouteStop();}
-    const imageState=$('#route-stop-image').dataset.loaded;
-    if(imageState==='error'){pauseRoute('Preview unavailable · retry, inspect the source, or choose Next');return;}
-    const pending=imageState==='pending'||(!atlasUI.pack&&state.sky.isStillActive?.());
-    if(pending&&now-p.waitSince<10000){$('#route-play-status').textContent='Loading source imagery before continuing…';p.frame=requestAnimationFrame(tickRoute);return;}
+    const pending=state.sky.isStillActive?.();
+    if(pending&&now-p.waitSince<10000){$('#route-play-status').textContent='Loading survey tiles before continuing…';p.frame=requestAnimationFrame(tickRoute);return;}
     if(pending){pauseRoute('Image tiles are still loading · Resume to retry or choose Next');return;}
   }
   const segment=p.timeline.segments[frame.index];
@@ -147,6 +149,18 @@ function seekRoute(time){
   if(!routePlayer.timeline)return;pauseRoute();routePlayer.elapsed=Math.min(routePlayer.timeline.total,Math.max(0,time));
   const frame=RouteTimeline.at(routePlayer.timeline,routePlayer.elapsed);
   routePlayer.waitKey='';applyRouteFrame(frame);pauseRoute(frame?.phase==='travel'?'Paused during travel to '+routePlayer.route.stops[frame.index].title:'Paused at selected position');
+}
+function applyRouteSkySurvey(){
+  const p=routePlayer;if(!p.route||!p.timeline)return;
+  p.route.stops=(p.route.stops||[]).map(tourSurveyView);p.route.track=(p.route.track||[]).map(tourSurveyView);
+  p.timeline=RouteTimeline.build(p.route,tourSurveyView(p.timeline.origin));p.survey=null;p.lastView=null;
+  atlasClear();clearTourImageOverlays();atlasUI.packIndex=-1;
+  applyRouteFrame(RouteTimeline.at(p.timeline,p.elapsed));
+  if(p.route.kind!=='recording'){
+    const stop=p.route.stops[p.index];
+    $('#route-stop-facts').textContent=`Sky position: RA ${stop.ra.toFixed(5)}°, Dec ${stop.dec.toFixed(5)}° · field ${stop.fov.toFixed(4)}°\n${state.config.surveys.find(s=>s.id===tourSkySurvey())?.name||tourSkySurvey()}`;
+    atlasShowPackView(p.route,p.index);atlasPrefetch(p.route,p.index);
+  }
 }
 function skipRouteStop(direction){
   const p=routePlayer;if(!p.timeline?.segments.length)return;
@@ -206,8 +220,8 @@ function initRoutePlayer(){
   $('#route-play-close').onclick=closeRoutePlayer;
   $('#route-play-prev').onclick=()=>skipRouteStop(-1);$('#route-play-next').onclick=()=>skipRouteStop(1);
   $('#route-play-seek').oninput=e=>seekRoute(Number(e.target.value));
-  $('#route-play-manual').onclick=()=>{pauseRoute('Paused · you have the flight controls');$('#route-player').hidden=true;$('#explore-page').classList.remove('route-active');startFlight();};
-  $('#route-stop-inspect').onclick=()=>inspectNavigationMedia(routePlayer.route.media[routePlayer.index]);
+  $('#route-play-manual').onclick=()=>{pauseRoute('Paused · you have the flight controls');$('#route-player').hidden=true;$('#explore-page').classList.remove('route-active');syncTourSkyControls();startFlight();};
+  $('#route-stop-inspect').onclick=()=>showTourStopDetails(routePlayer.route.media[routePlayer.index]);
   $('#route-stop-video').onclick=()=>{pauseRoute();const m=routePlayer.route.media[routePlayer.index];modal(m.video_title,`<video controls playsinline style="width:100%" src="${esc(m.video_url)}"></video><p>${esc(m.video_kind)}</p><a href="${esc(m.video_page)}" target="_blank" rel="noopener">Publisher credits ↗</a>`);};
   $('#route-narration').onchange=()=>{if($('#route-narration').checked)speakRouteStop();else window.speechSynthesis?.cancel();};
   if(typeof initTourNarration==='function')initTourNarration();else if(!window.speechSynthesis)$('#route-narration').disabled=true;

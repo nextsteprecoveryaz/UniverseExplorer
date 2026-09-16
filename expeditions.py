@@ -14,11 +14,12 @@ import cefca_tours
 import recent_archive as archive
 import webb_gallery as gallery
 import object_map
+import tour_surveys
 from integrations import now
 
 PATH=Path(__file__).parent/'data'/'flight-routes.sqlite3'
 router=APIRouter(prefix='/api/navigation')
-SURVEYS={'optical','webb-color','hubble-color','webb-200','webb-444','hydrogen','hst-ha','oxygen','sulfur','nitrogen','h2','dust','cefca-virgo'}
+SURVEYS={'optical','2mass','webb-color','hubble-color','webb-200','webb-444','hydrogen','hst-ha','oxygen','sulfur','nitrogen','h2','dust','cefca-virgo'}
 
 class Strict(BaseModel):
     model_config=ConfigDict(extra='forbid',allow_inf_nan=False)
@@ -112,23 +113,24 @@ def read(ident):
     if not r:raise HTTPException(404,'Saved route not found.')
     return document(r,True)
 
-def stop_for(media):
-    return Stop(title=media.get('title') or media['name'],ra=media['ra'],dec=media['dec'],fov=media.get('fov',.18),survey=media.get('survey','optical'),source=Reference(kind=media['kind'],id=media['id']))
+def stop_for(media,survey=None):
+    selected=tour_surveys.normalize_survey(media.get('survey') if survey is None else survey)
+    return Stop(title=media.get('title') or media['name'],ra=media['ra'],dec=media['dec'],fov=media.get('fov',.18),survey=selected,source=Reference(kind=media['kind'],id=media['id']))
 
 def templates():
     guides=[{**o,'kind':'featured'} for o in object_map.FEATURED]
     def preset(ident,title,description,items):
-        return {'id':ident,**Route(title=title,description=description,stops=[stop_for(m) for m in items]).model_dump(),
+        return {'id':ident,**Route(title=title,description=description,stops=[stop_for(m,tour_surveys.DEFAULT_SURVEY) for m in items]).model_dump(),
                 'media':[resolve_source({'kind':m['kind'],'id':m['id']}) for m in items]}
-    result=[preset('grand-tour','Landmarks in the light','A guided journey from stellar nurseries to neighboring galaxies, with published explanations and optional source videos.',guides[:5]),
-            preset('star-forming','Where stars take shape','Explore the Pillars, Cosmic Cliffs and Orion. Every guide identifies the survey and the source of its explanation.',guides[:3])]
+    result=[preset('grand-tour','Landmarks in the light','A guided journey from stellar nurseries to neighboring galaxies in your chosen sky survey, with published stories and source links.',guides[:5]),
+            preset('star-forming','Where stars take shape','Explore the sky positions of the Pillars, Cosmic Cliffs and Orion in one continuous survey, with published stories and source links.',guides[:3])]
     with gallery.connect() as c:
         rows=c.execute('SELECT payload FROM photos WHERE ra IS NOT NULL ORDER BY posted DESC').fetchall()
     photos=[json.loads(r[0]) for r in rows]
     for ident,title,description,pattern in [
-        ('webb-galaxies','Webb: islands of stars','Recent published galaxy images, shown beside their catalog target positions.',r'galax|quintet|arp '),
-        ('webb-nebulae','Webb: clouds and new stars','Published nebula and star-forming-region images. JPEG target markers are not calibrated image footprints.',r'nebula|star.form|pillar|cliff|orion|tarantula'),
-        ('webb-releases','The latest located Webb releases','The newest published images for which the local gallery has resolved an astronomical target.',None)]:
+        ('webb-galaxies','Webb: islands of stars','Galaxy destinations drawn from published Webb releases, explored in a continuous sky survey.',r'galax|quintet|arp '),
+        ('webb-nebulae','Webb: clouds and new stars','Nebula and star-forming destinations drawn from Webb releases, explored in a continuous sky survey.',r'nebula|star.form|pillar|cliff|orion|tarantula'),
+        ('webb-releases','The latest located Webb releases','The newest resolved Webb release destinations, explored in a continuous sky survey with source references.',None)]:
         import re
         chosen=[]
         for p in photos:
@@ -149,7 +151,7 @@ def templates():
                 if any(coverage.separation(o['s_ra'],o['s_dec'],m['ra'],m['dec'])<.035 for m in chosen):continue
                 chosen.append(coverage.observation_media(o))
                 if len(chosen)>=6:break
-            if chosen:result.append(preset('recent-'+mission.lower(),'Recent public '+label+' fields','Six distinct fields selected from the latest 1,500 observation records in this local telescope index. Actual MAST previews, instrument filters and exposure dates accompany the sky context.',chosen))
+            if chosen:result.append(preset('recent-'+mission.lower(),'Recent public '+label+' fields','Six distinct fields selected from the latest 1,500 observation records in this local telescope index. Explore their positions in a continuous sky survey with archive references.',chosen))
     cefca=cefca_tours.template_metadata()
     result.append({**preset(cefca['id'],cefca['title'],cefca['description'],cefca_tours.media_items()),**cefca})
     return result

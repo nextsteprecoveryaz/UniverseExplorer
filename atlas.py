@@ -17,6 +17,7 @@ import atlas_cache as cache
 import coverage_index
 import recent_archive
 import expeditions
+import tour_surveys
 from integrations import now
 from sky_cutout import from_archive, view_header
 from range_fits import RangeFITS
@@ -186,45 +187,24 @@ def cancel(ident:str):
     return {'cancelled':True,'note':'The current bounded transfer may finish; remaining pack views will be skipped.'}
 
 @router.post('/packs/{route_id}')
-def download_pack(route_id:str):
-    route=expeditions.read(route_id)
+def download_pack(route_id:str,survey:tour_surveys.TourSurvey='optical'):
+    try:route=tour_surveys.clone_route(expeditions.read(route_id),survey)
+    except ValueError as error:raise HTTPException(422,str(error)) from error
     if route['kind']!='waypoints' or not route['stops']:raise HTTPException(400,'Choose a waypoint tour with at least one stop. Continuous recordings can use the visited-tile cache.')
-    for stop in route['stops']:require_rendered_views(stop.get('survey','optical'))
+    require_rendered_views(survey)
     if CACHED_ONLY:raise HTTPException(409,'Turn off cached-only mode before downloading a tour.')
-    ident=cache.key('pack:'+route_id+':'+str(route['revision']))
+    # Separate survey selections and preserve every legacy pack and its pinned files.
+    ident=cache.key('pack-survey-v2:'+route_id+':'+str(route['revision'])+':'+survey)
     def work(job):
-        pack={'id':ident,'route_id':route_id,'revision':route['revision'],'title':route['title'],'route':route,'state':'downloading','views':[],'errors':[],'created_at':now(),'total':len(route['stops'])}
+        pack={'id':ident,'route_id':route_id,'revision':route['revision'],'title':route['title'],'survey':survey,'route':route,'state':'downloading','views':[],'errors':[],'created_at':now(),'total':len(route['stops'])}
         cache.save_pack(pack)
         for i,stop in enumerate(route['stops']):
             if job['cancelled']:break
             job['progress']=f'View {i+1} of {len(route["stops"])}';entry={'index':i}
             try:entry['view']=survey_view(stop,ident)
             except Exception as e:pack['errors'].append({'index':i,'error':str(e)})
-            media=route['media'][i] or {};preview=media.get('preview_url')
-            if preview and 'view' in entry:
-                try:
-                    # Only resolver-produced MAST previews or NASA gallery image URLs.
-                    if media.get('kind')=='mast':
-                        o=recent_archive.observation(media['id']);uri=o.get('jpegURL')
-                        if not uri or not uri.startswith('mast:'):raise ValueError('No archive preview identifier.')
-                        from urllib.parse import quote
-                        url='https://mast.stsci.edu/api/v0.1/Download/file?uri='+quote(uri,safe='')
-                    elif media.get('kind')=='gallery':
-                        from urllib.parse import urlparse
-                        host=urlparse(preview).hostname or ''
-                        if not (host.endswith('.staticflickr.com') or host=='live.staticflickr.com'):raise ValueError('Unsupported preview host.')
-                        url=preview
-                    else:url=None
-                    if url:
-                        pid=cache.key('pack-preview:'+url);item=cache.get(pid)
-                        if not item:
-                            raw,mime=read_remote(url,max_bytes=15*1024*1024)
-                            item=cache.put(pid,raw,mime,{'source_url':url},ident)
-                        else:cache.pin(ident,pid)
-                        entry['preview_url']='/api/atlas/files/'+pid
-                except Exception as e:entry['preview_error']=str(e)
             pack['views'].append(entry);cache.save_pack(pack)
-        pack['state']='cancelled' if job['cancelled'] else 'partial' if pack['errors'] or any(v.get('preview_error') for v in pack['views']) else 'complete'
+        pack['state']='cancelled' if job['cancelled'] else 'partial' if pack['errors'] else 'complete'
         pack['finished_at']=now();cache.save_pack(pack);return pack
     return begin(ident,work,DOWNLOADS)
 

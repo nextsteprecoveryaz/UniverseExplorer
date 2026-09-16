@@ -42,6 +42,7 @@ function showPage(page){
   if(page!=='explore')interruptTour('Paused · another workspace is open');
   if(page!=='explore'&&flight.active)exitFlight();
   currentField();state.page=page;
+  syncTourSkyControls();
   $$('.page').forEach(el=>el.classList.toggle('active',el.id===page+'-page'));
   $$('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page===page));
   if(page==='notebook')loadNotes().catch(failure);
@@ -70,6 +71,10 @@ function coordinates(){
   onAtlasViewChanged();
 }
 function chooseSurvey(id){
+  if(tourSurveyActive()&&!routePlayer.writing){
+    if(!setTourSkySurvey(id)){toast('Choose a full-sky survey for this tour. Close the tour to explore other telescope layers.');$('#survey-select').value=tourSkySurvey();}
+    return;
+  }
   interruptTour('Paused · survey changed');
   const survey=state.config.surveys.find(s=>s.id===id);
   if(!survey)return;
@@ -110,6 +115,7 @@ async function initSky(){
     await A.init;
     state.sky=A.aladin('#aladin-lite-div',{survey:atlasSurveyURL(state.config.surveys.find(s=>s.id===state.survey)),target:`${state.ra} ${state.dec}`,fov:state.fov,projection:'AIT',cooFrame:'ICRSd',showReticle:false,showZoomControl:false,showFullscreenControl:false,showLayersControl:false,showGotoControl:false,showShareControl:false,showFrame:false,showCooLocation:false,showProjectionControl:false,showFov:false,showCooGrid:false,showStatusBar:true,showCooGridControl:false,showSimbadPointerControl:false,showContextMenu:true,backgroundColor:'#03070c'});
     $('#aladin-lite-div').addEventListener('pointerdown',()=>cancelAnimationFrame(travelFrame));
+    installTourLayerGuard(state.sky);
     $('#aladin-lite-div').addEventListener('wheel',()=>cancelAnimationFrame(travelFrame),{passive:true});
     state.sky.on('positionChanged',()=>coordinates());
     state.sky.on('zoomChanged',()=>coordinates());
@@ -342,6 +348,7 @@ async function boot(){
     initFlight();
     initNavigation();
     initAtlas();
+    initTourSkyControls();
     initComparison();
     initResearch();
     initSDSS();

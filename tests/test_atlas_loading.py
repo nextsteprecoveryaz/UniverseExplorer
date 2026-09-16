@@ -189,18 +189,15 @@ def test_cefca_cached_legacy_properties_work_offline_without_rewriting_image_pix
     assert atlas.survey_tile('cefca-virgo',tile).body==pixels
 
 
-def test_unsupported_rendered_views_and_mixed_tour_packs_fail_before_queueing(isolated_cache,monkeypatch):
+def test_unsupported_individual_rendered_views_fail_before_queueing(isolated_cache,monkeypatch):
     survey={'id':'cefca-virgo','url':'https://www.cefca.es/img/aladin/VirgoCluster',
             'name':'CEFCA Virgo Cluster','rendered_views':False}
     monkeypatch.setitem(atlas.SURVEYS,'cefca-virgo',survey)
     monkeypatch.setattr(atlas.expeditions,'SURVEYS',atlas.expeditions.SURVEYS|{'cefca-virgo'})
     monkeypatch.setattr(atlas,'begin',lambda *a,**kw:pytest.fail('Unsupported downloads must not be queued'))
     monkeypatch.setattr(atlas,'read_remote',lambda *a,**kw:pytest.fail('Unsupported downloads must not fetch'))
-    route={'kind':'waypoints','stops':[{'survey':'optical'},{'survey':'cefca-virgo'}]}
-    monkeypatch.setattr(atlas.expeditions,'read',lambda _:route)
     with TestClient(app) as client:
-        for response in [client.post('/api/atlas/view',json={'ra':187.7,'dec':12.4,'fov':.2,'survey':'cefca-virgo'}),
-                         client.post('/api/atlas/packs/test-route')]:
-            assert response.status_code==409
-            assert 'Interactive survey tiles remain available' in response.json()['detail']
+        response=client.post('/api/atlas/view',json={'ra':187.7,'dec':12.4,'fov':.2,'survey':'cefca-virgo'})
+        assert response.status_code==409
+        assert 'Interactive survey tiles remain available' in response.json()['detail']
     assert cache.status()['files']==0
