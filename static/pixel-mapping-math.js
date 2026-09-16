@@ -17,7 +17,7 @@
 
   function defaults() {
     return {black: 0, mid: .5, white: 1, stretch: 'linear', colormap: 'native',
-      reversed: false, saturation: 0, brightness: 0, contrast: 0, red: 0, yellow: 0, green: 0};
+      reversed: false, saturation: 0, brightness: 0, contrast: 0, red: 0, yellow: 0, green: 0, blue: 0};
   }
 
   function normalize(input) {
@@ -40,23 +40,21 @@
       contrast: clamp(numberOr(value.contrast, 0), -1, 1),
       red: clamp(numberOr(value.red, 0), -1, 1),
       yellow: clamp(numberOr(value.yellow, 0), -1, 1),
-      green: clamp(numberOr(value.green, 0), -1, 1)};
+      green: clamp(numberOr(value.green, 0), -1, 1),
+      blue: clamp(numberOr(value.blue, 0), -1, 1)};
   }
 
-  // Display-only selective intensity. Masks measure channel differences, so neutral
-  // gray and blue are unchanged. The SVG preview uses the same masks and blend order.
-  // Settings should be normalized once before processing a complete image.
-  function selectiveColor(red, green, blue, settings) {
-    const masks = [Math.max(red-green, 0)*Math.max(red-blue, 0),
-      Math.max(red-blue, 0)*Math.max(green-blue, 0),
-      Math.max(green-red, 0)*Math.max(green-blue, 0)];
-    let values = [red, green, blue];
-    for (let i = 0; i < 3; i += 1) {
-      const gain = settings[['red', 'yellow', 'green'][i]] || 0, weight = masks[i];
-      if (gain && weight) values = values.map(value =>
-        clamp(value*(1+gain), 0, 1)*weight + value*(1-weight));
-    }
-    return values;
+  // Display-only RGB gains work even on faint or nearly neutral survey pixels.
+  // Yellow raises or lowers red and green together. The SVG preview and PNG export
+  // share these gains; settings should be normalized once before image processing.
+  function channelGains(settings) {
+    const yellow = 1 + settings.yellow;
+    return [(1 + settings.red) * yellow, (1 + settings.green) * yellow, 1 + settings.blue];
+  }
+
+  function colorIntensity(red, green, blue, settings) {
+    const gains = channelGains(settings);
+    return [clamp(red * gains[0], 0, 1), clamp(green * gains[1], 0, 1), clamp(blue * gains[2], 0, 1)];
   }
 
   function gamma(settings) {
@@ -132,5 +130,5 @@
     return {black, mid: (black + white) / 2, white};
   }
 
-  return Object.freeze({defaults, normalize, gamma, moveHandle, histogram, autoLevels, selectiveColor});
+  return Object.freeze({defaults, normalize, gamma, moveHandle, histogram, autoLevels, channelGains, colorIntensity});
 });

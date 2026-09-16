@@ -28,7 +28,7 @@ function harness({saved, storageError = false} = {}) {
   let serial = 0, currentLayer = null;
   if (saved !== undefined) storage.set('test-pixel-profile', saved);
   function node(selector) {
-    if (/^\[data-output=/.test(selector) && !/brightness|contrast|saturation|red|yellow|green/.test(selector)) return null;
+    if (/^\[data-output=/.test(selector) && !/brightness|contrast|saturation|red|yellow|green|blue/.test(selector)) return null;
     if (!nodes.has(selector)) {
       const dataset = {};
       for (const name of ['handle', 'level', 'setting', 'look']) {
@@ -38,7 +38,7 @@ function harness({saved, storageError = false} = {}) {
       const attributes = new Map();
       nodes.set(selector, {
         dataset, style: {}, textContent: '', hidden: false, disabled: false, value: '', checked: false,
-        type: dataset.setting === 'reversed' ? 'checkbox' : ['brightness', 'contrast', 'saturation', 'red', 'yellow', 'green'].includes(dataset.setting) ? 'range' : 'select',
+        type: dataset.setting === 'reversed' ? 'checkbox' : ['brightness', 'contrast', 'saturation', 'red', 'yellow', 'green', 'blue'].includes(dataset.setting) ? 'range' : 'select',
         setAttribute(name, value) { attributes.set(name, String(value)); },
         getAttribute(name) { return attributes.get(name); },
         getBoundingClientRect() { return {left: 20, top: 0, width: 320, height: 12}; },
@@ -55,7 +55,7 @@ function harness({saved, storageError = false} = {}) {
       const sets = {
         '[data-handle]': ['black', 'mid', 'white'].map(name => `[data-handle="${name}"]`),
         '[data-level]': ['black', 'mid', 'white'].map(name => `[data-level="${name}"]`),
-        '[data-setting]': ['stretch', 'colormap', 'reversed', 'brightness', 'contrast', 'saturation', 'red', 'yellow', 'green'].map(name => `[data-setting="${name}"]`),
+        '[data-setting]': ['stretch', 'colormap', 'reversed', 'brightness', 'contrast', 'saturation', 'red', 'yellow', 'green', 'blue'].map(name => `[data-setting="${name}"]`),
         '[data-look]': ['faint', 'crisp'].map(name => `[data-look="${name}"]`),
       };
       return (sets[selector] || []).map(node);
@@ -128,7 +128,7 @@ test('normalized display controls become native byte cuts, with valid gamma boun
 test('each survey retains independent settings across switches and controller reloads', async () => {
   const h = harness(), infrared = layer('2mass'), optical = layer('optical');
   await h.bind('2mass', infrared);
-  h.controller.change({...PixelMappingMath.defaults(), black: 0.2, mid: 0.55, colormap: 'viridis'}); h.flushFrames();
+  h.controller.change({...PixelMappingMath.defaults(), black: 0.2, mid: 0.55, colormap: 'viridis',blue:.4}); h.flushFrames();
   const infraredSettings = JSON.stringify(h.controller.settings);
   await h.bind('optical', optical);
   assert.equal(h.controller.settings.black, 0); assert.deepEqual(optical.cuts, [0, 255]);
@@ -473,7 +473,7 @@ function exportHarness() {
   h.document.createElementNS=()=>({attributes:{},setAttribute(name,value){this.attributes[name]=value;},innerHTML:''});
   h.document.createElement=tag=>{
     assert.equal(tag,'canvas');
-    const canvas={width:0,height:0,draws:[],labels:[],pixels:new Uint8ClampedArray([128,0,0,255,0,128,0,255])};
+    const canvas={width:0,height:0,draws:[],labels:[],pixels:new Uint8ClampedArray([128,0,0,255,0,128,0,255,25,46,61,128])};
     const ctx={filter:'none',drawImage(image,...args){canvas.draws.push({image,args,filter:this.filter});},
       fillRect(){},fillText(text,x,y){canvas.labels.push({text,x,y});},
       measureText(text){return {width:text.length*6};},
@@ -486,22 +486,41 @@ function exportHarness() {
   return {...h,canvases,downloads,updates,source,svg,png};
 }
 
-test('selective controls persist, affect imagery only, and original/reset remove their filter', async () => {
+test('all four color controls persist, affect imagery only, and original/reset remove their filter', async () => {
   const h=exportHarness();await h.bind('2mass',layer('2mass'));
-  for(const [name,value] of [['red',-.7],['yellow',.5],['green',.3]]) {
+  for(const [name,value] of [['red',-.7],['yellow',.5],['green',.3],['blue',.8]]) {
     const input=h.node(`[data-setting="${name}"]`);input.value=String(value);input.oninput();
   }
   h.flushFrames();
   assert.match(h.imageCanvas.style.filter,/url\("#pixel-color-\d+"\)/);
   assert.equal(h.catalogCanvas.style.filter,'none');assert.equal(h.sky.aladinDiv.style.filter,'none');
   assert.equal(h.svg.length,1);assert.match(h.svg[0].innerHTML,/color-interpolation-filters="sRGB"/);
-  assert.match(h.svg[0].innerHTML,/result="red-graded"/);assert.match(h.svg[0].innerHTML,/result="yellow-graded"/);
+  const slopes=[...h.svg[0].innerHTML.matchAll(/<feFunc[RGB] type="linear" slope="([^"]+)"/g)].map(match=>Number(match[1]));
+  assert.deepEqual(slopes,PixelMappingMath.channelGains(h.controller.settings));
+  assert.match(h.svg[0].innerHTML,/<feFuncA type="identity"\/>/);
+  assert.equal(h.node('[data-output="blue"]').textContent,'+80%');
   const stored=h.storage.get('test-pixel-profile'),filter=h.imageCanvas.style.filter;
   h.node('[data-action="original"]').onclick();h.flushFrames();assert.equal(h.imageCanvas.style.filter,'none');
   assert.equal(h.storage.get('test-pixel-profile'),stored);
   h.node('[data-action="original"]').onclick();h.flushFrames();assert.equal(h.imageCanvas.style.filter,filter);
   h.node('[data-action="reset"]').onclick();h.flushFrames();assert.equal(h.imageCanvas.style.filter,'none');
-  assert.equal(h.controller.settings.red,0);assert.equal(h.controller.settings.green,0);
+  assert.equal(h.controller.settings.red,0);assert.equal(h.controller.settings.green,0);assert.equal(h.controller.settings.blue,0);
+});
+
+test('each live channel gain matches exported dim pixels while preserving alpha', async () => {
+  for(const [name,value,expected] of [
+    ['red',-1,[0,46,61,128]],['yellow',1,[50,92,61,128]],
+    ['green',1,[25,92,61,128]],['blue',1,[25,46,122,128]]
+  ]) {
+    const h=exportHarness();await h.bind('2mass',layer('2mass'));
+    const input=h.node(`[data-setting="${name}"]`);input.value=String(value);input.oninput();h.flushFrames();
+    const gains=[...h.svg[0].innerHTML.matchAll(/<feFunc[RGB] type="linear" slope="([^"]+)"/g)].map(match=>Number(match[1]));
+    assert.deepEqual([25,46,61].map((v,i)=>Math.min(255,Math.round(v*gains[i]))),expected.slice(0,3));
+    const pending=h.controller.savePNG();h.flushFrames();await pending;
+    assert.deepEqual([...h.canvases[0].pixels.slice(8,12)],expected);
+    assert.match(Buffer.from(await h.downloads[0].blob.arrayBuffer()).toString(),/"color_intensity_model":"rgb-channel-gains-v1"/);
+    if(name==='blue')assert.match(Buffer.from(await h.downloads[0].blob.arrayBuffer()).toString(),/"blue":1/);
+  }
 });
 
 test('yellow palette is registered through the renderer API once and other palettes remain native', async () => {

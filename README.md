@@ -30,7 +30,7 @@ Choose linear, asinh, logarithmic, square-root or squared stretch; survey colors
 
 Checks: `.venv\Scripts\python.exe -m pytest tests/test_live_feed.py -q` and `node --test tests/test_telescope_live.cjs tests/test_pixel_mapping_math.cjs tests/test_pixel_mapping.cjs`.
 
-**Color intensity** adjusts existing red, yellow and green tones separately. Additional palettes include red, yellow, green, blue, inferno, plasma and rainbow. Yellow uses a custom black-to-yellow Aladin color map. These are display adjustments, not measurements of chemical abundance.
+**Color intensity** adjusts the red, green and blue channels directly, including dim survey pixels. Yellow adjusts red and green together. Zero is neutral; −100% removes the selected channel and +100% doubles it before display clipping. Yellow multiplies the individual red and green adjustments. The live preview and saved PNG use the same gains; each survey remembers its own settings. Additional palettes include red, yellow, green, blue, inferno, plasma and rainbow. Yellow uses a custom black-to-yellow Aladin color map. These are display adjustments, not measurements of chemical abundance.
 
 **Save PNG** exports the visible Telescope Live map with its current levels, palette and color adjustments. Catalog markers keep their original colors. A source-credit strip is added below the map, and survey URLs, coordinates and full display settings are embedded in the PNG. **Settings JSON** saves that information separately. **Show original** also applies to exports; neither action changes the source imagery.
 

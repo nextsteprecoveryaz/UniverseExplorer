@@ -29,7 +29,7 @@ class PixelMappingController {
       <section class="pm-section"><h3>Color &amp; stretch</h3><div class="pm-options"><label>Stretch<select data-setting="stretch" aria-label="Pixel mapping stretch"><option value="linear">Linear</option><option value="asinh">Asinh</option><option value="log">Logarithmic</option><option value="sqrt">Square root</option><option value="pow2">Squared</option></select></label><label>Color map<select data-setting="colormap" aria-label="Pixel mapping color map">${[['native','Survey colors'],['grayscale','Grayscale'],['red','Red'],['yellow','Yellow'],['green','Green'],['blue','Blue'],['viridis','Viridis'],['magma','Magma'],['cividis','Cividis'],['inferno','Inferno'],['plasma','Plasma'],['rainbow','Rainbow']].map(([value,label])=>`<option value="${value}">${label}</option>`).join('')}</select></label></div>
       <div class="pm-gamma"><span>Midtone gamma <output data-pm="gamma">1.00</output></span><label><input type="checkbox" data-setting="reversed"> Invert colors</label></div>
       <div class="pm-presets"><span>Presets</span><button type="button" data-look="faint">Lift faint detail</button><button type="button" data-look="crisp">Crisp contrast</button></div></section>
-      <section class="pm-section pm-colors"><h3>Color intensity</h3><p class="pm-help">Brighten or darken existing red, yellow and green tones.</p>${['red','yellow','green'].map(name=>`<label><span class="pm-color-dot pm-color-${name}"></span>${name[0].toUpperCase()+name.slice(1)}<output data-output="${name}">0</output><input type="range" min="-1" max="1" step="0.01" value="0" data-setting="${name}" aria-label="${name[0].toUpperCase()+name.slice(1)} color intensity"></label>`).join('')}</section>
+      <section class="pm-section pm-colors"><h3>Color intensity</h3><p class="pm-help">Adjust each color channel. Yellow adjusts red and green together. Zero keeps the original intensity.</p>${['red','yellow','green','blue'].map(name=>`<label><span class="pm-color-dot pm-color-${name}"></span>${name[0].toUpperCase()+name.slice(1)}<output data-output="${name}">0%</output><input type="range" min="-1" max="1" step="0.01" value="0" data-setting="${name}" aria-label="${name[0].toUpperCase()+name.slice(1)} color intensity"></label>`).join('')}</section>
       <details class="pm-advanced"><summary>Fine adjustment</summary>${['brightness','contrast','saturation'].map(name=>`<label>${name[0].toUpperCase()+name.slice(1)}<output data-output="${name}">0</output><input type="range" min="-1" max="1" step="0.01" value="0" data-setting="${name}" aria-label="Pixel mapping ${name}"></label>`).join('')}</details>
       <div class="pm-actions"><div class="pm-action-row"><button type="button" class="button" data-action="original" aria-pressed="false">Show original</button><button type="button" class="button" data-action="reset">Reset display</button></div><div class="pm-action-row"><button type="button" class="button pm-save" data-action="save">Save PNG</button><button type="button" class="button pm-settings" data-action="settings" title="Download display settings and source information as JSON">Settings JSON</button></div><p class="pm-caption pm-save-status" data-pm="save-status" role="status">Saves this view with its display settings and source credit.</p></div>
       <p data-pm="status" class="pm-caption" role="status"></p><p class="pm-provenance">CDS Aladin display controls. Sampled luminance is derived from survey colors, not calibrated photometry.</p></div>`;
@@ -117,7 +117,7 @@ class PixelMappingController {
   }
   displayFilter(s) {
     const basic=PixelMappingController.basicFilter(s);
-    if(!s.red&&!s.yellow&&!s.green)return basic;
+    if(!s.red&&!s.yellow&&!s.green&&!s.blue)return basic;
     if(!this.colorFilter) {
       this.colorFilter=document.createElementNS('http://www.w3.org/2000/svg','svg');
       this.colorFilter.setAttribute('class','pm-filter-defs'); this.colorFilter.setAttribute('aria-hidden','true');
@@ -125,22 +125,10 @@ class PixelMappingController {
       // Keep SVG outside the hideable panel: display:none would disable its filter.
       this.sky.aladinDiv.append(this.colorFilter);
     }
-    const channel=(name,row)=>`<feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${row} 0 0" result="${name}"/>`;
-    const difference=(a,b)=>`<feComposite in="${a}" in2="${b}" operator="arithmetic" k2="1" k3="-1" result="${a}${b}"/>`;
-    let primitives=channel('r','1 0 0')+channel('g','0 1 0')+channel('b','0 0 1')+
-      difference('r','g')+difference('r','b')+difference('g','r')+difference('g','b')+
-      '<feComposite in="rg" in2="rb" operator="in" result="red"/>'+
-      '<feComposite in="rb" in2="gb" operator="in" result="yellow"/>'+
-      '<feComposite in="gr" in2="gb" operator="in" result="green"/>';
-    let current='SourceGraphic';
-    for(const name of ['red','yellow','green']) {
-      if(!s[name])continue;
-      primitives+=`<feComponentTransfer in="${current}" result="${name}-candidate">${['R','G','B'].map(c=>`<feFunc${c} type="linear" slope="${1+s[name]}"/>`).join('')}</feComponentTransfer>`+
-        `<feComposite in="${name}-candidate" in2="${name}" operator="in" result="${name}-selected"/>`+
-        `<feComposite in="${current}" in2="${name}" operator="out" result="${name}-rest"/>`+
-        `<feComposite in="${name}-selected" in2="${name}-rest" operator="arithmetic" k2="1" k3="1" result="${name}-graded"/>`;
-      current=name+'-graded';
-    }
+    // Direct sRGB gains stay responsive on dim survey pixels. Use the same gains
+    // as PNG export; leave alpha and the separate catalog canvas untouched.
+    const gains=PixelMappingMath.channelGains(s);
+    const primitives=`<feComponentTransfer in="SourceGraphic">${['R','G','B'].map((c,i)=>`<feFunc${c} type="linear" slope="${gains[i]}" intercept="0"/>`).join('')}<feFuncA type="identity"/></feComponentTransfer>`;
     this.colorFilter.innerHTML=`<defs><filter id="${this.filterId}" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">${primitives}</filter></defs>`;
     return (basic==='none'?'':basic+' ')+`url("#${this.filterId}")`;
   }
@@ -152,7 +140,8 @@ class PixelMappingController {
       survey:{id:this.key,...info},view:{ra_deg:center[0],dec_deg:center[1],fov_deg:fov[0],coordinate_frame:'ICRS'},
       original_preview:this.original,display:PixelMappingMath.normalize(this.original?PixelMappingMath.defaults():this.settings),
       saved_adjustments:PixelMappingMath.normalize(this.settings),renderer:'CDS Aladin Lite 3.8.2',
-      processing:'Survey display visualization. Native cuts, stretch, colormap and gamma; browser brightness, contrast and saturation; selective red/yellow/green intensity. Not calibrated photometry.',
+      color_intensity_model:'rgb-channel-gains-v1',
+      processing:'Survey display visualization. Native cuts, stretch, colormap and gamma; browser brightness, contrast and saturation; red, green and blue channel gains with yellow multiplying red and green. Not calibrated photometry.',
       image_kind:'Ground-based survey context; not a Hubble or Webb exposure.'};
   }
   download(blob,filename) {
@@ -185,10 +174,10 @@ class PixelMappingController {
       const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
       const ctx=canvas.getContext('2d',{willReadFrequently:true});
       ctx.filter=PixelMappingController.basicFilter(s);ctx.drawImage(source,0,0,width,height);ctx.filter='none';
-      if(s.red||s.yellow||s.green) {
+      if(s.red||s.yellow||s.green||s.blue) {
         const pixels=ctx.getImageData(0,0,width,height),data=pixels.data;
         for(let p=0;p<data.length;p+=4) {
-          const rgb=PixelMappingMath.selectiveColor(data[p]/255,data[p+1]/255,data[p+2]/255,s);
+          const rgb=PixelMappingMath.colorIntensity(data[p]/255,data[p+1]/255,data[p+2]/255,s);
           data[p]=Math.round(rgb[0]*255);data[p+1]=Math.round(rgb[1]*255);data[p+2]=Math.round(rgb[2]*255);
         }
         ctx.putImageData(pixels,0,0);
@@ -319,9 +308,9 @@ class PixelMappingController {
       const handle=this.el(`[data-handle="${name}"]`); handle.style.left=(s[name]*100)+'%'; handle.setAttribute('aria-valuenow',(s[name]*255).toFixed(1));
       const input=this.el(`[data-level="${name}"]`); if(document.activeElement!==input)input.value=(s[name]*255).toFixed(1);
     }
-    for(const key of ['stretch','colormap','reversed','brightness','contrast','saturation','red','yellow','green']) {
+    for(const key of ['stretch','colormap','reversed','brightness','contrast','saturation','red','yellow','green','blue']) {
       const input=this.el(`[data-setting="${key}"]`); if(input.type==='checkbox')input.checked=s[key]; else input.value=s[key];
-      const output=this.el(`[data-output="${key}"]`); if(output)output.textContent=(s[key]>0?'+':'')+s[key].toFixed(2);
+      const output=this.el(`[data-output="${key}"]`); if(output)output.textContent=(s[key]>0?'+':'')+(['red','yellow','green','blue'].includes(key)?Math.round(s[key]*100)+'%':s[key].toFixed(2));
     }
     this.el('[data-pm="gamma"]').textContent=PixelMappingMath.gamma(s).toFixed(2);
     const original=this.el('[data-action="original"]'); original.setAttribute('aria-pressed',String(this.original)); original.textContent=this.original?'Show adjustments':'Show original';

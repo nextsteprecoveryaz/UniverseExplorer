@@ -19,7 +19,7 @@ test('UMD exports the same public contract to a browser global', () => {
 test('defaults are neutral and each caller receives an independent object', () => {
   const first = math.defaults();
   assert.deepEqual(first, {black: 0, mid: .5, white: 1, stretch: 'linear', colormap: 'native',
-    reversed: false, saturation: 0, brightness: 0, contrast: 0, red: 0, yellow: 0, green: 0});
+    reversed: false, saturation: 0, brightness: 0, contrast: 0, red: 0, yellow: 0, green: 0, blue: 0});
   first.black = .3;
   assert.equal(math.defaults().black, 0);
   assert.equal(math.gamma(math.defaults()), 1);
@@ -68,31 +68,53 @@ test('accepted stretches and colormaps survive with clamped display controls', (
   assert.equal(math.normalize({stretch: 'pow'}).stretch, 'linear');
 });
 
-test('older profiles gain neutral selective colors and malformed intensities are bounded', () => {
+test('older profiles gain neutral color controls and malformed intensities are bounded', () => {
   const restored=math.normalize({black:.2,mid:.55,white:.9,colormap:'magma'});
-  assert.equal(restored.red,0);assert.equal(restored.yellow,0);assert.equal(restored.green,0);
-  const clipped=math.normalize({red:100,yellow:-4,green:'1'});
-  assert.equal(clipped.red,1);assert.equal(clipped.yellow,-1);assert.equal(clipped.green,0);
-  for(const value of [NaN,Infinity,null,[],{},true])assert.equal(math.normalize({red:value}).red,0);
+  assert.equal(restored.red,0);assert.equal(restored.yellow,0);assert.equal(restored.green,0);assert.equal(restored.blue,0);
+  const previous=math.normalize({red:.3,yellow:-.2,green:.5});
+  assert.equal(previous.red,.3);assert.equal(previous.yellow,-.2);assert.equal(previous.green,.5);assert.equal(previous.blue,0);
+  const clipped=math.normalize({red:100,yellow:-4,green:'1',blue:10});
+  assert.equal(clipped.red,1);assert.equal(clipped.yellow,-1);assert.equal(clipped.green,0);assert.equal(clipped.blue,1);
+  assert.equal(math.normalize({blue:-10}).blue,-1);
+  for(const name of ['red','yellow','green','blue'])
+    for(const value of [NaN,Infinity,-Infinity,null,[],{},true,'1'])assert.equal(math.normalize({[name]:value})[name],0);
 });
 
-test('selective intensity changes matching color tones without changing gray, white or blue', () => {
-  const adjusted=math.normalize({red:-.8,yellow:.7,green:-.5});
-  for(const rgb of [[0,0,0],[.5,.5,.5],[1,1,1],[0,0,1],[0,.5,.5]])
-    assert.deepEqual(math.selectiveColor(...rgb,adjusted),rgb);
-  assert.ok(math.selectiveColor(.7,0,0,adjusted)[0]<.7);
-  assert.ok(math.selectiveColor(.5,.5,0,adjusted)[0]>.5);
-  assert.ok(math.selectiveColor(0,.8,0,adjusted)[1]<.8);
-  assert.deepEqual(math.selectiveColor(.7,.4,.2,math.defaults()),[.7,.4,.2]);
+test('each color control visibly changes dim survey pixels without relying on strong existing hues', () => {
+  const input=[.20,.18,.16];
+  for(const [name,channels] of [['red',[0]],['yellow',[0,1]],['green',[1]],['blue',[2]]]) {
+    for(const amount of [-1,1]) {
+      const output=math.colorIntensity(...input,math.normalize({[name]:amount}));
+      for(let channel=0;channel<3;channel++) {
+        if(channels.includes(channel)) {
+          assert.ok(Math.abs(output[channel]-input[channel])*255>30, `${name} must visibly affect dim pixels`);
+          close(output[channel],input[channel]*(1+amount));
+        } else close(output[channel],input[channel]);
+      }
+    }
+  }
 });
 
-test('selective intensity uses smoothly weighted hue masks with clipping before blend', () => {
-  const red=math.normalize({red:1});
-  // Red mask at (.8,.1,0) is (.8-.1)*(.8-0)=.56; candidate clips .8*2 to 1.
-  const result=math.selectiveColor(.8,.1,0,red);
-  close(result[0],1*.56+.8*.44);close(result[1],.2*.56+.1*.44);close(result[2],0);
+test('yellow combines red and green gains while blue remains independent', () => {
+  const settings=math.normalize({red:.5,yellow:.5,green:-.5,blue:.25});
+  assert.deepEqual(math.channelGains(settings),[2.25,.75,1.25]);
+  const output=math.colorIntensity(.2,.4,.4,settings);
+  close(output[0],.45);close(output[1],.3);close(output[2],.5);
+  assert.deepEqual(math.channelGains(math.normalize({yellow:-1,red:1,green:1,blue:1})),[0,0,2]);
+});
+
+test('neutral color settings preserve input pixels and zero stays black', () => {
+  assert.deepEqual(math.channelGains(math.defaults()),[1,1,1]);
+  for(const rgb of [[0,0,0],[.05,.04,.03],[.5,.5,.5],[1,1,1],[.7,.4,.2]])
+    assert.deepEqual(math.colorIntensity(...rgb,math.defaults()),rgb);
+  assert.deepEqual(math.colorIntensity(0,0,0,math.normalize({red:1,yellow:1,green:1,blue:1})),[0,0,0]);
+});
+
+test('combined extreme color gains clip safely to display range', () => {
+  assert.deepEqual(math.colorIntensity(.8,.7,.6,math.normalize({red:1,yellow:1,green:1,blue:1})),[1,1,1]);
+  assert.deepEqual(math.colorIntensity(.8,.7,.6,math.normalize({red:-1,yellow:-1,green:-1,blue:-1})),[0,0,0]);
   for(let r=0;r<=1;r+=.1)for(let g=0;g<=1;g+=.1)for(let b=0;b<=1;b+=.1)
-    for(const gain of [-1,1])for(const value of math.selectiveColor(r,g,b,math.normalize({red:gain,yellow:gain,green:gain})))
+    for(const gain of [-1,1])for(const value of math.colorIntensity(r,g,b,math.normalize({red:gain,yellow:gain,green:gain,blue:gain})))
       assert.ok(Number.isFinite(value)&&value>=0&&value<=1);
 });
 
