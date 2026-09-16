@@ -70,10 +70,11 @@ function coordinates(){
   onNavigationSkyChanged();
   onAtlasViewChanged();
 }
-function skyMapSurveys(){return state.config.surveys.filter(s=>!['webb-color','hubble-color'].includes(s.id));}
+const HIDDEN_MAP_SURVEYS=new Set(['webb-color','hubble-color','oxygen','sulfur']);
+function skyMapSurveys(){return state.config.surveys.filter(s=>!HIDDEN_MAP_SURVEYS.has(s.id));}
 function chooseSurvey(id){
-  // Older destinations and notebook entries can still reference released-photo layers.
-  if(['webb-color','hubble-color'].includes(id))id='optical';
+  // Keep older destinations and notebook entries usable without restoring hidden lenses.
+  if(HIDDEN_MAP_SURVEYS.has(id))id='optical';
   const survey=state.config.surveys.find(s=>s.id===id);
   if(!survey)return;
   if(!routePlayer.writing)leaveTourView('Paused · exploring another survey');
