@@ -1,0 +1,87 @@
+[
+  {
+    "id": "virgo-ngc4452",
+    "narration": "NGC 4452 is a galaxy that almost hides its own shape. Its disk lies nearly edge-on to Earth, squeezing the combined light of billions of stars into a remarkably thin streak. Hubble resolves a bright central nucleus and a faint halo of stars surrounding the disk. William Herschel recorded this object in 1784, long before astronomers understood that such distant nebulae were separate galaxies.",
+    "sources": [
+      {
+        "title": "ESA/Hubble: An extraordinarily slender galaxy",
+        "url": "https://esahubble.org/images/potw1029a/"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-ngc4567-ngc4568",
+    "narration": "A collision between galaxies can assemble the raw material for new star clusters. ALMA observations of NGC 4567 and NGC 4568 uncovered a ribbon of molecular gas where the two galaxies overlap. It stretches roughly six thousand light-years and contains four clouds, each with about a million times the Sun's mass. These clouds are bound by their own gravity. The researchers suggest this filament could eventually produce unusually massive star clusters.",
+    "sources": [
+      {
+        "title": "Kaneko, Kuno and Saitoh (2018): Discovery of a Molecular Collision Front in Interacting Galaxies NGC 4567/4568 with ALMA",
+        "url": "https://arxiv.org/abs/1805.11630"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-m89",
+    "narration": "Messier 89's smooth appearance hides a messy history. Deep photographs reveal faint shells and wisps of stars beyond its bright main body. Their origin is still debated: they may be debris from smaller galaxies it absorbed, or waves of stars stirred up by a larger encounter. This elliptical galaxy also hosts more than two thousand globular clusters, dense stellar communities that make its surroundings far richer than a simple oval suggests.",
+    "sources": [
+      {
+        "title": "NASA Astronomy Picture of the Day: M89, Elliptical Galaxy with Outer Shells and Plumes",
+        "url": "https://apod.nasa.gov/apod/ap170614.html"
+      },
+      {
+        "title": "NASA Hubble Messier Catalog: Messier 89",
+        "url": "https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/messier-89/"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-m84",
+    "narration": "Messier 84's central black hole is reshaping the gas around its galaxy. Chandra's X-ray observations reveal cavities carved by jets launched near the black hole, leaving a hot-gas pattern resembling a letter H about forty thousand light-years tall. The surrounding gas reaches tens of millions of degrees. Researchers find that the jets may even slow the supply of gas falling inward, allowing the black hole's activity to influence its own fuel supply.",
+    "sources": [
+      {
+        "title": "NASA Chandra: M84, 'H' is for Hot and Huge in Chandra Image",
+        "url": "https://chandra.harvard.edu/photo/2023/m84/"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-ngc4425",
+    "narration": "NGC 4425 carries a clue to its hidden architecture in the motions of its stars. It is viewed at a steep angle and has a box-shaped central bulge. Spectroscopic measurements show that, at a given radius, the average rotation changes little with height above the disk. This pattern, together with the boxy shape, supports the presence of a bar of stars. Motion helps reveal a structure that a flat photograph can disguise.",
+    "sources": [
+      {
+        "title": "Falcon-Barroso et al. (2006): The SAURON project VII, Integral-field absorption and emission-line kinematics of 24 spiral galaxy bulges",
+        "url": "https://academic.oup.com/mnras/article/369/2/529/3101472"
+      },
+      {
+        "title": "Williams et al. (2011): The stellar kinematics and populations of boxy bulges, cylindrical rotation and vertical gradients",
+        "url": "https://academic.oup.com/mnras/article/414/3/2163/1037870"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-ngc4429",
+    "narration": "A disk of gas acts as a cosmic weighing scale in NGC 4429. ALMA measured its rotation, and astronomers modeled those motions to infer a central black hole with about one hundred and fifty million times the Sun's mass. The molecular emission also reveals a gap near the center. The researchers suggest that powerful tidal forces and gas that resists forming dense clouds may together explain that gap.",
+    "sources": [
+      {
+        "title": "Davis et al. (2018): WISDOM Project III, Molecular gas measurement of the supermassive black hole mass in the barred lenticular galaxy NGC 4429",
+        "url": "https://academic.oup.com/mnras/article/473/3/3818/4411823"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-ic3476",
+    "narration": "IC 3476 is having its star-making fuel pushed around by the space between galaxies. As this dwarf galaxy moves through the cluster's gas, a pressure like a headwind strips and compresses its own gas. Observations indicate little or no star formation along the exposed edge, while deeper regions are unusually active. The same environmental force can therefore shut down stellar nurseries in one place and help trigger new ones elsewhere.",
+    "sources": [
+      {
+        "title": "ESA/Hubble: A high amount of ram",
+        "url": "https://esahubble.org/images/potw2408a/"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  }
+]

@@ -1,0 +1,79 @@
+[
+  {
+    "id": "virgo-vcc846",
+    "narration": "This small Virgo galaxy is approaching us at roughly seven hundred and thirty kilometers per second. Inside a galaxy cluster, gravity drives large local motions that can outweigh the overall expansion of the universe. Independent distance measurements place this dwarf in Virgo despite its strong blueshift. Its faint appearance hides a striking reminder: a galaxy cluster is a moving, gravitationally connected system, with its members following very different paths through space.",
+    "sources": [
+      {"title": "Forbes et al. — Bridging the gap between low- and high-mass dwarf galaxies, section 7.5", "url": "https://academic.oup.com/mnras/article/413/4/2665/964298"},
+      {"title": "Binggeli — The Virgo Cluster: Home of M87, substructure and dynamics", "url": "https://ned.ipac.caltech.edu/level5/Binggeli/Bin6.html"},
+      {"title": "SDSS Voyages — Using spectra to measure redshift", "url": "https://voyages.sdss.org/preflight/light/redshift/"}
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-vcc1413",
+    "narration": "A galaxy does not need a brilliant center to hold a history of star formation. This diffuse dwarf lacks a prominent central nucleus. Hubble included it in a survey searching for compact star clusters. Such clusters can preserve clues about stellar ages and a galaxy's past. The challenge is separating those tiny possible clusters from unrelated foreground stars and much more distant galaxies sharing the same patch of sky.",
+    "sources": [
+      {"title": "CEFCA — Published Virgo Cluster tour, VCC 1413 waypoint", "url": "https://www.cefca.es/divulgacion/tour_cumulo_virgo"},
+      {"title": "Seth et al. — Star Clusters in Virgo and Fornax Dwarf Irregular Galaxies, Tables 1 and 2", "url": "https://arxiv.org/pdf/astro-ph/0311106"},
+      {"title": "NASA — Starburst Galaxy NGC 3310 Blazes With Star Formation: dating stellar populations with cluster colors", "url": "https://science.nasa.gov/asset/hubble/starburst-galaxy-ngc-3310-blazes-with-star-formation/"}
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-ngc4438",
+    "narration": "This battered spiral records a complicated history. NGC 4438 has been strongly distorted by encounters with other galaxies. Its nearby companion, NGC 4435, may share responsibility, but researchers also found long filaments of glowing hydrogen connecting it to the giant galaxy M86. Those filaments support a past collision with M86. During close encounters, gravity pulls differently across a galaxy, displacing material and reshaping it. The aftermath can persist long after the participants have moved apart.",
+    "sources": [
+      {"title": "ESO — VLT Looks into The Eyes of the Virgin", "url": "https://www.eso.org/public/news/eso1131/"},
+      {"title": "Kenney et al. — A Spectacular H-alpha Complex in Virgo: Evidence for a Collision Between M86 and NGC 4438", "url": "https://arxiv.org/abs/0810.0711"}
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-viii-zw186",
+    "narration": "Galaxies can have turbulent lives even when they are small. This pair lies behind Virgo and appears in a published catalog of interacting dwarf galaxies. Researchers selected these systems by searching for faint structures that encounters can leave behind, including streams, shells and distorted outlines. Such small mergers offer a way to investigate how gravity rearranges stars and gas, and how interactions influence the growth and star formation of modest galaxies.",
+    "sources": [
+      {"title": "Paudel et al. — A Catalog of Merging Dwarf Galaxies in the Local Universe, Table 1 entry 087", "url": "https://arxiv.org/pdf/1807.07195"},
+      {"title": "CEFCA — Published Virgo Cluster tour, VIII Zw 186 background pair", "url": "https://www.cefca.es/divulgacion/tour_cumulo_virgo"}
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-vpc0880",
+    "narration": "This peculiar galaxy is an unfinished case. CEFCA highlights three bluish knots around a redder central feature, but does not establish what produced the pattern. In visible light, blue regions often contain hot, young stars, while older stellar populations can look redder; dust can also redden light. Those clues suggest questions rather than a diagnosis. A convincing explanation of this galaxy's shape needs more evidence than its colors and outline alone.",
+    "sources": [
+      {"title": "CEFCA — Published Virgo Cluster tour, VPC 0880 waypoint and uncertain interpretation", "url": "https://www.cefca.es/divulgacion/tour_cumulo_virgo"},
+      {"title": "NASA — Starburst Galaxy NGC 3310 Blazes With Star Formation: stellar colors and ages", "url": "https://science.nasa.gov/asset/hubble/starburst-galaxy-ngc-3310-blazes-with-star-formation/"},
+      {"title": "NASA — Piercing the Dark Birthplaces of Massive Stars with Webb: dust reddening", "url": "https://science.nasa.gov/missions/webb/piercing-the-dark-birthplaces-of-massive-stars-with-webb/"}
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-distant-galaxy-cluster",
+    "narration": "CEFCA identifies this compact patch as a group or cluster far behind Virgo. Its galaxies invite a surprising question: how much of a cluster can ordinary light reveal? In well-studied galaxy clusters, vast reservoirs of hot gas fill the space between galaxies and glow in X-rays. Dark matter supplies most of the gravitational mass. The luminous galaxies are therefore only one part of a much larger physical system, whose contents require several kinds of observation.",
+    "sources": [
+      {"title": "CEFCA — Published Virgo Cluster tour, background group at RA 185.915691, Dec 13.053627", "url": "https://www.cefca.es/divulgacion/tour_cumulo_virgo"},
+      {"title": "NASA Chandra X-ray Center — Groups and Clusters of Galaxies", "url": "https://www.chandra.harvard.edu/xray_sources/galaxy_clusters.html"}
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-more-distant-galaxy-cluster",
+    "narration": "CEFCA marks this second background grouping as more distant still. A field like this brings different eras of cosmic history into one picture. Light takes time to travel, so distant galaxies reach us as they were in the past. Astronomers measure shifts in familiar spectral features to work out how much the universe expanded during that journey. Each galaxy's light carries both an image of its earlier appearance and clues to its place in cosmic history.",
+    "sources": [
+      {"title": "CEFCA — Published Virgo Cluster tour, background cluster at RA 185.47625, Dec 14.97194", "url": "https://www.cefca.es/divulgacion/tour_cumulo_virgo"},
+      {"title": "NASA — Cosmic Distances: light travel time and lookback time", "url": "https://science.nasa.gov/solar-system/cosmic-distances/"},
+      {"title": "NASA — Redshift Wrangler: spectra and the expansion history of the universe", "url": "https://science.nasa.gov/citizen-science/redshift-wrangler/"}
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-sdss-j122359-112800",
+    "narration": "This star-like point is a quasar far beyond Virgo. Its published redshift is about four point one two: cosmic expansion has stretched its light to more than five times its original wavelength. It also appears in a sample of quasars with unusually weak emission lines. Its enormous glow comes from hot matter around a supermassive black hole. A tiny galactic center can outshine its host, yet reach us looking like a single faint star.",
+    "sources": [
+      {"title": "Diamond-Stanic et al. — High-Redshift SDSS Quasars with Weak Emission Lines, Table 2: SDSS J122359.35+112800.1", "url": "https://arxiv.org/pdf/0904.2181"},
+      {"title": "SDSS Voyages — Redshift: the observed-to-emitted wavelength relation", "url": "https://voyages.sdss.org/preflight/light/redshift/"},
+      {"title": "NASA — Hubble Quasars: black-hole accretion and luminous galactic nuclei", "url": "https://science.nasa.gov/mission/hubble/science/science-behind-the-discoveries/hubble-quasars/"}
+    ],
+    "verified_on": "2026-09-16"
+  }
+]

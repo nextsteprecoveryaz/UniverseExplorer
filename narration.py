@@ -24,8 +24,10 @@ MAX_AUDIO_BYTES = 12 * 1024 * 1024
 TIMEOUT_SECONDS = 120
 ENDPOINT = 'https://api.openai.com/v1/audio/speech'
 INSTRUCTIONS = (
-    'Narrate this astronomy tour in a calm, warm, clear voice, at an unhurried '
-    'but natural pace. Read the supplied text faithfully. Pronounce astronomical '
+    'Narrate this astronomy tour like an engaging science documentary: warm, '
+    'curious, and clear, with a subtle sense of wonder. Use natural pacing, '
+    'brief pauses, and varied emphasis to make the discoveries easy to follow. '
+    'Avoid a sales pitch or exaggerated drama. Read the supplied text faithfully. Pronounce astronomical '
     'object names and catalogue numbers clearly. Do not add commentary, sound '
     'effects, or music.'
 )

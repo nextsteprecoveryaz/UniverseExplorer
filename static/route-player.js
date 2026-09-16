@@ -66,7 +66,7 @@ function resumeRoute(){
   $('#route-play-toggle').textContent='Ⅱ Pause';cancelAnimationFrame(routePlayer.frame);routePlayer.frame=requestAnimationFrame(tickRoute);
   if(typeof resumeTourNarration==='function')resumeTourNarration();
 }
-function narrationFor(media,stop){return [stop?.title,media?.description||stop?.notes||''].filter(Boolean).join('. ').replace(/\s+/g,' ').trim().slice(0,3500);}
+function narrationFor(media,stop){return (media?.narration?.trim()||[stop?.title,media?.description||stop?.notes||''].filter(Boolean).join('. ')).replace(/\s+/g,' ').trim().slice(0,3500);}
 function speakRouteStop(){
   if(typeof startTourNarration==='function'){void startTourNarration();return;}
   if(!$('#route-narration').checked||!window.speechSynthesis||!routePlayer.playing)return;
@@ -76,6 +76,7 @@ function speakRouteStop(){
 function updateRouteGuide(index){
   if(typeof resetTourNarration==='function')resetTourNarration();
   const p=routePlayer;p.index=index;p.waitSince=0;p.skipWait=false;
+  $('#route-story-sources').innerHTML=storySourcesMarkup(p.route.kind==='recording'?null:p.route.media[index]);
   if(p.route.kind==='recording'){
     $('#route-stop-title').textContent='Your recorded flight';$('#route-stop-description').textContent=p.route.description||'Replay of sampled sky positions, zoom, rotation and survey selection.';
     $('#route-stop-facts').textContent='';$('#route-image-message').textContent='';

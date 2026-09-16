@@ -3,16 +3,32 @@
 Snapshot checked 2026-09-15 against SOURCE_URL. Coordinates (ICRS degrees),
 field sizes and stop order follow the 23 positioned slides in the official
 tour. Its two introductory slides have no coordinates and are represented by
-the route overview, not invented waypoints. English navigation notes below
-are original to Universe Explorer; no Tour Navigator code or Spanish prose is
-bundled. The remote image survey remains credited to CEFCA Foundation.
+the route overview, not invented waypoints. Researched English stories live in
+tour_content, with primary-source links for each stop. No Tour Navigator code
+or Spanish prose is bundled. The image survey is credited to CEFCA Foundation.
 """
+from copy import deepcopy
+import json
+from pathlib import Path
 
 TOUR_ID = 'cefca-virgo'
 SURVEY_ID = 'cefca-virgo'
 SOURCE_URL = 'https://www.cefca.es/divulgacion/tour_cumulo_virgo'
 SURVEY_URL = 'https://www.cefca.es/img/aladin/VirgoCluster/'
 CREDIT = 'CEFCA Foundation · JAST80 / T80Cam'
+
+
+def _load_stories():
+    rows = []
+    for name in ('cefca_virgo_01_08.json', 'cefca_virgo_09_15.json', 'cefca_virgo_16_23.json'):
+        rows.extend(json.loads((Path(__file__).parent / 'tour_content' / name).read_text(encoding='utf-8')))
+    stories = {row['id']: row for row in rows}
+    if len(stories) != len(rows) or set(stories) != {row[0] for row in WAYPOINTS}:
+        raise ValueError('CEFCA stories must cover each published waypoint exactly once.')
+    for row in rows:
+        if not row['narration'].strip() or len(row['narration']) > 3500 or not row['sources']:
+            raise ValueError('Every CEFCA story needs narration and research sources.')
+    return stories
 
 # Stable source id, English title, RA, Dec, horizontal field of view, our notes.
 # Keep these published positions and their order independent of live web pages.
@@ -65,19 +81,24 @@ WAYPOINTS = (
      'Finish at the quasar position. Its compact appearance contrasts with the extended galaxies along the route.'),
 )
 
+STORIES = _load_stories()
+
 
 def source(ident):
     """Resolve only a bundled source id; user input never selects a URL."""
     try:
-        _, title, ra, dec, fov, description = next(row for row in WAYPOINTS if row[0] == ident)
+        _, title, ra, dec, fov, navigation_note = next(row for row in WAYPOINTS if row[0] == ident)
     except StopIteration as exc:
         raise ValueError('Unknown CEFCA waypoint.') from exc
+    story = STORIES[ident]
     return {
         'id': ident, 'kind': 'cefca', 'title': title,
         'ra': ra, 'dec': dec, 'fov': fov, 'survey': SURVEY_ID,
-        'description': description, 'available': True, 'preview_url': None,
+        'description': story['narration'], 'narration': story['narration'],
+        'story_sources': deepcopy(story['sources']), 'story_verified_on': story['verified_on'],
+        'navigation_note': navigation_note, 'available': True, 'preview_url': None,
         'source_url': SOURCE_URL, 'source_language': 'es', 'credit': CREDIT,
-        'location_note': 'Published CEFCA tour position. English navigation notes by Universe Explorer.',
+        'location_note': 'Published CEFCA tour position. Researched English story by Universe Explorer; references under Story sources.',
     }
 
 
@@ -88,7 +109,7 @@ def media_items():
 def template_metadata():
     return {
         'id': TOUR_ID, 'title': 'Virgo Cluster with CEFCA',
-        'description': 'Explore 23 published CEFCA stops across the Virgo Cluster image, from bright galaxies to faint background objects. Follow the original sequence on the JAST80 / T80Cam sky mosaic, with short English navigation notes and a link to the full Spanish guide.',
+        'description': 'Discover the stories behind 23 CEFCA sky stops: giant black holes, colliding galaxies, stripped gas and distant quasars. Explore the original JAST80 / T80Cam mosaic with researched English narration and sources for every stop. Voice narration pauses the journey until each story finishes.',
         'collection': 'cefca', 'source_url': SOURCE_URL, 'source_language': 'es',
         'credit': CREDIT, 'cover_url': '/assets/cefca-virgo.jpg',
     }

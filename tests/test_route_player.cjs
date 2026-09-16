@@ -14,7 +14,7 @@ function player(api=async()=>({revision:2})){
   const context=vm.createContext({$,api,console,Image:class{},
     atlasUI:{pack:null},atlasPrefetch(){},atlasShowPackView(){},atlasStopPack(){},atlasClear(){},
     state:{page:'explore',config:{surveys:[{id:'optical',name:'Visible'}]},sky:{setProjection(v){calls.push(['projection',v]);},gotoRaDec(...v){calls.push(['position',...v]);},setFoV(v){calls.push(['fov',v]);},setRotation(v){calls.push(['roll',v]);},isStillActive:()=>false}},
-    navigationUI:{dirty:false},flight:{active:false},drawNavigationFootprint(){},setNearbyVisible(){},chooseSurvey(v){calls.push(['survey',v]);},setInterval(){},failure(e){throw e;},flightEditable:()=>false,
+    navigationUI:{dirty:false},flight:{active:false},storySourcesMarkup:()=>'',drawNavigationFootprint(){},setNearbyVisible(){},chooseSurvey(v){calls.push(['survey',v]);},setInterval(){},failure(e){throw e;},flightEditable:()=>false,
     routePayload:r=>({title:r.title,kind:r.kind,stops:r.stops||[],track:r.track||[]}),
     performance:{now:()=>clock},requestAnimationFrame(fn){frames.set(++frameId,fn);return frameId;},cancelAnimationFrame(id){frames.delete(id);},
     document:{hidden:false,hasFocus:()=>true,addEventListener(k,f){events[k]=f;}},window:{addEventListener(k,f){windowEvents[k]=f;}}
@@ -122,4 +122,22 @@ test('explicit Next can leave a stop while narration is pending',()=>{
   assert.equal(p.run('routePlayer.elapsed'),31);
   assert.equal(p.run('routePlayer.playing'),true);
   assert.equal(resets,1);
+});
+
+test('researched narration replaces navigation notes without repeating catalog titles',()=>{
+  const p=player();
+  p.context.researchedStory='  A giant black hole.\n  A surprising discovery.';
+  assert.equal(p.run(`narrationFor({narration:researchedStory,description:'Old navigation notes.'},{title:'M87',notes:'Personal note'})`),'A giant black hole. A surprising discovery.');
+  assert.equal(p.run(`narrationFor({description:'An existing gallery story.'},{title:'Carina'})`),'Carina. An existing gallery story.');
+  assert.equal(p.run(`narrationFor({narration:'   '},{title:'My target',notes:'My own notes.'})`),'My target. My own notes.');
+});
+
+test('moving between stops and recordings clears the previous story sources',()=>{
+  const p=player();p.context.storySourcesMarkup=m=>m?.story_sources?.[0]?.title||'';
+  p.run(`routePlayer.route.media[0]={story_sources:[{title:'NASA research'}]};updateRouteGuide(0)`);
+  assert.equal(p.$('#route-story-sources').innerHTML,'NASA research');
+  p.run(`routePlayer.route.media[0]=null;updateRouteGuide(0)`);
+  assert.equal(p.$('#route-story-sources').innerHTML,'');
+  p.run(`routePlayer.route.kind='recording';updateRouteGuide(0)`);
+  assert.equal(p.$('#route-story-sources').innerHTML,'');
 });

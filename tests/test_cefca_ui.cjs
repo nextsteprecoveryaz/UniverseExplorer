@@ -142,3 +142,15 @@ test('CEFCA inspection shows the source guide and escaped notes without using a 
   assert.match(modal[2],/target="_blank" rel="noopener"/);
   assert.deepEqual(p.errors,[]);
 });
+
+test('story citations are linked, escaped and reject non-HTTPS URLs',()=>{
+  const p=harness([]);
+  p.c.media={story_sources:[{title:'NASA <research>',url:'https://science.nasa.gov/example?q="quoted"'},{title:'Unsafe',url:'javascript:alert(1)'},null]};
+  const html=p.run('storySourcesMarkup(media)');
+  assert.match(html,/Story sources/);
+  assert.match(html,/NASA &lt;research&gt;/);
+  assert.match(html,/&quot;quoted&quot;/);
+  assert.match(html,/rel="noopener noreferrer"/);
+  assert.doesNotMatch(html,/javascript:|Unsafe/);
+  assert.equal(p.run('storySourcesMarkup(null)'),'');
+});

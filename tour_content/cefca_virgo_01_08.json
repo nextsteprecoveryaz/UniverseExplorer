@@ -1,0 +1,106 @@
+[
+  {
+    "id": "virgo-m87",
+    "narration": "M87 gave humanity its first image of a black hole's shadow. Released in 2019, that image came from radio telescopes across Earth working together like a planet-sized instrument. The central black hole packs roughly six and a half billion Suns' worth of mass into one object. Its surroundings also power a jet of particles moving almost at light speed. This quiet-looking galaxy contains one of the universe's most extraordinary engines.",
+    "sources": [
+      {
+        "title": "NASA JPL: Black Hole Image Makes History",
+        "url": "https://www.jpl.nasa.gov/news/black-hole-image-makes-history/"
+      },
+      {
+        "title": "NASA Hubble Messier Catalog: Messier 87",
+        "url": "https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/messier-87/"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-m86",
+    "narration": "M86 is plunging through the Virgo Cluster fast enough to have its gas blown away. Chandra X-ray observations revealed a tail stretching more than two hundred thousand light-years. The culprit is pressure from the hot, thin gas filling the cluster, acting like a headwind against the moving galaxy. M86 is also coming toward us, even though the cluster as a whole is moving away. Local gravity can overcome the wider cosmic expansion.",
+    "sources": [
+      {
+        "title": "NASA Chandra: M86 - Cluster's Gain is Galaxy's Loss",
+        "url": "https://chandra.harvard.edu/photo/2003/m86/"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-m88",
+    "narration": "M88 is heading toward the crowded heart of the Virgo Cluster. Astronomers estimate it will pass closest to the giant galaxy M87 in roughly two hundred to three hundred million years. Its graceful spiral arms surround a bright, active nucleus containing a black hole estimated at one hundred million times the Sun's mass. Across the whole galaxy, the stellar population is estimated at around four hundred billion. This is a vast city of stars on a very long journey.",
+    "sources": [
+      {
+        "title": "NASA Hubble Messier Catalog: Messier 88",
+        "url": "https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/messier-88/"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-m90",
+    "narration": "M90 is a spiral galaxy with a fading future. About three hundred million years ago, its path carried it near the Virgo Cluster's crowded center, where surrounding gas stripped away much of its star-making material. New stars still form near the inner disk, but the outer arms are far quieter. Astronomers expect the spiral eventually to become a smoother, lens-shaped galaxy. Even a galaxy's shape can change when its fuel supply runs low.",
+    "sources": [
+      {
+        "title": "NASA Hubble Messier Catalog: Messier 90",
+        "url": "https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/messier-90/"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-m91",
+    "narration": "M91 is a spiral galaxy whose stellar nursery is unusually quiet. Astronomers call it anemic: its rate of making new stars is lower than in many other spirals. It lies roughly sixty million light-years away, yet Hubble once photographed a much nearer visitor crossing its face. An asteroid in our own solar system traced a broken line over the galaxy, a chance meeting of two vastly different cosmic scales.",
+    "sources": [
+      {
+        "title": "NASA Hubble Messier Catalog: Messier 91",
+        "url": "https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/messier-91/"
+      },
+      {
+        "title": "ESA/Hubble: Broken Asteroid Trail in NGC 4548",
+        "url": "https://esahubble.org/images/opo9810e/"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-m58",
+    "narration": "M58 concentrates some of its busiest star formation into a tiny ring near its center. This rare structure is called an ultra-compact nuclear ring: a necklace of stellar nurseries tucked inside a much larger barred spiral galaxy. Farther out, the spiral arms have relatively little hydrogen for making new stars. The center also contains a black hole estimated at about seventy million times the Sun's mass. Activity here changes dramatically from one region to another.",
+    "sources": [
+      {
+        "title": "NASA Hubble Messier Catalog: Messier 58",
+        "url": "https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/messier-58/"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-ngc4298-ngc4302",
+    "narration": "These two galaxies reveal how much a change of angle can disguise a spiral. The narrow galaxy is seen almost exactly edge-on, while its rounder companion is tilted toward us. Both are dusty spiral systems about fifty-five million light-years away. In the edge-on disk, dust blocks and reddens much of the starlight. Despite their apparent closeness, they lack the dramatic stellar tails often associated with strong encounters. Their different silhouettes owe much to our viewing position.",
+    "sources": [
+      {
+        "title": "NASA: A New Angle on Two Spiral Galaxies for Hubble's 27th Birthday",
+        "url": "https://science.nasa.gov/missions/hubble/a-new-angle-on-two-spiral-galaxies-for-hubbles-27th-birthday/"
+      },
+      {
+        "title": "ESA/Hubble: Hubble celebrates 27 years with two close friends",
+        "url": "https://esahubble.org/news/heic1709/"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  },
+  {
+    "id": "virgo-ngc4440",
+    "narration": "A galaxy can retire from star-making without losing its spiral shape. Researchers identified NGC 4440 as a passive spiral: its arms remain, but their measurements found no signs of ongoing star formation. It also has a strong central bar with brighter patches at both ends, features astronomers call handles. The Virgo Cluster environment may have helped cut off its gas supply. Its surviving structure makes it a useful clue to how galaxies grow quiet.",
+    "sources": [
+      {
+        "title": "Fraser-McKelvie et al.: Multiple mechanisms quench passive spiral galaxies",
+        "url": "https://academic.oup.com/mnras/article/474/2/1909/4582902"
+      },
+      {
+        "title": "University of Alabama: De Vaucouleurs Atlas of Galaxies - NGC 4440",
+        "url": "https://kudzu.astr.ua.edu/devatlas/NGC_4440______g___________.html"
+      }
+    ],
+    "verified_on": "2026-09-16"
+  }
+]

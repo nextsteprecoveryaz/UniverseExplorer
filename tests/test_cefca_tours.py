@@ -143,3 +143,28 @@ def test_source_results_cannot_mutate_the_trusted_registry():
     assert fresh['description'] != 'changed'
     with pytest.raises(ValueError):
         cefca.source('https://www.cefca.es/arbitrary')
+
+
+def test_all_stops_have_researched_stories_and_separate_source_credits():
+    for item in cefca.media_items():
+        assert 40 <= len(item['narration'].split()) <= 110
+        assert item['description'] == item['narration'] != item['navigation_note']
+        assert item['story_sources'] and item['story_verified_on']
+        assert item['source_url'] == cefca.SOURCE_URL
+        for reference in item['story_sources']:
+            assert reference['url'].startswith('https://') and reference['title'].strip()
+    item = cefca.source('virgo-m87')
+    item['story_sources'][0]['url'] = 'https://evil.invalid'
+    assert cefca.source('virgo-m87')['story_sources'][0]['url'] != 'https://evil.invalid'
+
+
+def test_existing_saved_routes_get_updated_stories_without_changing_waypoints(client, monkeypatch):
+    original = template(client)
+    original['stops'][0].update(title='My M87 stop', notes='Return to this galaxy later.', hold=42)
+    saved = client.post('/api/navigation/routes', json=route_payload(original)).json()
+    replacement = {**cefca.STORIES['virgo-m87'], 'narration': 'A newly researched story.'}
+    monkeypatch.setitem(cefca.STORIES, 'virgo-m87', replacement)
+    refreshed = client.get('/api/navigation/routes/' + saved['id']).json()
+    assert refreshed['stops'] == saved['stops']
+    assert refreshed['media'][0]['narration'] == replacement['narration']
+    assert refreshed['media'][0]['story_sources'] == replacement['sources']
