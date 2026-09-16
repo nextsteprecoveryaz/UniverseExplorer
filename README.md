@@ -37,7 +37,7 @@ Checks: `.venv\Scripts\python.exe -m pytest tests/test_live_feed.py -q` and `nod
 ## Start exploring
 
 1. The app opens to a **360° all-sky overview** in the visible-light survey. Drag to pan and scroll to zoom into any region; no destination is required. **All sky** returns to this overview at any time. The destination cards are optional shortcuts, and the search accepts object names or decimal `RA, Dec`.
-2. Use **Webb**, **Hubble**, or the wavelength selector to switch actual datasets. Hydrogen, oxygen, sulfur, nitrogen, molecular-hydrogen-band, and dust views have different resolutions and coverage. **Visible** restores a wide-field sky survey for orientation.
+2. Use **Visible**, **Near-IR**, or the wavelength selector to switch survey datasets. Hydrogen, oxygen, sulfur, nitrogen, molecular-hydrogen-band, and dust views have different resolutions and coverage. Released Hubble/Webb photo composites are available in the image sections, rather than as telescope-map choices.
 3. The **Telescope Live** panel refreshes every minute while the app tab is visible. Click a target to travel to its reported pointing; the supplied Webb observation is pinned below the panel. Start/end times and execution status come from the feed. Its current record is not always an observation confirmed to be executing at this instant.
 4. Choose **Explore observations** to search public MAST images around the current coordinates. Filter by telescope or band, then open data products. Calibrated image products are ordered ahead of raw files where metadata permits. Previews are representations; the original FITS is the scientific input.
 5. **Open this view in image lab** captures the current sky visualization. **AI enhance** runs FSRCNN x2 locally on the CPU. The comparison and exported PNG are clearly labeled. Open your own FITS, PNG, JPEG, TIFF, or WebP files as well.
@@ -47,7 +47,7 @@ Checks: `.venv\Scripts\python.exe -m pytest tests/test_live_feed.py -q` and `nod
 
 The map has a **− minimize button** on its panels. Use **Panels** at the top right to show individual panels again, or **Hide sidebar** for more map space. **Clear view** (keyboard **H**, outside text fields) hides the map panels and sidebar together; **Restore layout** brings back your previous arrangement. Your choices survive a browser reload. A compact Stop/Exit bar stays available when flight controls are minimized, and tours keep their Pause/Resume and End controls. Minimizing information panels does not turn off imagery or catalog markers.
 
-Click **Fly** beside **All sky** to enter the flight cockpit at your current coordinates. From the full-sky overview it narrows to a 70-degree perspective view; you can start anywhere. Select Webb, Hubble or a wavelength lens as you explore. The wide visible survey provides context where individual telescope datasets have no coverage.
+Click **Fly** beside **All sky** to enter the flight cockpit at your current coordinates. From the full-sky overview it narrows to a 70-degree perspective view; you can start anywhere. Select Visible, Near-IR, SDSS or a wavelength lens as you explore. The wide visible survey provides context where individual telescope datasets have no coverage.
 
 - **Arrow keys:** look left, right, up and down. **A / D** also steer left/right.
 - **W / S:** move closer or farther by smoothly changing magnification. The mouse wheel still works.

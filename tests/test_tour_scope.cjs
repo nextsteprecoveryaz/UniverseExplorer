@@ -15,7 +15,7 @@ function harness(){
     }
     return nodes.get(id);
   };
-  const ids=['optical','2mass','hydrogen','dust','sdss-color','sdss-g','sdss-r','sdss-i','webb-color'];
+  const ids=['optical','2mass','hydrogen','dust','sdss-color','sdss-g','sdss-r','sdss-i','webb-200'];
   const options=ids.map(value=>({value,disabled:false})),chips=ids.map(survey=>({dataset:{survey},disabled:false,classList:{toggle(){}}}));
   const selectors=[element('#tour-sky-choice')];
   const sky={ra:12,dec:3,fov:1,projection:'AIT',rotation:0,base:{layer:'native-base'},
@@ -74,7 +74,7 @@ for(const paused of [false,true]){
 test('the ordinary survey controls retain SDSS bands and do not change the tour survey preference',async()=>{
   const h=harness();await h.start();h.run('syncTourSkyControls()');
   assert.ok(h.options.every(option=>!option.disabled));assert.ok(h.chips.every(button=>!button.disabled));
-  for(const survey of ['sdss-color','sdss-g','sdss-r','sdss-i','webb-color']){
+  for(const survey of ['sdss-color','sdss-g','sdss-r','sdss-i','webb-200']){
     h.run(`chooseSurvey('${survey}')`);
     assert.equal(h.run('state.survey'),survey);assert.equal(h.run('tourSkySurvey()'),'2mass');
     assert.equal(h.run('tourSurveyActive()'),false);

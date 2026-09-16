@@ -70,7 +70,10 @@ function coordinates(){
   onNavigationSkyChanged();
   onAtlasViewChanged();
 }
+function skyMapSurveys(){return state.config.surveys.filter(s=>!['webb-color','hubble-color'].includes(s.id));}
 function chooseSurvey(id){
+  // Older destinations and notebook entries can still reference released-photo layers.
+  if(['webb-color','hubble-color'].includes(id))id='optical';
   const survey=state.config.surveys.find(s=>s.id===id);
   if(!survey)return;
   if(!routePlayer.writing)leaveTourView('Paused · exploring another survey');
@@ -313,8 +316,8 @@ function about(){
 async function boot(){
   try{
     state.config=await api('/api/config');state.destination=ALL_SKY;
-    const groups=[...new Set(state.config.surveys.map(s=>s.group))];
-    $('#survey-select').innerHTML=groups.map(group=>`<optgroup label="${esc(group)}">${state.config.surveys.filter(s=>s.group===group).map(s=>`<option value="${s.id}">${esc(s.name)} · ${esc(s.tag)}</option>`).join('')}</optgroup>`).join('');
+    const surveys=skyMapSurveys(),groups=[...new Set(surveys.map(s=>s.group))];
+    $('#survey-select').innerHTML=groups.map(group=>`<optgroup label="${esc(group)}">${surveys.filter(s=>s.group===group).map(s=>`<option value="${s.id}">${esc(s.name)} · ${esc(s.tag)}</option>`).join('')}</optgroup>`).join('');
     chooseSurvey('optical');
     $('#destinations').innerHTML=state.config.destinations.map((d,i)=>`<button class="destination-card" data-name="${esc(d.name)}" data-destination="${i}"><span class="num">0${i+1}</span><small>${esc(d.type)}</small><strong>${esc(d.name)}</strong></button>`).join('');
     $$('[data-destination]').forEach(b=>b.onclick=()=>flyTo(state.config.destinations[Number(b.dataset.destination)]));
