@@ -9,6 +9,10 @@ Universe Explorer retrieves third-party software during setup instead of storing
 | Eclipse Temurin Java runtime | [Adoptium](https://adoptium.net/) | Installed with its original notices in `vendor/aladin/runtime/`; the downloaded archive is checked against the checksum provided by Adoptium. |
 | FSRCNN x2 model | [FSRCNN TensorFlow](https://github.com/Saafke/FSRCNN_Tensorflow) | `models/FSRCNN_x2.pb` and `models/LICENSE-FSRCNN.txt`. The model is checked against the SHA-256 pinned in `setup_model.py`. |
 | Python dependencies | Listed in `requirements-lock.txt` | Installed in `.venv/` with each package's own licensing metadata. |
+| Three.js 0.180.0 | [Three.js](https://github.com/mrdoob/three.js) | `static/vendor/three/` includes the MIT license, pinned modules and checksum manifest, installed by `setup_three.py`. One GLTFLoader relative import is adjusted for the local directory layout. |
+| Optional TRELLIS.2 | [Microsoft TRELLIS.2](https://github.com/microsoft/TRELLIS.2) | MIT source and original notices remain in the separate WSL `UniverseExplorer-runtime/TRELLIS.2` checkout. The installer pins source revisions; downloaded weights stay outside Git. |
+| Optional CUDA mesh dependencies | [CuMesh](https://github.com/JeffreyXiang/CuMesh), [FlexGEMM](https://github.com/JeffreyXiang/FlexGEMM), [nvdiffrast](https://github.com/NVlabs/nvdiffrast), [nvdiffrec](https://github.com/JeffreyXiang/nvdiffrec) | Source, original licenses and submodules remain in the separate WSL runtime. Each component retains its own terms. |
+| Optional DINOv3 image features | [Meta DINOv3](https://huggingface.co/facebook/dinov3-vitl16-pretrain-lvd1689m) | Gated weights require the user's approved Hugging Face account and the model's terms. No weights or credentials are redistributed in this repository. |
 
 The small Pillars of Creation preview in `static/assets/` is a released Webb outreach composite retrieved through the CDS HiPS service. Its retrieval URL and credit are recorded in `static/assets/provenance.json`. Image credit: NASA, ESA, CSA, STScI; J. DePasquale, A. Koekemoer, A. Pagan (STScI); projection by CDS.
 

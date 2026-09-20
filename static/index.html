@@ -16,6 +16,9 @@
   <link rel="stylesheet" href="/image-lab-colors.css?v=1">
   <link rel="stylesheet" href="/topaz-controls.css?v=1">
   <link rel="stylesheet" href="/explore-pixel-mapping.css?v=1">
+  <link rel="stylesheet" href="/image-3d.css?v=1">
+  <script type="importmap">{"imports":{"three":"/vendor/three/three.module.js"}}</script>
+  <script type="module" src="/image-3d.js?v=3"></script>
   <script src="/vendor/aladin.js" charset="utf-8" defer></script>
   <script src="/features.js?v=topaz-models-4" defer></script>
   <script src="/journeys.js?v=fullsky-1" defer></script>
@@ -39,7 +42,7 @@
   <script src="/explore-pixel-mapping.js?v=1" defer></script>
   <script src="/image-lab-colors.js?v=1" defer></script>
   <script src="/telescope-live.js?v=8" defer></script>
-  <script src="/app.js?v=explore-pixels-6" defer></script>
+  <script src="/app.js?v=image-3d-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -175,7 +178,7 @@
       <div id="image-library" class="image-library"></div>
       <div id="lab-empty" class="empty-state lab-empty"><span class="empty-symbol">◈</span><h2>A universe of detail, on your PC.</h2><p>Capture the sky view, import a MAST product, or open a FITS / PNG / JPEG image.<br>Choose local enhancement, Topaz upscaling, OpenAI cloud editing, or a ChatGPT handoff.</p><button id="lab-capture" class="button">Capture current sky view</button></div>
       <div id="lab-content" hidden>
-        <div class="image-toolbar"><div><strong id="image-name"></strong><div id="image-info" class="small muted"></div></div><div class="flex"><label class="small">FITS display<select id="fits-stretch"><option value="asinh">Asinh</option><option value="linear">Linear</option><option value="log">Log</option></select></label><a id="original-download" class="button" download>↓ Original</a></div></div>
+        <div class="image-toolbar"><div><strong id="image-name"></strong><div id="image-info" class="small muted"></div></div><div class="flex"><label class="small">FITS display<select id="fits-stretch"><option value="asinh">Asinh</option><option value="linear">Linear</option><option value="log">Log</option></select></label><button id="image-create-3d" class="button primary">Create 3D</button><a id="original-download" class="button" download>↓ Original</a></div></div>
         <div class="enhancement-tools"><div class="toolbar"><label>Enhancement provider<select id="enhancement-provider"><option value="local">Local · FSRCNN 2×</option><option value="topaz">Topaz cloud &middot; upscale</option><option value="cloud">OpenAI · cloud image editing</option><option value="chatgpt">ChatGPT · export & bring back</option></select></label><button id="enhance-button" class="button primary">✧ Enhance locally · 2×</button><button id="cloud-connect" class="button">Cloud connection</button></div>
           <div id="topaz-settings" hidden>
             <div class="toolbar"><label>Topaz model<select id="topaz-model"><option value="Standard V2">Standard 2 · Precision</option></select></label><label>Upscale size<select id="topaz-scale"><option value="2">2&times; width &amp; height</option><option value="4">4&times; width &amp; height</option></select></label><button id="topaz-connect" class="button">Topaz connection</button></div>

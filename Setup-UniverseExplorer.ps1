@@ -46,6 +46,7 @@ try {
     Invoke-SetupStep 'Installing pinned Python dependencies' @('-m','pip','install','-r','requirements-lock.txt')
     Invoke-SetupStep 'Installing the verified local enhancement model' @('setup_model.py')
     Invoke-SetupStep 'Installing the Aladin Lite sky viewer' @('setup_atlas.py')
+    Invoke-SetupStep 'Installing the local 3D viewer' @('setup_three.py')
     if (-not $SkipDesktop) { Invoke-SetupStep 'Installing Aladin Desktop and its portable Java runtime' @('setup_aladin.py') }
     Invoke-SetupStep 'Checking application imports and health endpoint' @('-c',"from fastapi.testclient import TestClient; from app import app; response=TestClient(app).get('/api/health'); assert response.status_code == 200, response.text; print('Application health check passed.')")
     Write-Host "`nSetup complete. Open Launch.cmd to start Universe Explorer."

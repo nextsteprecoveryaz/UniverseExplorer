@@ -6,6 +6,7 @@ import re
 import sqlite3
 import time
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 from urllib.parse import quote, urlparse
@@ -32,16 +33,23 @@ import atlas
 import research
 import sdss
 import narration
+import image_3d
 
 ROOT=Path(__file__).parent
 DATA=ROOT/'data'
 DATA.mkdir(exist_ok=True)
-app=FastAPI(title='Universe Explorer',version='0.1.0')
+@asynccontextmanager
+async def lifespan(application):
+    yield
+    image_3d.cancel_active_jobs()
+
+app=FastAPI(title='Universe Explorer',version='0.1.0',lifespan=lifespan)
 app.include_router(expeditions.router)
 app.include_router(atlas.router)
 app.include_router(research.router)
 app.include_router(sdss.router)
 app.include_router(narration.router)
+app.include_router(image_3d.router)
 app.add_middleware(TrustedHostMiddleware,allowed_hosts=['127.0.0.1','localhost','testserver'])
 HEAVY=asyncio.Semaphore(1)
 CLOUD_BUSY=asyncio.Lock()
@@ -98,6 +106,8 @@ async def local_boundary(request:Request, call_next):
     response=await call_next(request)
     response.headers['X-Content-Type-Options']='nosniff'
     response.headers['Referrer-Policy']='strict-origin-when-cross-origin'
+    if request.url.path in ('/', '/index.html'):
+        response.headers['Cache-Control']='no-cache'
     return response
 
 @app.exception_handler(ValueError)

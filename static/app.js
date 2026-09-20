@@ -37,6 +37,7 @@ function currentField(){
   return {ra:state.ra,dec:state.dec,fov:state.fov,survey:state.survey};
 }
 function showPage(page){
+  if(page!=='lab')window.ImageLab3D?.close();
   if(typeof researchLeaving==='function'&&page!=='research')researchLeaving();
   cancelAnimationFrame(travelFrame);
   if(page!=='explore')leaveTourView('Paused · another workspace is open');
@@ -217,6 +218,7 @@ function openImage(image){
   $('#detect-button').disabled=!image.scientific;
   renderAI();
   bindImageLabColors(image);
+  window.dispatchEvent(new CustomEvent('universe:image-opened',{detail:{image:{...image,display_stretch:$('#fits-stretch').value}}}));
   $('#image-provenance').textContent=JSON.stringify(image,null,2);
 }
 function renderAI(){
@@ -360,6 +362,12 @@ async function boot(){
     initTelescopeLive();
     initMapPanels();
     $('#fits-stretch').onchange=e=>{$('#original-image').src=state.image.preview_url+'?stretch='+e.target.value;updateEnhancementControls();refreshImageLabColors();};
+    $('#image-create-3d').onclick=()=>{
+      if(!state.image)return;
+      if(!window.ImageLab3D){toast('The 3D viewer is still loading. Please try again shortly.',true);return;}
+      window.ImageLab3D.bind({...state.image,display_stretch:$('#fits-stretch').value});
+      window.ImageLab3D.open();
+    };
     $('#save-image').onclick=()=>{const m=state.image;const center=m.center||m.extra;noteDialog({title:m.name,ra:center.ra??center.s_ra??null,dec:center.dec??center.s_dec??null,body:'Saved image for visual exploration and follow-up.',provenance:{image_id:m.id,input_sha256:m.sha256,source:m.source,filter:m.filter,ai:m.ai,observation:m.extra}});};
     $('#detect-button').onclick=()=>busy($('#detect-button'),'Analyzing original FITS…',detect);
     $('#export-candidates').onclick=()=>download(state.candidates,'source-candidates.json');
