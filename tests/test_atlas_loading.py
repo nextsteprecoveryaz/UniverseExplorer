@@ -164,6 +164,62 @@ def test_server_error_recovery_is_shared_by_simultaneous_tile_requests(isolated_
     assert len(calls)==2 and atlas.TILE_PENDING=={}
 
 
+@pytest.mark.parametrize('prefer_mirror',[False,True])
+def test_closed_keepalive_retries_same_source_once(isolated_cache,monkeypatch,caplog,prefer_mirror):
+    canonical=atlas.SURVEYS['sdss-color']['url'];mirror=atlas.TILE_MIRRORS[canonical][0]
+    part='Norder3/Dir0/Npix152.jpg';source=mirror if prefer_mirror else canonical;calls=[]
+    if prefer_mirror:
+        atlas.TILE_PREFERRED[canonical]={'base':mirror,'until':atlas.time.monotonic()+120}
+    def fetch(url,**kwargs):
+        calls.append(url)
+        assert url==source+'/'+part
+        if len(calls)==1:raise httpx.RemoteProtocolError('private connection details')
+        return b'original-sdss-pixels','image/jpeg'
+    monkeypatch.setattr(atlas,'read_remote',fetch)
+    response=atlas.survey_tile('sdss-color',part)
+    assert calls==[source+'/'+part,source+'/'+part]
+    assert response.body==b'original-sdss-pixels'
+    assert response.headers['X-Atlas-Retrieval-URL']==source+'/'+part
+    assert 'error=RemoteProtocolError retry_same_host=True' in caplog.text
+    assert 'private connection details' not in caplog.text
+
+
+def test_repeated_protocol_failure_falls_back_after_one_same_host_retry(isolated_cache,monkeypatch):
+    canonical=atlas.SURVEYS['sdss-color']['url'];mirror=atlas.TILE_MIRRORS[canonical][0]
+    part='Norder3/Dir0/Npix141.jpg';calls=[]
+    def fetch(url,**kwargs):
+        calls.append(url)
+        if url.startswith(canonical+'/'):raise httpx.RemoteProtocolError('connection closed')
+        return b'mirror-sdss-pixels','image/jpeg'
+    monkeypatch.setattr(atlas,'read_remote',fetch)
+    assert atlas.survey_tile('sdss-color',part).body==b'mirror-sdss-pixels'
+    assert calls==[canonical+'/'+part,canonical+'/'+part,mirror+'/'+part]
+
+
+def test_protocol_retries_are_bounded_when_all_sources_fail(isolated_cache,monkeypatch):
+    canonical=atlas.SURVEYS['sdss-color']['url'];mirror=atlas.TILE_MIRRORS[canonical][0]
+    part='Norder3/Dir0/Npix141.jpg';calls=[]
+    def fetch(url,**kwargs):
+        calls.append(url);raise httpx.RemoteProtocolError('connection closed')
+    monkeypatch.setattr(atlas,'read_remote',fetch)
+    with TestClient(app) as client:
+        response=client.get('/api/atlas/surveys/sdss-color/'+part)
+    assert response.status_code==503
+    assert calls==[canonical+'/'+part,canonical+'/'+part,mirror+'/'+part,mirror+'/'+part]
+    assert atlas.TILE_PENDING=={} and cache.status()['files']==0
+
+
+@pytest.mark.parametrize('failure',[httpx.ConnectTimeout,httpx.ReadTimeout])
+def test_timeouts_do_not_gain_extra_same_host_retries(isolated_cache,monkeypatch,failure):
+    calls=[]
+    def fetch(url,**kwargs):
+        calls.append(url);raise failure('timeout')
+    monkeypatch.setattr(atlas,'read_remote',fetch)
+    with pytest.raises(failure):
+        atlas.read_tile_remote(atlas.SURVEYS['sdss-color']['url']+'/Norder3/Dir0/Npix141.jpg')
+    assert len(calls)==2 and calls[0]!=calls[1]
+
+
 def test_failed_primary_and_mirror_are_bounded_and_later_request_can_recover(isolated_cache,monkeypatch):
     calls=[];healthy=False
     def fetch(url,**kwargs):
@@ -211,7 +267,7 @@ def test_unverified_survey_has_no_invented_mirror_and_pool_timeout_is_not_host_f
     assert len(calls)==1
 
 
-def test_fast_tile_timeouts_leave_science_transfer_timeouts_unchanged(isolated_cache,monkeypatch):
+def test_fast_tile_timeouts_leave_unmirrored_lenses_and_science_unchanged(isolated_cache,monkeypatch):
     requests=[]
     def respond(request):
         requests.append(request)
@@ -219,9 +275,54 @@ def test_fast_tile_timeouts_leave_science_transfer_timeouts_unchanged(isolated_c
     with httpx.Client(transport=httpx.MockTransport(respond),timeout=httpx.Timeout(90,connect=12,pool=15)) as client:
         monkeypatch.setattr(atlas,'remote_client',lambda:client)
         atlas.read_tile_remote(atlas.SURVEYS['optical']['url']+'/Norder1/Dir0/Npix1.jpg')
+        atlas.read_tile_remote('https://example.test/custom-survey/Norder1/Dir0/Npix1.jpg')
         atlas.read_remote('https://example.test/science-cutout',{'fov':.1})
     assert requests[0].extensions['timeout']=={'connect':4,'read':18,'write':18,'pool':5}
     assert requests[1].extensions['timeout']=={'connect':12,'read':90,'write':90,'pool':15}
+    assert requests[2].extensions['timeout']=={'connect':12,'read':90,'write':90,'pool':15}
+
+
+@pytest.mark.parametrize('survey_id,part',[
+    ('sdss-color','Norder8/Dir170000/Npix176429.jpg'),
+    ('sdss-g','Norder10/Dir4640000/Npix4643549.png'),
+    ('sdss-r','Norder10/Dir4640000/Npix4643549.png'),
+    ('sdss-i','Norder10/Dir4640000/Npix4643549.png'),
+    ('2mass','Norder9/Dir2110000/Npix2118624.jpg'),
+])
+def test_sdss_and_near_infrared_recover_exact_selected_survey(isolated_cache,monkeypatch,survey_id,part):
+    canonical=atlas.SURVEYS[survey_id]['url'];mirror=atlas.TILE_MIRRORS[canonical][0];calls=[]
+    def fetch(url,**kwargs):
+        calls.append(url)
+        if url==canonical+'/'+part:raise httpx.ConnectTimeout('primary unavailable')
+        assert url==mirror+'/'+part
+        return b'original-selected-survey-pixels','image/png' if part.endswith('.png') else 'image/jpeg'
+    monkeypatch.setattr(atlas,'read_remote',fetch)
+    response=atlas.survey_tile(survey_id,part)
+    assert calls==[canonical+'/'+part,mirror+'/'+part]
+    assert response.body==b'original-selected-survey-pixels'
+    assert response.headers['X-Atlas-Retrieval-URL']==mirror+'/'+part
+    item=cache.get(cache.key('tile:'+canonical+'/'+part))
+    assert item['metadata']['source_url']==canonical+'/'+part
+    assert item['metadata']['retrieval_url']==mirror+'/'+part
+
+
+def test_sdss_mirror_missing_coverage_is_not_a_connection_failure(isolated_cache,monkeypatch):
+    canonical=atlas.SURVEYS['sdss-color']['url'];mirror=atlas.TILE_MIRRORS[canonical][0];calls=[]
+    def fetch(url,**kwargs):
+        calls.append(url)
+        if url.startswith(canonical+'/'):raise httpx.ConnectTimeout('primary unavailable')
+        response=httpx.Response(404,request=httpx.Request('GET',url));response.raise_for_status()
+    monkeypatch.setattr(atlas,'read_remote',fetch)
+    with TestClient(app) as client:
+        first=client.get('/api/atlas/surveys/sdss-color/Norder10/Dir8470000/Npix8474377.jpg')
+        assert first.status_code==404 and 'no tile' in first.json()['detail']
+        assert len(calls)==2
+        expiry=atlas.TILE_PREFERRED[canonical]['until']
+        second=client.get('/api/atlas/surveys/sdss-color/Norder10/Dir8470000/Npix8474378.jpg')
+        assert second.status_code==404
+    assert len(calls)==3 and calls[-1].startswith(mirror+'/')
+    assert atlas.TILE_PREFERRED[canonical]['until']==expiry
+    assert atlas.TILE_PENDING=={} and cache.status()['files']==0
 
 
 def test_cache_size_persists_without_allocating_or_deleting(isolated_cache):

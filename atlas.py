@@ -46,6 +46,10 @@ LOGGER=logging.getLogger('uvicorn.error')
 # checksums. Keep the canonical URL/cache key even when a mirror supplies bytes.
 TILE_MIRRORS={
     'https://alasky.cds.unistra.fr/DSS/DSSColor':('https://alaskybis.cds.unistra.fr/DSS/DSSColor',),
+    'https://alasky.cds.unistra.fr/2MASS/Color':('https://alaskybis.cds.unistra.fr/2MASS/Color',),
+    'https://alasky.cds.unistra.fr/SDSS/DR9/color':('https://alaskybis.cds.unistra.fr/SDSS/DR9/color',),
+    **{'https://alasky.cds.unistra.fr/SDSS/DR9/band-'+band:
+       ('https://alaskybis.cds.unistra.fr/SDSS/DR9/band-'+band,) for band in ('g','r','i')},
 }
 
 def remote_client():
@@ -128,8 +132,27 @@ def read_tile_remote(url):
             elif preferred:TILE_PREFERRED.pop(canonical,None)
     for index,source in enumerate(sources):
         try:
-            raw,mime=read_remote(source,timeout=TILE_TIMEOUT)
+            # Only use a short first attempt when this exact survey has a
+            # verified alternate. Other lenses retain their original patience.
+            for connection_attempt in range(2):
+                try:
+                    raw,mime=read_remote(source,timeout=TILE_TIMEOUT if canonical else None)
+                    break
+                except httpx.RemoteProtocolError:
+                    # An idle keep-alive connection may have been closed by
+                    # the server. HTTPX discards it; retry this GET once before
+                    # abandoning an otherwise responsive source.
+                    if connection_attempt:raise
+                    LOGGER.warning('Survey tile connection closed: host=%s error=RemoteProtocolError retry_same_host=True',
+                        urlsplit(source).hostname)
         except (httpx.TransportError,httpx.HTTPStatusError) as error:
+            # A mirror's missing tile is still a valid reply from a reachable
+            # survey server. Avoid repeating a dead primary for every empty
+            # patch while preserving the 404 and never caching fake imagery.
+            if canonical and source!=url and isinstance(error,httpx.HTTPStatusError) and error.response.status_code==404:
+                with TILE_LOCK:
+                    if not TILE_PREFERRED.get(canonical):
+                        TILE_PREFERRED[canonical]={'base':source[:-len(suffix)],'until':time.monotonic()+TILE_MIRROR_SECONDS}
             # Coverage/authorization/client errors retain their exact semantics.
             # Pool exhaustion is local, so switching upstream cannot repair it.
             retryable=(not isinstance(error,httpx.PoolTimeout) and
