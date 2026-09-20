@@ -201,7 +201,7 @@ def run_trellis(job_id, request, config):
     target = folder(job_id)
     heartbeat = target / 'worker.heartbeat'
     heartbeat.touch()
-    command = ['wsl.exe', '-d', config['distribution'], '--', config['python'], config['worker'],
+    command = ['wsl.exe', '-d', config['distribution'], '--exec', config['python'], config['worker'],
                '--input', wsl_path(target / 'input.png'), '--output', wsl_path(target / 'model.glb'),
                '--seed', str(request.seed), '--resolution', str(request.resolution),
                '--cancel-file', wsl_path(target / 'cancel.flag'),

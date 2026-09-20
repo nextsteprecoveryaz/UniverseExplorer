@@ -318,7 +318,7 @@ def test_mock_trellis_subprocess_uses_arguments_and_exports_validated_result(cli
     job = wait_job(client, response.json()['id'])
     assert job['state'] == 'complete', job
     command, options = commands[0]
-    assert command[:6] == ['wsl.exe', '-d', 'Ubuntu-22.04', '--', '/opt/local/python', '/opt/local/worker.py']
+    assert command[:6] == ['wsl.exe', '-d', 'Ubuntu-22.04', '--exec', '/opt/local/python', '/opt/local/worker.py']
     assert command[command.index('--seed') + 1] == '123'
     assert command[command.index('--resolution') + 1] == '1024'
     assert command[command.index('--cancel-file') + 1].endswith('/cancel.flag')
