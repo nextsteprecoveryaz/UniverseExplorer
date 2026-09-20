@@ -5,9 +5,12 @@ import re
 import threading
 import hashlib
 import atexit
+import logging
+import time
 from datetime import datetime,timezone
 from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Literal
+from urllib.parse import urlsplit
 import httpx
 from PIL import Image
 from fastapi import APIRouter, HTTPException, Query
@@ -35,6 +38,15 @@ TILE_LOCK=threading.Lock()
 TILE_PENDING={}
 TILE_REFRESHING=set()
 TILE_REFRESH=ThreadPoolExecutor(max_workers=2,thread_name_prefix='tile-refresh')
+TILE_TIMEOUT=httpx.Timeout(18,connect=4,pool=5)
+TILE_MIRROR_SECONDS=120
+TILE_PREFERRED={}
+LOGGER=logging.getLogger('uvicorn.error')
+# CDS registry mirrors of the same HiPS, verified against creator_did and tile
+# checksums. Keep the canonical URL/cache key even when a mirror supplies bytes.
+TILE_MIRRORS={
+    'https://alasky.cds.unistra.fr/DSS/DSSColor':('https://alaskybis.cds.unistra.fr/DSS/DSSColor',),
+}
 
 def remote_client():
     """Share persistent connections across tile requests instead of renegotiating TLS."""
@@ -89,16 +101,51 @@ def begin(ident,work,pool):
     pool.submit(run)
     return dict(job)
 
-def read_remote(url,params=None,max_bytes=16*1024*1024):
+def read_remote(url,params=None,max_bytes=16*1024*1024,*,timeout=None):
     if CACHED_ONLY:raise ValueError('Cached-only mode is on. This view has not been downloaded.')
     data=bytearray()
-    with remote_client().stream('GET',url,params=params) as r:
+    options={'timeout':timeout} if timeout is not None else {}
+    with remote_client().stream('GET',url,params=params,**options) as r:
         r.raise_for_status()
         for part in r.iter_bytes():
             data.extend(part)
             if len(data)>max_bytes:raise ValueError('The image exceeds the atlas transfer limit.')
         mime=r.headers.get('content-type','application/octet-stream').split(';')[0]
     return bytes(data),mime
+
+def read_tile_remote(url):
+    """Try at most two verified sources; failed detail tiles must not stall the map."""
+    canonical=next((base for base in TILE_MIRRORS if url.startswith(base+'/')),None)
+    sources=[url]
+    if canonical:
+        suffix=url[len(canonical):]
+        sources.extend(base+suffix for base in TILE_MIRRORS[canonical])
+        with TILE_LOCK:
+            preferred=TILE_PREFERRED.get(canonical)
+            if preferred and preferred['until']>time.monotonic():
+                chosen=preferred['base']+suffix
+                if chosen in sources:sources.remove(chosen);sources.insert(0,chosen)
+            elif preferred:TILE_PREFERRED.pop(canonical,None)
+    for index,source in enumerate(sources):
+        try:
+            raw,mime=read_remote(source,timeout=TILE_TIMEOUT)
+        except (httpx.TransportError,httpx.HTTPStatusError) as error:
+            # Coverage/authorization/client errors retain their exact semantics.
+            # Pool exhaustion is local, so switching upstream cannot repair it.
+            retryable=(not isinstance(error,httpx.PoolTimeout) and
+                       (not isinstance(error,httpx.HTTPStatusError) or error.response.status_code>=500))
+            LOGGER.warning('Survey tile fetch failed: host=%s error=%s status=%s retry=%s',
+                urlsplit(source).hostname,type(error).__name__,
+                error.response.status_code if isinstance(error,httpx.HTTPStatusError) else '-',
+                retryable and index+1<len(sources))
+            if not retryable or index+1==len(sources):raise
+        else:
+            if canonical:
+                with TILE_LOCK:
+                    if source==url:TILE_PREFERRED.pop(canonical,None)
+                    elif not TILE_PREFERRED.get(canonical):
+                        TILE_PREFERRED[canonical]={'base':source[:-len(suffix)],'until':time.monotonic()+TILE_MIRROR_SECONDS}
+            return raw,mime,source
 
 def view_key(view):
     return cache.key('survey-view-v1:'+json.dumps({k:view[k] for k in ('ra','dec','fov','survey')},sort_keys=True))
@@ -261,10 +308,10 @@ def fetch_tile(survey_id,part,url,ident,refresh=False):
             item=None if refresh else cache.get(ident)
             result=(item['path'].read_bytes(),item['mime'],item['metadata']) if item else None
         if result is None:
-            raw,mime=read_remote(url)
+            raw,mime,retrieval_url=read_tile_remote(url)
             if part=='properties':
                 raw=rewrite_survey_properties(survey_id,raw)
-            metadata={'source_url':url,'created_at':now()}
+            metadata={'source_url':url,'retrieval_url':retrieval_url,'created_at':now()}
             cache.put(ident,raw,mime,metadata)
             result=(raw,mime,metadata)
         pending.set_result(result)
@@ -310,6 +357,7 @@ def survey_tile(survey_id:str,part:str):
         return Response(data,media_type='text/plain' if part=='properties' else mime,headers={
             'Cache-Control':'public, max-age='+('60' if stale else '86400'),
             'X-Atlas-Retrieved':metadata['created_at'],'X-Atlas-Stale':str(stale).lower(),
+            'X-Atlas-Retrieval-URL':metadata.get('retrieval_url',metadata.get('source_url',url)),
             'X-Atlas-Cache':'stale' if stale else 'hit' if item else 'miss'})
     except httpx.HTTPStatusError as e:
         if e.response.status_code==404:raise HTTPException(404,'This survey has no tile at this position and resolution.') from None

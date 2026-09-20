@@ -145,6 +145,8 @@ The atlas cache defaults to an **8 GiB disk budget**, adjustable from 1 to 64 Gi
 
 Map tile downloads share persistent HTTP connections, and simultaneous requests for the same tile share one transfer. Cached tiles display immediately; after 24 hours, a bounded background refresh checks for updated copies without delaying the cached response. Original retrieval timestamps remain available in response headers. Larger disk caches help revisits, while first visits still depend on the survey server and network. A powerful GPU helps render the map but cannot supply imagery that has not arrived or detail beyond the source survey's resolution.
 
+For **Visible sky / DSS2**, a temporary connection failure or server error automatically tries the same tile on the alternate CDS server. The app briefly prefers the responding server so subsequent detail tiles do not repeat the same timeout. The canonical survey source stays unchanged, and the actual retrieval URL is recorded in cache metadata and the `X-Atlas-Retrieval-URL` response header. Missing-coverage responses are preserved. If a view was already stuck with blurry tiles before a connection recovered, reload the page to request its detail again. [CDS HiPS server registry](https://aladin.cds.unistra.fr/java/nph-aladin.pl?frame=aladinHpxList)
+
 Aladin Lite 3.8.2, its embedded WebAssembly and license files are bundled under `static/vendor/`; the viewer itself no longer depends on loading a remote script at startup. Survey source metadata and timestamps remain in the local cache.
 
 ## Object mapping, summaries, and videos

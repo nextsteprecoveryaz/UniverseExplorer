@@ -18,6 +18,7 @@ def isolated_cache(tmp_path,monkeypatch):
     monkeypatch.setattr(atlas,'CACHED_ONLY',False)
     monkeypatch.setattr(atlas,'TILE_PENDING',{})
     monkeypatch.setattr(atlas,'TILE_REFRESHING',set())
+    monkeypatch.setattr(atlas,'TILE_PREFERRED',{})
     with ThreadPoolExecutor(max_workers=2) as workers:
         monkeypatch.setattr(atlas,'TILE_REFRESH',workers)
         yield workers
@@ -44,7 +45,7 @@ def test_remote_client_reused_and_transfer_limit_enforced(monkeypatch):
 
 def test_simultaneous_requests_share_tile_and_distinct_tiles_can_load(isolated_cache,monkeypatch):
     started=threading.Event();release=threading.Event();calls=[]
-    def fetch(url):
+    def fetch(url,**kwargs):
         calls.append(url)
         if url.endswith('Npix1.jpg'):
             started.set();assert release.wait(5)
@@ -68,7 +69,7 @@ def test_stale_tile_returns_immediately_and_refreshes_once(isolated_cache,monkey
     part='Norder1/Dir0/Npix1.jpg';url=atlas.SURVEYS['optical']['url']+'/'+part
     ident=cache.key('tile:'+url);old='2000-01-01T00:00:00+00:00'
     cache.put(ident,b'old','image/jpeg',{'created_at':old,'source_url':url})
-    def fetch(url):
+    def fetch(url,**kwargs):
         calls.append(url);started.set();assert release.wait(5)
         return b'new','image/jpeg'
     monkeypatch.setattr(atlas,'read_remote',fetch)
@@ -98,13 +99,129 @@ def test_offline_stale_tile_never_refreshes(isolated_cache,monkeypatch):
 
 
 def test_missing_upstream_tile_reports_no_coverage(isolated_cache,monkeypatch):
-    def missing(url):
+    calls=[]
+    def missing(url,**kwargs):
+        calls.append(url)
         response=httpx.Response(404,request=httpx.Request('GET',url));response.raise_for_status()
     monkeypatch.setattr(atlas,'read_remote',missing)
     with TestClient(app) as client:
         r=client.get('/api/atlas/surveys/optical/Norder1/Dir0/Npix1.jpg')
     assert r.status_code==404 and 'no tile' in r.json()['detail']
     assert atlas.TILE_PENDING=={}
+    assert len(calls)==1  # Genuine missing coverage must not become a mirror retry.
+
+
+def test_tls_failure_recovers_identical_survey_tile_and_remembers_mirror(isolated_cache,monkeypatch,caplog):
+    calls=[];canonical=atlas.SURVEYS['optical']['url'];mirror=atlas.TILE_MIRRORS[canonical][0]
+    part='Norder9/Dir1200000/Npix1201512.jpg';primary_healthy=False
+    def fetch(url,**kwargs):
+        calls.append(url)
+        assert kwargs['timeout'].connect==4 and kwargs['timeout'].read==18
+        if url.startswith(canonical) and not primary_healthy:
+            raise httpx.ConnectTimeout('TLS handshake timed out; private diagnostic')
+        return b'same-publisher-jpeg','image/jpeg'
+    monkeypatch.setattr(atlas,'read_remote',fetch)
+    response=atlas.survey_tile('optical',part)
+    assert calls==[canonical+'/'+part,mirror+'/'+part]
+    assert response.body==b'same-publisher-jpeg'
+    assert response.headers['X-Atlas-Retrieval-URL']==mirror+'/'+part
+    cached=cache.get(cache.key('tile:'+canonical+'/'+part))
+    assert cached['metadata']['source_url']==canonical+'/'+part
+    assert cached['metadata']['retrieval_url']==mirror+'/'+part
+    assert cached['path'].read_bytes()==b'same-publisher-jpeg'
+    assert cache.get(cache.key('tile:'+mirror+'/'+part)) is None
+    assert 'host=alasky.cds.unistra.fr error=ConnectTimeout' in caplog.text
+    assert 'private diagnostic' not in caplog.text
+    expiry=atlas.TILE_PREFERRED[canonical]['until']
+    calls.clear();second=part.replace('1201512','1201513')
+    assert atlas.survey_tile('optical',second).body==b'same-publisher-jpeg'
+    assert calls==[mirror+'/'+second]
+    assert atlas.TILE_PREFERRED[canonical]['until']==expiry  # Preference is temporary, not extended by every tile.
+    atlas.TILE_PREFERRED[canonical]['until']=0;primary_healthy=True
+    calls.clear();third=part.replace('1201512','1201514')
+    assert atlas.survey_tile('optical',third).headers['X-Atlas-Retrieval-URL']==canonical+'/'+third
+    assert calls==[canonical+'/'+third]
+    assert canonical not in atlas.TILE_PREFERRED
+
+
+def test_server_error_recovery_is_shared_by_simultaneous_tile_requests(isolated_cache,monkeypatch):
+    started=threading.Event();release=threading.Event();calls=[]
+    canonical=atlas.SURVEYS['optical']['url'];part='Norder9/Dir1200000/Npix1201512.jpg'
+    def fetch(url,**kwargs):
+        calls.append(url)
+        if url.startswith(canonical):
+            response=httpx.Response(503,request=httpx.Request('GET',url));response.raise_for_status()
+        started.set();assert release.wait(5)
+        return b'mirror-original-pixels','image/jpeg'
+    monkeypatch.setattr(atlas,'read_remote',fetch)
+    with ThreadPoolExecutor(max_workers=6) as workers:
+        first=workers.submit(atlas.survey_tile,'optical',part)
+        try:
+            assert started.wait(3)
+            duplicates=[workers.submit(atlas.survey_tile,'optical',part) for _ in range(4)]
+        finally:release.set()
+        assert all(result.result(timeout=3).body==b'mirror-original-pixels' for result in [first,*duplicates])
+    assert len(calls)==2 and atlas.TILE_PENDING=={}
+
+
+def test_failed_primary_and_mirror_are_bounded_and_later_request_can_recover(isolated_cache,monkeypatch):
+    calls=[];healthy=False
+    def fetch(url,**kwargs):
+        calls.append(url)
+        if not healthy:raise httpx.ReadTimeout('temporarily unavailable')
+        return b'recovered','image/jpeg'
+    monkeypatch.setattr(atlas,'read_remote',fetch)
+    with TestClient(app) as client:
+        path='/api/atlas/surveys/optical/Norder9/Dir1200000/Npix1201512.jpg'
+        assert client.get(path).status_code==503
+        assert len(calls)==2 and atlas.TILE_PENDING=={}
+        assert cache.status()['files']==0
+        healthy=True
+        result=client.get(path)
+        assert result.status_code==200 and result.content==b'recovered'
+        assert len(calls)==3 and cache.status()['files']==1
+
+
+@pytest.mark.parametrize('status',[401,403,404,429])
+def test_non_transient_status_does_not_switch_to_another_server(isolated_cache,monkeypatch,status):
+    calls=[]
+    def fetch(url,**kwargs):
+        calls.append(url)
+        response=httpx.Response(status,request=httpx.Request('GET',url));response.raise_for_status()
+    monkeypatch.setattr(atlas,'read_remote',fetch)
+    with pytest.raises(httpx.HTTPStatusError):
+        atlas.read_tile_remote(atlas.SURVEYS['optical']['url']+'/Norder1/Dir0/Npix1.jpg')
+    assert len(calls)==1 and not atlas.TILE_PREFERRED
+
+
+def test_unverified_survey_has_no_invented_mirror_and_pool_timeout_is_not_host_failure(isolated_cache,monkeypatch):
+    calls=[]
+    def fetch(url,**kwargs):
+        calls.append(url);raise httpx.PoolTimeout('local pool occupied')
+    monkeypatch.setattr(atlas,'read_remote',fetch)
+    with pytest.raises(httpx.PoolTimeout):
+        atlas.read_tile_remote(atlas.SURVEYS['optical']['url']+'/properties')
+    assert len(calls)==1
+    calls.clear()
+    def disconnected(url,**kwargs):
+        calls.append(url);raise httpx.ConnectError('unavailable')
+    monkeypatch.setattr(atlas,'read_remote',disconnected)
+    with pytest.raises(httpx.ConnectError):
+        atlas.read_tile_remote('https://example.test/custom-survey/Norder1/Dir0/Npix1.jpg')
+    assert len(calls)==1
+
+
+def test_fast_tile_timeouts_leave_science_transfer_timeouts_unchanged(isolated_cache,monkeypatch):
+    requests=[]
+    def respond(request):
+        requests.append(request)
+        return httpx.Response(200,content=b'pixels',headers={'content-type':'image/jpeg'})
+    with httpx.Client(transport=httpx.MockTransport(respond),timeout=httpx.Timeout(90,connect=12,pool=15)) as client:
+        monkeypatch.setattr(atlas,'remote_client',lambda:client)
+        atlas.read_tile_remote(atlas.SURVEYS['optical']['url']+'/Norder1/Dir0/Npix1.jpg')
+        atlas.read_remote('https://example.test/science-cutout',{'fov':.1})
+    assert requests[0].extensions['timeout']=={'connect':4,'read':18,'write':18,'pool':5}
+    assert requests[1].extensions['timeout']=={'connect':12,'read':90,'write':90,'pool':15}
 
 
 def test_cache_size_persists_without_allocating_or_deleting(isolated_cache):
