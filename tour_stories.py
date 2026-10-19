@@ -64,6 +64,7 @@ Never read coordinates, observation
 IDs, program titles, campaign names, file names, spectral classification codes, exposure dates, or filter codes.
 No lists, headings, Markdown, bracketed citations, URLs, stage directions, or bibliography in paragraph text.
 Search and cite primary astronomy sources. Each paragraph must list the actual source URLs supporting its facts.
+Copy those URLs exactly from the search results; do not reconstruct paths or change singular/plural path segments.
 Choose three to six useful facts, not a statistics dump. Paraphrase sources; never copy long passages.
 If sources disagree about distance or age, use a qualified approximate range or omit it; never invent precision.
 The displayed map is the supplied sky survey, NOT the Hubble or Webb exposure mentioned in the archive metadata.
@@ -168,14 +169,34 @@ def cited_sources(response):
     return sources
 
 
+def match_citation(url,sources):
+    if url in sources:return url
+    if not source_url(url):raise ValueError('Unrecognized research citation.')
+    parsed=urlparse(url)
+    # NASA's Hubble catalog uses /mission/, while its news pages use /missions/.
+    # Repair this specific model typo only when the exact catalog page was retrieved.
+    prefix='/missions/hubble/science/explore-the-night-sky/'
+    if parsed.hostname=='science.nasa.gov' and parsed.path.startswith(prefix):
+        candidate=parsed._replace(path=parsed.path.replace(prefix,'/mission/hubble/science/explore-the-night-sky/',1)).geturl()
+        if candidate in sources:return candidate
+    raise ValueError('Story citations did not match the research sources.')
+
+
 def response_story(data,context,details):
     if data.get('status')!='completed':raise ValueError('Research response was incomplete.')
     text=''.join(p['text'] for i in data.get('output',[]) if i.get('type')=='message' for p in i.get('content',[]) if p.get('type')=='output_text')
     story=Story.model_validate_json(text);narration=spoken_text(story);sources=cited_sources(data)
+    repairs=[]
+    for paragraph in story.paragraphs:
+        verified=[]
+        for url in paragraph.source_urls:
+            actual=match_citation(url,sources);verified.append(actual)
+            if actual!=url:repairs.append({'original':url,'retrieved_url':actual})
+        paragraph.source_urls=list(dict.fromkeys(verified))
     used=list(dict.fromkeys(url for p in story.paragraphs for url in p.source_urls))
     if not used or any(url not in sources for url in used):raise ValueError('Story citations did not match the research sources.')
     return {'context':context,'story':story.model_dump(),'narration':narration,'sources':[{'url':url,'title':sources[url]} for url in used],
-            'model':MODEL,'created_at':integrations.now(),'response_id':data.get('id'),'provider':'OpenAI','catalog_context':details}
+            'model':MODEL,'created_at':integrations.now(),'response_id':data.get('id'),'provider':'OpenAI','catalog_context':details,'citation_repairs':repairs}
 
 
 async def generate(context,key,retry):

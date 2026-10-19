@@ -1,6 +1,6 @@
 'use strict';
 const objectResearchUI={serial:0,timer:null,record:null,pending:false};
-function researchTarget(o){return {id:String(o.id),name:o.name||o.title,catalog:o.catalog||'Featured',ra:o.ra,dec:o.dec,type:o.type||'',source_url:o.source_url||''};}
+function researchTarget(o){return {id:String(o.id),name:o.research_name||o.name||o.title,catalog:o.catalog||'Featured',ra:o.ra,dec:o.dec,type:o.type||'',source_url:o.source_url||''};}
 function objectResearchCurrent(serial,o){return objectResearchUI.serial===serial&&mapUI.selected===o;}
 function objectResearchStatus(message){const node=$('#object-research-status');if(node)node.textContent=message;}
 function objectResearchMarkup(o,record){

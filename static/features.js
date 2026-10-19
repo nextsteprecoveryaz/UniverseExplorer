@@ -7,7 +7,7 @@ let topazModelsReady=false;
 const topazModelValues=new Map();
 let enhancementRunning=false;
 
-function stopObjectVideo(){document.querySelectorAll('#object-detail video, #object-detail audio').forEach(media=>media.pause());}
+function stopObjectVideo(){if(typeof cancelDestinationVisit==='function')cancelDestinationVisit();document.querySelectorAll('#object-detail video, #object-detail audio').forEach(media=>media.pause());}
 function onSkyViewChanged(){
   if(!mapUI.enabled||!state.sky)return;
   cancelAnimationFrame(mapUI.frame);mapUI.frame=requestAnimationFrame(positionObjectMarkers);
@@ -101,8 +101,8 @@ function showObjectDetail(o){
   const sed=document.createElement('button');sed.className='button';sed.textContent='VizieR photometry';$('.object-actions').append(sed);sed.onclick=()=>openPhotometry(`${o.ra} ${o.dec>=0?'+':''}${o.dec}`);
   const tess=document.createElement('button');tess.className='button';tess.textContent='Find TESS light curves';$('.object-actions').append(tess);tess.onclick=()=>openTessStar(o);
   if(o.video_url)$('#object-video').onerror=()=>$('#video-error').hidden=false;
-  void loadObjectResearch(o);
   positionObjectMarkers();
+  return loadObjectResearch(o);
 }
 
 function selectedTopazModel(){return topazModels.models.find(model=>model.id===$('#topaz-model').value);}

@@ -51,6 +51,16 @@ Image Lab has **Red, Yellow, Green and Blue** intensity sliders for either the o
 5. **Open this view in image lab** captures the current sky visualization. **Local GPU** offers full-resolution Real-ESRNet and Real-ESRGAN enhancement. The legacy CPU model and optional cloud providers remain available. Comparisons and exported PNGs are labeled. Open your own FITS, PNG, JPEG, TIFF, or WebP files as well.
 6. Save fields and images to the **Discovery notebook**. Recent images and their AI outputs remain in the image lab after reopening the app. Export notes and analyses as JSON.
 
+## Fifty narrated DSS2 destinations
+
+The **Optional Destination Shortcuts** strip includes 50 catalog-verified locations: nebulae, stellar remnants, open and globular clusters, nearby and interacting galaxies, and the TRAPPIST-1 host-star field. The original six favorites remain represented. Every shortcut opens **Visible sky · DSS2** with a field width chosen for its target. Coordinates and canonical identifiers come from SIMBAD; the bundled catalog records its verification date and source links. Some nebula fields are anchored on their associated star cluster. Small details and exoplanets are not resolved by this survey.
+
+Scroll sideways using the mouse wheel, trackpad, scrollbar, or previous/next arrows. Search by name or catalog number and filter by category. Keyboard focus supports left/right arrows and Home/End. The strip remains available while the object story is open and can still be minimized with the other map panels.
+
+With **Narrate visits** enabled (the default), a click flies to the destination, asks OpenAI for a source-backed story, saves it, then creates and plays ElevenLabs narration using the exact saved text. Generation happens on the first visit, not for all 50 at startup; new research and voice requests use the connected API accounts. Return visits load the saved story and MP3 locally. The same story remains available in the object card and can be added to a tour. Switching destinations or taking over the map prevents the old request from starting narration; completed research and audio remain saved. A browser that blocks autoplay offers **Listen to narration**. Unfinished provider requests require explicit retry in the card rather than automatic repeat billing.
+
+Turn **Narrate visits** off to browse positions and existing research without automatic research or narration. This preference is saved in this browser.
+
 ## Research an object from its sky card
 
 In **Explore the sky**, click an object marker or object-list entry, then **Research Object** in its card. OpenAI writes a source-backed object story in complete paragraphs, shown in place of the generic catalog summary. Sparse object-specific evidence is identified as such; general stellar or galaxy science is distinguished from measurements of that individual object. This biography is independent of the selected sky survey.

@@ -77,6 +77,7 @@ function coordinates(){
 const HIDDEN_MAP_SURVEYS=new Set(['webb-color','hubble-color','oxygen','sulfur']);
 function skyMapSurveys(){return state.config.surveys.filter(s=>!HIDDEN_MAP_SURVEYS.has(s.id));}
 function chooseSurvey(id){
+  if(typeof cancelDestinationVisit==='function'&&destinationVisit.active&&id!=='optical')cancelDestinationVisit();
   // Keep older destinations and notebook entries usable without restoring hidden lenses.
   if(HIDDEN_MAP_SURVEYS.has(id))id='optical';
   const survey=state.config.surveys.find(s=>s.id===id);
@@ -94,6 +95,8 @@ function chooseSurvey(id){
   }
 }
 function flyTo(destination){
+  if(typeof stopObjectVideo==='function')stopObjectVideo();
+  else if(typeof cancelDestinationVisit==='function')cancelDestinationVisit();
   leaveTourView('Paused · visiting another destination');
   if(flight.active)exitFlight();
   const origin=state.sky?{...currentField()}:null;
@@ -118,9 +121,9 @@ async function initSky(){
     if(!window.A)throw new Error('The CDS sky viewer could not load. Check your internet connection and reload.');
     await A.init;
     state.sky=A.aladin('#aladin-lite-div',{survey:atlasSurveyURL(state.config.surveys.find(s=>s.id===state.survey)),target:`${state.ra} ${state.dec}`,fov:state.fov,projection:'AIT',cooFrame:'ICRSd',showReticle:false,showZoomControl:false,showFullscreenControl:false,showLayersControl:false,showGotoControl:false,showShareControl:false,showFrame:false,showCooLocation:false,showProjectionControl:false,showFov:false,showCooGrid:false,showStatusBar:true,showCooGridControl:false,showSimbadPointerControl:false,showContextMenu:true,backgroundColor:'#03070c'});
-    $('#aladin-lite-div').addEventListener('pointerdown',()=>cancelAnimationFrame(travelFrame));
+    $('#aladin-lite-div').addEventListener('pointerdown',()=>{cancelAnimationFrame(travelFrame);if(typeof cancelDestinationVisit==='function')cancelDestinationVisit();});
     installTourLayerGuard(state.sky);
-    $('#aladin-lite-div').addEventListener('wheel',()=>cancelAnimationFrame(travelFrame),{passive:true});
+    $('#aladin-lite-div').addEventListener('wheel',()=>{cancelAnimationFrame(travelFrame);if(typeof cancelDestinationVisit==='function')cancelDestinationVisit();},{passive:true});
     state.sky.on('positionChanged',()=>coordinates());
     state.sky.on('zoomChanged',()=>coordinates());
     initExplorePixelMapping();
@@ -327,8 +330,7 @@ async function boot(){
     const surveys=skyMapSurveys(),groups=[...new Set(surveys.map(s=>s.group))];
     $('#survey-select').innerHTML=groups.map(group=>`<optgroup label="${esc(group)}">${surveys.filter(s=>s.group===group).map(s=>`<option value="${s.id}">${esc(s.name)} · ${esc(s.tag)}</option>`).join('')}</optgroup>`).join('');
     chooseSurvey('optical');
-    $('#destinations').innerHTML=state.config.destinations.map((d,i)=>`<button class="destination-card" data-name="${esc(d.name)}" data-destination="${i}"><span class="num">0${i+1}</span><small>${esc(d.type)}</small><strong>${esc(d.name)}</strong></button>`).join('');
-    $$('[data-destination]').forEach(b=>b.onclick=()=>flyTo(state.config.destinations[Number(b.dataset.destination)]));
+    initDestinationShortcuts();
     $$('[data-page]').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
     $$('#lens-chips button').forEach(b=>b.onclick=()=>{showPage('explore');chooseSurvey(b.dataset.survey);});
     $('#survey-select').onchange=e=>{showPage('explore');chooseSurvey(e.target.value);};

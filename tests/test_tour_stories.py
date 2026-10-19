@@ -151,3 +151,19 @@ def test_completed_provider_response_is_recoverable_without_credentials_or_rebil
         r=c.post('/api/navigation/stories',json={'stop':STOP});assert r.status_code==200,r.text
         assert r.json()['cached'] and r.json()['narration']=='\n\n'.join(TEXTS)
     assert (stories.ROOT/(key+'.json')).exists() and not (stories.ROOT/(key+'.attempt.json')).exists()
+
+
+def test_nasa_catalog_path_typo_matches_only_the_same_retrieved_page():
+    mistyped=URL.replace('/mission/','/missions/')
+    assert stories.match_citation(mistyped,{URL:'NASA'})==URL
+    for unverified in (mistyped.replace('messier-16/','messier-42/'),mistyped.replace('science.nasa.gov','www.nasa.gov'),mistyped+'invented'):
+        with pytest.raises(ValueError):stories.match_citation(unverified,{URL:'NASA'})
+    with pytest.raises(ValueError):stories.match_citation(mistyped,{})
+
+
+def test_citation_repair_never_changes_the_spoken_story():
+    story=deepcopy(STORY);mistyped=URL.replace('/mission/','/missions/')
+    story['paragraphs'][1]['source_urls']=[mistyped]
+    saved=stories.response_story(output(story),{}, {})
+    assert saved['narration']=='\n\n'.join(TEXTS) and saved['story']==STORY
+    assert saved['citation_repairs']==[{'original':mistyped,'retrieved_url':URL}]

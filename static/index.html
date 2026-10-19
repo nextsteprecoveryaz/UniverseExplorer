@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/notebook.css?v=1">
   <link rel="stylesheet" href="/object-research.css?v=1">
+  <link rel="stylesheet" href="/destinations.css?v=1">
   <link rel="stylesheet" href="/flight.css">
   <link rel="stylesheet" href="/navigation.css?v=fullsky-2">
   <link rel="stylesheet" href="/atlas.css">
@@ -23,8 +24,9 @@
   <script type="importmap">{"imports":{"three":"/vendor/three/three.module.js"}}</script>
   <script type="module" src="/image-3d.js?v=4"></script>
   <script src="/vendor/aladin.js" charset="utf-8" defer></script>
-  <script src="/features.js?v=object-research-1" defer></script>
-  <script src="/object-research.js?v=1" defer></script>
+  <script src="/features.js?v=destinations-1" defer></script>
+  <script src="/object-research.js?v=destinations-1" defer></script>
+  <script src="/destinations.js?v=1" defer></script>
   <script src="/journeys.js?v=fullsky-1" defer></script>
   <script src="/photometry.js" defer></script>
   <script src="/flight-math.js" defer></script>
@@ -51,7 +53,7 @@
   <script src="/telescope-live.js?v=9" defer></script>
   <script src="/local-gpu.js?v=1" defer></script>
   <script src="/notebook.js?v=elevenlabs-1" defer></script>
-  <script src="/app.js?v=notebook-1" defer></script>
+  <script src="/app.js?v=destinations-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -132,7 +134,7 @@
         <p id="destination-description">Drag to move across the sky. Scroll to zoom into any region. Turn on Object map for guide markers and catalog information as you move closer.</p>
         <div class="intro-actions"><button id="find-observations" class="button primary">Explore observations <span>↗</span></button><button id="save-field" class="button ghost">+ Save field</button></div>
       </div>
-      <div class="destination-dock"><div class="dock-title"><span class="overline">OPTIONAL DESTINATION SHORTCUTS</span><span>Drag to explore · Scroll to travel closer</span></div><div id="destinations" class="destinations"></div></div>
+      <div class="destination-dock"><div class="dock-title"><div class="destination-heading"><span class="overline">OPTIONAL DESTINATION SHORTCUTS</span><span id="destination-count">50 · DSS2</span></div><div class="destination-controls"><input id="destination-search" type="search" placeholder="Find a destination…" aria-label="Find a destination"><select id="destination-category" aria-label="Destination category"></select><label title="On first visit, OpenAI researches the story and ElevenLabs records it using your API credits. Saved stories and audio are reused."><input id="destination-auto-narrate" type="checkbox" checked>Narrate visits</label><button id="destinations-previous" class="icon-button" aria-label="Previous destinations" aria-controls="destinations">‹</button><button id="destinations-next" class="icon-button" aria-label="Next destinations" aria-controls="destinations">›</button></div></div><div id="destinations" class="destinations" role="region" aria-label="Scrollable destination shortcuts"></div><p id="destination-status" role="status">Scroll for 50 destinations · first visit creates a story and narration; saved visits replay locally.</p></div>
       <div class="coordinate-bar"><span id="coordinates">RA 0.00000° &nbsp; DEC 0.00000°</span><span id="fov-readout">FIELD 360°</span><span id="sky-credit">Visible sky · DSS2 · CDS Aladin / HiPS</span></div>
     </section>
     <section id="routes-page" class="page workspace-page">

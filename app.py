@@ -91,14 +91,7 @@ SURVEYS.extend([
 ])
 atlas.SURVEYS={s['id']:s for s in SURVEYS}
 expeditions.SURVEYS.update(atlas.SURVEYS)
-DESTINATIONS=[
- {'name':'Pillars of Creation','type':'STAR-FORMING REGION','ra':274.730583,'dec':-13.844944,'fov':0.073,'survey':'webb-color','description':'Explore a small part of the Eagle Nebula, where dense clouds and young stars shape the landscape.','source_url':'https://esawebb.org/images/weic2216a/'},
- {'name':'Carina · Cosmic Cliffs','type':'STELLAR NURSERY','ra':159.216,'dec':-58.621,'fov':0.15,'survey':'webb-color','description':'The edge of a star-forming region in NGC 3324, revealed in Webb infrared imagery.'},
- {'name':'Orion Nebula','type':'NEARBY NEBULA','ra':83.82208,'dec':-5.39111,'fov':1.2,'survey':'optical','description':'A rich star-forming region. Search the archive here for Hubble and Webb observations.'},
- {'name':'Stephan’s Quintet','type':'GALAXY GROUP','ra':339.01,'dec':33.958,'fov':0.15,'survey':'webb-color','description':'A field of interacting galaxies. Compare filters and follow the structures through infrared light.'},
- {'name':'Andromeda Galaxy','type':'SPIRAL GALAXY','ra':10.68471,'dec':41.26875,'fov':3.0,'survey':'optical','description':'Visit M31 in the visible sky survey and look for public Hubble observations across its disk.'},
- {'name':'TRAPPIST-1','type':'KNOWN PLANETARY SYSTEM','ra':346.622,'dec':-5.041,'fov':0.2,'survey':'optical','description':'A star with known planets. Planets will not resolve in this sky view; use the catalog and transit tools.'},
-]
+from destination_catalog import DESTINATIONS
 
 def db():
     return discovery_notebook.connect()
