@@ -30,11 +30,22 @@ async function startTourNarration(replay=false){
   const n=tourNarration,p=routePlayer,route=p.route,index=p.index;
   if(!narrationEnabled()||!route||route.kind==='recording'||index<0)return;
   const provider=$('#tour-narration-provider').value,voice=$('#tour-narration-voice').value;
-  const text=narrationFor(route.media[index],route.stops[index]);if(!text)return;
-  const context=[route.id,route.revision,index,provider,voice,text].join('|');
+  let text=narrationFor(route.media[index],route.stops[index]);
+  const research=typeof tourStoryNeeded==='function'&&tourStoryNeeded(route,index);
+  if(!text&&!research)return;
+  const survey=typeof tourSkySurvey==='function'?tourSkySurvey():'';
+  const contextFor=()=>[route.id,route.revision,index,provider,voice,narrationFor(route.media[index],route.stops[index]),survey].join('|');
+  const context=contextFor();
   if(n.context===context&&!replay){if(n.pending||n.error)return;if(provider!=='browser'&&n.audio?.src&&!n.audio.ended&&p.playing)await playNarrationAudio();return;}
   resetTourNarration();n.context=context;const serial=n.serial;
-  const current=()=>serial===n.serial&&routePlayer.route===route&&routePlayer.index===index&&narrationEnabled();
+  const current=()=>serial===n.serial&&routePlayer.route===route&&routePlayer.index===index&&narrationEnabled()&&(typeof tourSkySurvey!=='function'||tourSkySurvey()===survey);
+  if(research){
+    n.pending=true;narrationStatus('OpenAI is researching this object and writing its story… Saved stories are reused.');
+    try{
+      const story=await prepareTourStory(route,index,replay);if(!current())return;
+      applyTourStory(route,index,story);text=story.narration;n.context=contextFor();n.pending=false;
+    }catch(error){if(current()){n.pending=false;n.error=true;narrationStatus(error.message+' Use OpenAI story connection or Replay narration.');if(typeof pauseRoute==='function')pauseRoute('Story research needs attention · no archive codes will be narrated.');}return;}
+  }
   if(provider==='browser'){
     if(!window.speechSynthesis){n.error=true;narrationStatus('Browser narration is unavailable. Choose Windows local voice or OpenAI voice.');return;}
     const speech=new SpeechSynthesisUtterance(text);speech.rate=Math.min(1.6,Number($('#route-play-speed').value)||1);
@@ -67,6 +78,7 @@ function initTourNarration(){
   $('#tour-narration-provider').onchange=settingsChanged;$('#tour-narration-voice').onchange=settingsChanged;
   $('#tour-narration-replay').onclick=()=>{$('#route-narration').checked=true;void startTourNarration(true);};
   $('#tour-narration-connect').onclick=()=>($('#tour-narration-provider').value==='openai'?openCloudConnection('speech'):openElevenLabsConnection()).catch(failure);
+  const storyConnection=document.createElement('button');storyConnection.className='text-button';storyConnection.id='tour-story-connect';storyConnection.textContent='OpenAI story connection';storyConnection.onclick=()=>openCloudConnection('stories').catch(failure);$('#tour-narration-connect').after(storyConnection);
   $('#route-play-speed').addEventListener('change',()=>{n.audio.playbackRate=Number($('#route-play-speed').value)||1;});
   setNarratorPreference(preferredNarrator());updateVoiceControls();
   narrationStatus('ElevenLabs reads the guide once; saved audio is reused on this PC.');

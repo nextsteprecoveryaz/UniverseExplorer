@@ -188,3 +188,68 @@ test('ElevenLabs is the default narrator, requests its dedicated cache and prese
   const replay=p.run('startTourNarration(true)');assert.deepEqual(p.requests[1].body,p.requests[0].body);
   p.resolve(1,'/eleven.mp3',true);await replay;assert.equal(p.audio.src,'/eleven.mp3');
 });
+
+function researchedNarrator(){
+  const p=narrator(null);
+  p.c.currentSurvey='2mass';p.c.tourSkySurvey=()=>p.c.currentSurvey;
+  p.c.esc=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
+  p.c.storySourcesMarkup=()=>'<details>Story sources</details>';
+  p.c.narrationFor=(m,s)=>m?.narration||s?.guide?.narration||'';
+  p.c.pauseRoute=()=>{p.c.routePlayer.playing=false;p.calls.push('route-paused');};
+  p.run('routePlayer.route.media[0]={kind:"mast",title:"M-16",description:"JWST Cycle 1 Outreach Campaign"};routePlayer.route.stops[0]={title:"M-16",ra:274.73,dec:-13.85,fov:.2,source:{kind:"mast",id:"123"}}');
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../static/tour-stories.js'),'utf8'),p.c);
+  return p;
+}
+function story(survey='2mass'){
+  const narration='The Eagle Nebula is a stellar nursery in Serpens. Young stars sculpt its dense clouds of gas and dust.';
+  const url='https://science.nasa.gov/eagle-nebula';
+  return {narration,context:{survey},story:{title:'The Eagle Nebula',paragraphs:[{text:narration,source_urls:[url]}]},sources:[{url,title:'NASA'}],cached:true};
+}
+
+test('archive codes are researched before ElevenLabs receives plain sentences, with clickable sources separate',async()=>{
+  const p=researchedNarrator(),pending=p.run('startTourNarration()');
+  assert.equal(p.requests.length,1);assert.equal(p.requests[0].url,'/api/navigation/stories');
+  assert.equal(p.requests[0].body.stop.survey,'2mass');assert.equal(p.run('tourNarrationPending()'),true);
+  p.requests[0].resolve(story());await settle();
+  assert.equal(p.requests[1].url,'/api/narration/elevenlabs/clip');
+  assert.deepEqual(p.requests[1].body,{text:story().narration});
+  assert.doesNotMatch(p.requests[1].body.text,/Campaign|https:|\[1\]/);
+  assert.match(p.$('#route-stop-description').innerHTML,/href="https:\/\/science.nasa.gov/);
+  p.resolve(1,'/saved-eagle.mp3',true);await pending;
+  await p.run('startTourNarration()');assert.equal(p.requests.length,2);
+  p.audio.finish();const replay=p.run('startTourNarration(true)');
+  assert.equal(p.requests.length,3);assert.equal(p.requests[2].url,'/api/narration/elevenlabs/clip');
+  p.resolve(2,'/saved-eagle.mp3',true);await replay;
+});
+
+test('research failure pauses the tour and never narrates metadata or automatically retries',async()=>{
+  const p=researchedNarrator(),pending=p.run('startTourNarration()');
+  p.requests[0].reject(new Error('OpenAI unavailable'));await pending;
+  assert.equal(p.requests.length,1);assert.equal(p.audio.src,'');assert.ok(p.calls.includes('route-paused'));
+  await p.run('startTourNarration()');assert.equal(p.requests.length,1);
+  const replay=p.run('startTourNarration(true)');assert.equal(p.requests[1].body.retry,true);
+  p.requests[1].resolve(story());await settle();p.resolve(2,'/eagle.mp3',true);await replay;
+});
+
+test('late research from a different stop or sky survey cannot replace the current story or start paid speech',async()=>{
+  const p=researchedNarrator(),first=p.run('startTourNarration()');
+  p.c.currentSurvey='hydrogen';p.run('refreshTourStoryForSurvey()');
+  assert.equal(p.requests.length,2);assert.equal(p.requests[1].body.stop.survey,'hydrogen');
+  p.requests[0].resolve(story());await first;assert.equal(p.requests.length,2);assert.equal(p.run('tourNarration.pending'),true);
+  p.run('routePlayer.index=1;resetTourNarration()');
+  p.requests[1].resolve(story('hydrogen'));await settle();
+  assert.equal(p.requests.length,2);assert.equal(p.audio.src,'');
+});
+
+test('browser voice also waits for researched sentences instead of reading archive titles',async()=>{
+  const p=researchedNarrator();p.$('#tour-narration-provider').value='browser';
+  const pending=p.run('startTourNarration()');assert.equal(p.spoken.length,0);
+  p.requests[0].resolve(story());await pending;
+  assert.equal(p.spoken.length,1);assert.equal(p.spoken[0].text,story().narration);
+});
+
+test('Notebook scripts remain exact and skip OpenAI research',async()=>{
+  const p=researchedNarrator();p.run('routePlayer.route.stops[0].guide={narration:"My own narration.",edited:true}');
+  const pending=p.run('startTourNarration()');assert.equal(p.requests[0].url,'/api/narration/elevenlabs/clip');
+  assert.equal(p.requests[0].body.text,'My own narration.');p.resolve();await pending;
+});

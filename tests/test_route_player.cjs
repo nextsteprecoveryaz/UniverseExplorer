@@ -146,8 +146,9 @@ test('researched narration replaces navigation notes without repeating catalog t
   const p=player();
   p.context.researchedStory='  A giant black hole.\n  A surprising discovery.';
   assert.equal(p.run(`narrationFor({narration:researchedStory,description:'Old navigation notes.'},{title:'M87',notes:'Personal note'})`),'A giant black hole. A surprising discovery.');
-  assert.equal(p.run(`narrationFor({description:'An existing gallery story.'},{title:'Carina'})`),'Carina. An existing gallery story.');
-  assert.equal(p.run(`narrationFor({narration:'   '},{title:'My target',notes:'My own notes.'})`),'My target. My own notes.');
+  assert.equal(p.run(`narrationFor({description:'JWST Cycle 1 Outreach Campaign'},{title:'M-16'})`),'');
+  assert.equal(p.run(`narrationFor({narration:'   '},{title:'My target',notes:'RA 123.456'})`),'');
+  assert.equal(p.run(`narrationFor(null,{guide:{narration:'My complete authored story.'}})`),'My complete authored story.');
 });
 
 test('moving between stops and recordings clears the previous story sources',()=>{

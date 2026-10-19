@@ -39,6 +39,7 @@ import gpu_enhancement
 import discovery_notebook
 import local_narration
 import elevenlabs_narration
+import tour_stories
 
 ROOT=Path(__file__).parent
 DATA=ROOT/'data'
@@ -61,6 +62,7 @@ app.include_router(gpu_enhancement.router)
 app.include_router(discovery_notebook.router)
 app.include_router(local_narration.router)
 app.include_router(elevenlabs_narration.router)
+app.include_router(tour_stories.router)
 app.add_middleware(TrustedHostMiddleware,allowed_hosts=['127.0.0.1','localhost','testserver'])
 HEAVY=asyncio.Semaphore(1)
 CLOUD_BUSY=asyncio.Lock()
@@ -145,7 +147,7 @@ def cloud_status():
 class CloudConnection(BaseModel):
     api_key:SecretStr
     remember:bool=False
-    service:Literal['image','speech']='image'
+    service:Literal['image','speech','stories']='image'
 
 @app.post('/api/cloud/connect')
 async def connect_cloud(body:CloudConnection):

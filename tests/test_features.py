@@ -34,7 +34,7 @@ def test_cloud_requires_connection_and_does_not_expose_secrets():
  assert science.metadata(m['id']).get('cloud_ai') is None
  assert c.post('/api/cloud/connect',headers={'Origin':'https://other.example'},json={'api_key':'x'*25}).status_code==403
 
-@pytest.mark.parametrize('service,model',[('speech','gpt-4o-mini-tts'),('image',cloud_ai.MODEL)])
+@pytest.mark.parametrize('service,model',[('speech','gpt-4o-mini-tts'),('image',cloud_ai.MODEL),('stories',cloud_ai.STORY_MODEL)])
 def test_connection_checks_the_requested_capability_without_exposing_key(monkeypatch,service,model):
  calls=[]
  class Client:

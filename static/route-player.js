@@ -79,7 +79,7 @@ function resumeRoute(){
   $('#route-play-toggle').textContent='Ⅱ Pause';cancelAnimationFrame(routePlayer.frame);routePlayer.frame=requestAnimationFrame(tickRoute);
   if(typeof resumeTourNarration==='function')resumeTourNarration();
 }
-function narrationFor(media,stop){return (media?.narration?.trim()||[stop?.title,media?.description||stop?.notes||''].filter(Boolean).join('. ')).replace(/\s+/g,' ').trim().slice(0,3500);}
+function narrationFor(media,stop){return (media?.narration?.trim()||stop?.guide?.narration?.trim()||'').replace(/\s+/g,' ').trim().slice(0,3500);}
 function speakRouteStop(){
   if(typeof startTourNarration==='function'){void startTourNarration();return;}
   if(!$('#route-narration').checked||!window.speechSynthesis||!routePlayer.playing)return;
@@ -118,6 +118,7 @@ function updateRouteGuide(index){
   $('#route-stop-video').hidden=true;
   drawNavigationFootprint(media?.footprint);
   p.prefetch=[];
+  if(typeof renderTourStory==='function')renderTourStory(media);
   if(window.speechSynthesis)window.speechSynthesis.cancel();
   saveRouteProgress();
 }
@@ -172,6 +173,7 @@ function applyRouteSkySurvey(){
     const stop=p.route.stops[p.index];
     $('#route-stop-facts').textContent=`Sky position: RA ${stop.ra.toFixed(5)}°, Dec ${stop.dec.toFixed(5)}° · field ${stop.fov.toFixed(4)}°\n${state.config.surveys.find(s=>s.id===tourSkySurvey())?.name||tourSkySurvey()}`;
     atlasShowPackView(p.route,p.index);atlasPrefetch(p.route,p.index);
+    if(typeof refreshTourStoryForSurvey==='function')refreshTourStoryForSurvey();
   }
 }
 function skipRouteStop(direction){

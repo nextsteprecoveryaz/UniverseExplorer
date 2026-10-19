@@ -15,6 +15,7 @@ import integrations
 import science
 
 MODEL='gpt-image-2.5-sunburst'
+STORY_MODEL='gpt-5.4-mini'
 KEY_FILE=Path(__file__).parent/'data'/'openai-key.dpapi'
 SESSION_KEY=None
 BASE_PROMPT=('Enhance the supplied astronomical image for visual presentation. Preserve the original composition, field of view, colors, locations and number of visible sources, and existing credit marks. Gently reduce noise and improve clarity and local contrast. Do not add stars, planets, gas structures, labels, or invented objects. Do not imply recovered measurements or discoveries. This is a visualization, not scientific reconstruction.')
@@ -67,9 +68,9 @@ async def connect(key,remember=False,service='image'):
  key=key.strip()
  if not 20<=len(key)<=1000 or any(c.isspace() for c in key):raise CloudError('Enter a valid OpenAI API key in this form.')
  async with httpx.AsyncClient(timeout=25) as client:
-  response=await client.get('https://api.openai.com/v1/models/'+('gpt-4o-mini-tts' if service=='speech' else MODEL),headers={'Authorization':'Bearer '+key})
+  response=await client.get('https://api.openai.com/v1/models/'+({'speech':'gpt-4o-mini-tts','stories':STORY_MODEL}.get(service,MODEL)),headers={'Authorization':'Bearer '+key})
  if not response.is_success:
-  if service=='speech':raise CloudError('OpenAI could not verify speech access. Check the API key, project permissions and billing.',response.status_code if response.status_code in (401,403,429) else 502)
+  if service in ('speech','stories'):raise CloudError('OpenAI could not verify '+service+' access. Check the API key, project permissions and billing.',response.status_code if response.status_code in (401,403,429) else 502)
   raise response_error(response)
  if remember:
   encrypted=protect(key.encode());KEY_FILE.write_bytes(encrypted)
