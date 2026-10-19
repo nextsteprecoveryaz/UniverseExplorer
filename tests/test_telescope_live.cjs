@@ -79,6 +79,26 @@ function harness(handler) {
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
+test('Open in Explorer transfers the panned field, zoom, projection and mission survey, not the observation target',()=>{
+  const h=harness();h.live.observation=observation();h.live.following=true;
+  h.sky.position=[122.4,51.7];h.sky.fov=1.25;h.sky.getProjectionName=()=> 'SIN';h.sky.getRotation=()=>17;
+  let destination,cancelled,readouts=0;
+  h.context.flyTo=value=>destination=value;h.context.travelFrame=42;h.context.cancelAnimationFrame=id=>cancelled=id;h.context.coordinates=()=>readouts++;
+  h.explorer.setProjection=value=>h.explorer.projection=value;h.explorer.gotoRaDec=(...value)=>h.explorer.position=value;
+  h.explorer.setFoV=value=>h.explorer.fov=value;h.explorer.setRotation=value=>h.explorer.rotation=value;
+  h.context.telescopeLiveOpenExplorer();
+  assert.deepEqual(h.explorer.position,[122.4,51.7]);assert.equal(h.explorer.fov,1.25);assert.equal(h.explorer.rotation,17);assert.equal(h.explorer.projection,'SIN');
+  assert.equal(destination.survey,'2mass');assert.equal(destination.ra,122.4);assert.equal(destination.dec,51.7);
+  assert.equal(h.live.following,false);assert.equal(cancelled,42);assert.equal(readouts,1);assert.deepEqual(h.sky.position,[122.4,51.7]);
+  h.live.mission='hubble';h.sky.fov=360;h.sky.getProjectionName=()=> 'AIT';h.context.telescopeLiveOpenExplorer();
+  assert.equal(destination.survey,'optical');assert.equal(destination.overview,true);assert.equal(h.explorer.fov,360);
+});
+
+test('Open in Explorer rejects unavailable maps and invalid coordinates',()=>{
+  const h=harness();h.sky.position=[NaN,20];assert.throws(()=>h.context.telescopeLiveOpenExplorer(),/no usable coordinates/);
+  h.live.sky=null;assert.throws(()=>h.context.telescopeLiveOpenExplorer(),/finish loading/);
+});
+
 test('pixel mapping toolbar button closes the panel and reopens it after dismissal', () => {
   const h=harness(); let toggle;
   h.el('#telescope-live-fullscreen').before=button=>{toggle=button;};

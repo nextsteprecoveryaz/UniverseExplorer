@@ -207,10 +207,12 @@ function updateEnhancementControls(){
   const model=selectedTopazModel();
   $('#topaz-note').textContent=`Sends ${image?.scientific?'the selected FITS display stretch':'the original image or saved color-adjusted copy'} to Topaz when you click Upscale. Uses your Topaz API credits. Save an adjusted copy first to include Image Lab color changes. ${model?model.label+'; ':''}maximum 25 megapixels.${size}`;
   if(state.image)$('#handoff-download').href=`/api/images/${state.image.id}/handoff?stretch=${$('#fits-stretch').value}`;
+  if(typeof updateLocalGPUControls==='function')updateLocalGPUControls();
 }
 function renderEnhancementComparison(preferred){
   const image=state.image;if(!image)return;
   const options=[];
+  for(const result of [...(image.local_history||[])].reverse())options.push({value:result.variant,label:`Local GPU · ${result.model} · ${result.scale}× · ${date(result.created_at)}`,result});
   if(image.ai)options.push({value:'local',label:'Local · FSRCNN 2×',result:image.ai});
   for(const result of [...(image.cloud_history||[])].reverse())options.push({value:result.variant,label:`${result.provider}${result.provider==='Topaz cloud'&&result.model?' · '+result.model:''}${result.scale?' · '+result.scale+'×':''} · ${date(result.created_at)}`,result});
   const select=$('#ai-output-select');const selection=preferred||select.value;
@@ -218,7 +220,7 @@ function renderEnhancementComparison(preferred){
   if(options.some(o=>o.value===selection))select.value=selection;
   const ai=options.find(o=>o.value===select.value)?.result;
   $('#ai-placeholder').hidden=Boolean(ai);$('#ai-image').hidden=!ai;$('#ai-download').hidden=!ai;
-  if(ai){$('#ai-image').src=ai.url+'?v='+Date.now();$('#ai-download').href=ai.url+'?download=true';$('#ai-note').textContent=ai.note+` Preview ${ai.input_size.join(' × ')} → output ${ai.output_size.join(' × ')}.`;}
+  if(ai){$('#ai-image').src=ai.url+'?v='+Date.now();$('#ai-download').href=ai.url+'?download=true';$('#ai-note').textContent=ai.note+` Input ${ai.input_size.join(' × ')} → output ${ai.output_size.join(' × ')}.`;}
   else $('#ai-note').textContent='Choose local enhancement, Topaz upscaling, OpenAI cloud editing, or the ChatGPT handoff. Enhanced views are labeled visualizations; candidate detection always uses original FITS data.';
   updateEnhancementControls();
   if(typeof refreshImageLabColors==='function')refreshImageLabColors();
@@ -253,6 +255,7 @@ async function openTopazConnection(){
 }
 async function runEnhancement(){
   const provider=$('#enhancement-provider').value;if(provider==='chatgpt'||enhancementRunning||!state.image)return;
+  if(provider==='gpu')return runLocalGPUEnhancement();
   if(!['local','cloud','topaz'].includes(provider))return;
   if(provider==='cloud'&&!cloudConnection.configured){await openCloudConnection();return;}
   if(provider==='topaz'&&!topazConnection.configured){await openTopazConnection();return;}

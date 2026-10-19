@@ -19,9 +19,9 @@
   <link rel="stylesheet" href="/live-enhancement.css?v=1">
   <link rel="stylesheet" href="/image-3d.css?v=1">
   <script type="importmap">{"imports":{"three":"/vendor/three/three.module.js"}}</script>
-  <script type="module" src="/image-3d.js?v=3"></script>
+  <script type="module" src="/image-3d.js?v=4"></script>
   <script src="/vendor/aladin.js" charset="utf-8" defer></script>
-  <script src="/features.js?v=topaz-models-4" defer></script>
+  <script src="/features.js?v=local-gpu-1" defer></script>
   <script src="/journeys.js?v=fullsky-1" defer></script>
   <script src="/photometry.js" defer></script>
   <script src="/flight-math.js" defer></script>
@@ -44,8 +44,9 @@
   <script src="/live-enhancement-gpu.js?v=1" defer></script>
   <script src="/live-enhancement.js?v=1" defer></script>
   <script src="/image-lab-colors.js?v=1" defer></script>
-  <script src="/telescope-live.js?v=8" defer></script>
-  <script src="/app.js?v=live-enhance-1" defer></script>
+  <script src="/telescope-live.js?v=9" defer></script>
+  <script src="/local-gpu.js?v=1" defer></script>
+  <script src="/app.js?v=local-gpu-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -182,7 +183,14 @@
       <div id="lab-empty" class="empty-state lab-empty"><span class="empty-symbol">◈</span><h2>A universe of detail, on your PC.</h2><p>Capture the sky view, import a MAST product, or open a FITS / PNG / JPEG image.<br>Choose local enhancement, Topaz upscaling, OpenAI cloud editing, or a ChatGPT handoff.</p><button id="lab-capture" class="button">Capture current sky view</button></div>
       <div id="lab-content" hidden>
         <div class="image-toolbar"><div><strong id="image-name"></strong><div id="image-info" class="small muted"></div></div><div class="flex"><label class="small">FITS display<select id="fits-stretch"><option value="asinh">Asinh</option><option value="linear">Linear</option><option value="log">Log</option></select></label><button id="image-create-3d" class="button primary">Create 3D</button><a id="original-download" class="button" download>↓ Original</a></div></div>
-        <div class="enhancement-tools"><div class="toolbar"><label>Enhancement provider<select id="enhancement-provider"><option value="local">Local · FSRCNN 2×</option><option value="topaz">Topaz cloud &middot; upscale</option><option value="cloud">OpenAI · cloud image editing</option><option value="chatgpt">ChatGPT · export & bring back</option></select></label><button id="enhance-button" class="button primary">✧ Enhance locally · 2×</button><button id="cloud-connect" class="button">Cloud connection</button></div>
+        <div class="enhancement-tools"><div class="toolbar"><label>Enhancement provider<select id="enhancement-provider"><option value="gpu">Local GPU · Real-ESRNet / Real-ESRGAN</option><option value="local">Local CPU · legacy FSRCNN 2×</option><option value="topaz">Topaz cloud &middot; upscale</option><option value="cloud">OpenAI · cloud image editing</option><option value="chatgpt">ChatGPT · export & bring back</option></select></label><button id="enhance-button" class="button primary">✧ Upscale on GPU · 2×</button><button id="cloud-connect" class="button">Cloud connection</button></div>
+          <div id="local-gpu-settings">
+            <div class="toolbar"><label>Local model<select id="gpu-model"><option value="realesrnet">Gentle restoration · Real-ESRNet</option><option value="realesrgan">Strong detail · Real-ESRGAN</option></select></label><label>Output size<select id="gpu-scale"><option value="2">2× width &amp; height</option><option value="4">4× width &amp; height</option></select></label><label>AI blend <output id="gpu-strength-value">80%</output><input id="gpu-strength" type="range" min="0" max="100" value="80" step="5"></label></div>
+            <p id="gpu-size" class="small muted"></p><p id="gpu-model-note" class="small muted"></p>
+            <details><summary>GPU quality &amp; memory</summary><div class="toolbar"><label>Precision<select id="gpu-precision"><option value="fp16">FP16 · fast</option><option value="fp32">FP32 · higher numerical precision</option></select></label><label>Tile size<select id="gpu-tile"><option value="512">512 · high VRAM</option><option value="256">256 · balanced</option><option value="128">128 · low VRAM</option></select></label></div><p class="small muted">Both models reconstruct at 4× internally; 2× output is downsampled. AI blend mixes the result with a Lanczos resize of the original. Save a color-adjusted copy first to use your Image Lab color edits.</p></details>
+            <p id="gpu-device" class="small muted">Checking the local NVIDIA engine…</p><button id="gpu-refresh" class="button">Refresh GPU status</button>
+            <progress id="gpu-progress" max="100" value="0" aria-label="Local GPU enhancement progress"></progress><button id="gpu-cancel" class="button" hidden>Cancel enhancement</button><p id="gpu-job-status" class="small muted" role="status">Runs entirely on this PC. Originals are preserved; AI results are visualization only.</p>
+          </div>
           <div id="topaz-settings" hidden>
             <div class="toolbar"><label>Topaz model<select id="topaz-model"><option value="Standard V2">Standard 2 · Precision</option></select></label><label>Upscale size<select id="topaz-scale"><option value="2">2&times; width &amp; height</option><option value="4">4&times; width &amp; height</option></select></label><button id="topaz-connect" class="button">Topaz connection</button></div>
             <p id="topaz-model-description" class="small muted"></p><div id="topaz-model-parameters"></div><p id="topaz-model-status" class="small muted" role="status"></p>
@@ -193,7 +201,7 @@
           <div class="ai-output-picker"><label for="ai-output-select">Compare with</label><select id="ai-output-select"><option value="local">Local AI result</option></select></div>
         </div>
         <div class="image-compare"><figure><figcaption><span class="label-original">ORIGINAL DATA · DISPLAY PREVIEW</span></figcaption><div class="image-frame"><img id="original-image" alt="Original image preview"><svg id="candidate-overlay" aria-label="Candidate positions on original image"></svg></div></figure><figure><figcaption><span class="label-ai">AI ENHANCED · VISUALIZATION ONLY</span><a id="ai-download" hidden>↓ Save PNG</a></figcaption><div class="image-frame" id="ai-frame"><div id="ai-placeholder"><span>✧</span><p>Your original stays untouched.<br>Choose an enhancement option to compare.</p></div><img id="ai-image" alt="AI-enhanced visualization" hidden></div></figure></div>
-        <p id="ai-note" class="help-strip">FSRCNN runs locally on the CPU. It is a general image upscaler, not an astronomy reconstruction model. New-looking details are not evidence of new objects. Detection below uses only the original FITS pixels.</p>
+        <p id="ai-note" class="help-strip">Local GPU models work from the full-resolution image. New-looking details are not evidence of new objects. Detection below uses only the original FITS pixels.</p>
         <button id="save-image" class="button">+ Save image to notebook</button><button id="image-aladin" class="button">Open original in Aladin Desktop ↗</button>
         <details class="analysis-panel"><summary>Investigate source candidates <span>ORIGINAL FITS ONLY</span></summary><p class="small muted">Find unclassified peaks, inspect their coordinates, and check known Gaia sources. Noise, cosmic rays, diffraction spikes, and galaxies can also create peaks.</p><div class="toolbar"><label>Threshold (background σ)<input id="detection-sigma" type="number" min="3" max="20" step="0.5" value="6"></label><button id="detect-button" class="button">Find source candidates</button><button id="export-candidates" class="button" disabled>↓ Export candidates</button></div><div id="candidate-results" class="small muted">Import a 2D FITS image to begin.</div></details>
         <details class="analysis-panel"><summary>Image provenance</summary><pre id="image-provenance"></pre></details>

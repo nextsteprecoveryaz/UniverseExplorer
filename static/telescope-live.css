@@ -19,6 +19,7 @@
 .telescope-live-mission-label { display: flex; align-items: center; gap: 9px; font-size: 12px; color: #acbdc9; }
 .telescope-live-mission-label select { width: 135px; min-height: 36px; padding: 7px 10px; background: #192b37; border-color: #3a5564; color: #f0f5f6; font-size: 13px; }
 .telescope-live-observation-controls, .telescope-live-view-controls, .telescope-live-stepper { display: flex; align-items: center; gap: 7px; }
+.telescope-live-observation-controls { flex-wrap: wrap; }
 .telescope-live-stepper { gap: 0; }
 .telescope-live-stepper .button { width: 35px; font-size: 18px; padding: 3px; }
 .telescope-live-stepper .button:first-child { border-radius: 6px 0 0 6px; }

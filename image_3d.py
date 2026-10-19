@@ -129,14 +129,18 @@ def source_input(request, destination):
     metadata = science.metadata(request.image_id)
     variant, provider = 'original', None
     if request.source == 'enhanced':
-        enhanced = metadata.get('cloud_ai')
+        choices=[v for v in [metadata.get('cloud_ai'),*(metadata.get('local_history',[])[-1:])] if v]
+        enhanced = max(choices,key=lambda v:v.get('created_at','')) if choices else None
         if enhanced:
             variant_id = enhanced.get('variant', '')
             if not re.fullmatch('[0-9a-f]{32}', variant_id):
                 raise ValueError('The saved enhanced image has no valid variant.')
-            path = science.IMAGES / f'{request.image_id}-cloud-{variant_id}.png'
-            variant = 'cloud-' + variant_id
+            kind='gpu' if any(v.get('variant')==variant_id for v in metadata.get('local_history',[])) else 'cloud'
+            path = science.IMAGES / f'{request.image_id}-{kind}-{variant_id}.png'
+            variant = kind+'-' + variant_id
             provider = {key: enhanced[key] for key in ('provider', 'model', 'variant') if key in enhanced}
+            size=enhanced.get('output_size',[])
+            if len(size)==2 and size[0]*size[1]>25_000_000:raise ValueError('3D input is limited to 25 million pixels. Use a 2× enhancement or the original.')
         elif metadata.get('ai'):
             path = science.IMAGES / (request.image_id + '-ai.png')
             variant, provider = 'local-ai', {'model': metadata['ai'].get('model')}

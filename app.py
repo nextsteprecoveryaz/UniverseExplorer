@@ -35,6 +35,7 @@ import sdss
 import narration
 import image_3d
 import live_enhancement
+import gpu_enhancement
 
 ROOT=Path(__file__).parent
 DATA=ROOT/'data'
@@ -43,6 +44,7 @@ DATA.mkdir(exist_ok=True)
 async def lifespan(application):
     yield
     image_3d.cancel_active_jobs()
+    gpu_enhancement.shutdown()
 
 app=FastAPI(title='Universe Explorer',version='0.1.0',lifespan=lifespan)
 app.include_router(expeditions.router)
@@ -52,6 +54,7 @@ app.include_router(sdss.router)
 app.include_router(narration.router)
 app.include_router(image_3d.router)
 app.include_router(live_enhancement.router)
+app.include_router(gpu_enhancement.router)
 app.add_middleware(TrustedHostMiddleware,allowed_hosts=['127.0.0.1','localhost','testserver'])
 HEAVY=asyncio.Semaphore(1)
 CLOUD_BUSY=asyncio.Lock()

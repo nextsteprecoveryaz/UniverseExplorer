@@ -228,7 +228,7 @@ function renderAI(){
 }
 async function loadLibrary(){
   const data=await api('/api/images');
-  $('#image-library').innerHTML=data.rows.length?'<div class="overline">RECENT IMAGES · SAVED ON THIS PC</div><div class="library-items">'+data.rows.map((m,i)=>`<button class="library-item" data-library="${i}"><img src="${m.preview_url}" alt="" loading="lazy"><span>${esc(m.name)}<small>${m.scientific?'Original FITS':'Display image'}${m.ai||m.cloud_ai?' · AI view available':''}</small></span></button>`).join('')+'</div>':'';
+  $('#image-library').innerHTML=data.rows.length?'<div class="overline">RECENT IMAGES · SAVED ON THIS PC</div><div class="library-items">'+data.rows.map((m,i)=>`<button class="library-item" data-library="${i}"><img src="${m.preview_url}" alt="" loading="lazy"><span>${esc(m.name)}<small>${m.scientific?'Original FITS':'Display image'}${m.ai||m.cloud_ai||m.local_history?.length?' · AI view available':''}</small></span></button>`).join('')+'</div>':'';
   $$('[data-library]').forEach(b=>b.onclick=()=>openImage(data.rows[Number(b.dataset.library)]));
 }
 async function captureSky(){
@@ -351,6 +351,7 @@ async function boot(){
     $('#capture-button').onclick=()=>busy($('#capture-button'),'Capturing…',captureSky);$('#lab-capture').onclick=()=>busy($('#lab-capture'),'Capturing…',captureSky);
     $('#image-upload').onchange=async e=>{try{e.target.disabled=true;await uploadImage(e.target.files[0]);}catch(error){failure(error);}finally{e.target.disabled=false;e.target.value='';}};
     initObservatoryFeatures();
+    initLocalGPU();
     initImageLabColors();
     initImageJourneys();
     initPhotometry();

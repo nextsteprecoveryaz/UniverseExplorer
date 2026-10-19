@@ -12,7 +12,7 @@ A local Windows astronomy app, built around visual exploration of released obser
 
 For Python in a custom location, run `Setup.cmd -Python "C:\path\to\python.exe"`. To install the browser workbench first and add the full desktop Aladin package later, use `Setup.cmd -SkipDesktop`; rerun without that option when ready. Running `powershell -NoProfile -ExecutionPolicy Bypass -File .\Setup-UniverseExplorer.ps1 -CheckOnly` checks Python without installing anything.
 
-**No API key or GPU is needed for basic exploration or local enhancement.** Optional cloud enhancement requires your own OpenAI API access and incurs the provider's charges. Each installation has its own notebooks, routes, downloaded images, caches and credentials; those personal files are excluded from Git.
+**No API key or GPU is needed for basic exploration or the legacy CPU upscaler.** For the stronger local NVIDIA Image Lab models, run **Setup-GPU.cmd** once after Setup.cmd. It installs a separate `.venv-gpu`, CUDA-enabled PyTorch, and two verified model downloads (about 3 GB total). A current NVIDIA driver is required; setup executes a real CUDA kernel before reporting success. Optional cloud enhancement requires your own provider account and incurs its charges. Each installation has its own notebooks, routes, downloaded images, caches and credentials; those personal files are excluded from Git.
 
 This repository distributes the application for people to run on their own PCs. It is not a hosted, multi-user website. To update an installation, stop the app, update the source files, rerun Setup.cmd, then launch again. Preserve and back up your `data/` folder. See [third-party notices](THIRD_PARTY.md) for downloaded components and image credits.
 
@@ -21,6 +21,8 @@ This repository distributes the application for people to run on their own PCs. 
 Open **Telescope Live map** in the sidebar to browse the same continuous sky surveys used by [Space Telescope Live](https://spacetelescopelive.org/user-guide): **2MASS near-infrared color** for Webb and **DSS2 visible color** for Hubble. Both apps use Aladin Lite; this app bundles version 3.8.2 locally. These are ground-based survey images around telescope pointings, not freshly captured Hubble or Webb exposures.
 
 Choose **Latest observation** or step through **Previous/Next observation**. Expand **Find an observation** to select a **Schedule date & time (UTC)** or paste an official Webb or Hubble observation link. Date lookup follows the official schedule; reported execution times may differ. Observation and feed-retrieval times are shown in UTC. The target marker, program, times and source link come from the official feed. Its latest record is not always an observation confirmed to be executing at this instant.
+
+**Open in Explorer**, beside **Latest observation**, opens the currently viewed coordinates, zoom, projection, rotation, and mission survey in **Explore the sky**. It includes your manual panning and zooming; use **Center target** first if you want the reported observation position. Following stops when transferring the view. The header's **Sky explorer** button performs the same transfer.
 
 Drag and zoom across the sky, use **Center target** to restore the observation's 0.5-degree field, or select **All sky**. **Follow updates** checks the feed once per minute while this page is visible; refreshes preserve your view until the target changes. The original **Explore the sky** workspace keeps its separate position and layers. The image wall is no longer in the navigation; existing cached images and saved layouts are preserved.
 
@@ -46,7 +48,7 @@ Image Lab has **Red, Yellow, Green and Blue** intensity sliders for either the o
 2. Use **Visible**, **Near-IR**, or the wavelength selector to switch survey datasets. Hydrogen, nitrogen, molecular-hydrogen-band, and dust views have different resolutions and coverage. Released Hubble/Webb photo composites and the sparse O III/S II layers are excluded from map lenses. Their image and archive tools remain available, including SDSS MaNGA measurements.
 3. The **Telescope Live** panel refreshes every minute while the app tab is visible. Click a target to travel to its reported pointing; the supplied Webb observation is pinned below the panel. Start/end times and execution status come from the feed. Its current record is not always an observation confirmed to be executing at this instant.
 4. Choose **Explore observations** to search public MAST images around the current coordinates. Filter by telescope or band, then open data products. Calibrated image products are ordered ahead of raw files where metadata permits. Previews are representations; the original FITS is the scientific input.
-5. **Open this view in image lab** captures the current sky visualization. **AI enhance** runs FSRCNN x2 locally on the CPU. The comparison and exported PNG are clearly labeled. Open your own FITS, PNG, JPEG, TIFF, or WebP files as well.
+5. **Open this view in image lab** captures the current sky visualization. **Local GPU** offers full-resolution Real-ESRNet and Real-ESRGAN enhancement. The legacy CPU model and optional cloud providers remain available. Comparisons and exported PNGs are labeled. Open your own FITS, PNG, JPEG, TIFF, or WebP files as well.
 6. Save fields and images to the **Discovery notebook**. Recent images and their AI outputs remain in the image lab after reopening the app. Export notes and analyses as JSON.
 
 ## Glide through telescope imagery
@@ -203,6 +205,16 @@ Choose **Standard 2**, **High Fidelity 2**, or **High Fidelity 3** for precision
 
 The app sends the full raster original or a stretched FITS display image, with a 25-million-pixel output limit. Results retain the selected model and settings in provenance and join the comparison picker. Original files remain unchanged. Failed submissions are not automatically retried; a saved pending job is resumed only with the same model and settings. Keys can be kept in backend memory or encrypted for your Windows account using DPAPI; `TOPAZ_API_KEY` is also supported. Keys are never returned to the browser or committed to Git.
 
+## Local NVIDIA enhancement in Image Lab
+
+Select **Local GPU · Real-ESRNet / Real-ESRGAN** after running **Setup-GPU.cmd**. **Gentle restoration** uses RealESRNet x4plus; **Strong detail** uses RealESRGAN x4plus. These are 16.7-million-parameter restoration networks running on CUDA, tested on an RTX 5090. They read the full-resolution original raster, or the selected FITS display stretch at full resolution; they do not upscale the small library thumbnail. Display processing uses RGB, not calibrated detector values.
+
+Choose **2×** or **4×**, adjust **AI blend** (a blend with a Lanczos-resized original), and optionally choose FP16/FP32 precision and a 128/256/512 input tile size. Both models reconstruct internally at 4×; 2× uses downsampling. Tiles include 32 input pixels of context. Output is capped at 64 megapixels; oversized jobs are rejected without silently shrinking the image. **Save PNG** downloads the complete output. Color-adjusted-copy imports and 3D inputs retain their 25-megapixel limit; use 2× or a cropped original for those workflows.
+
+Progress and **Cancel enhancement** are available while the local worker runs. **Refresh GPU status** reconnects to an active job after a reload or connection interruption; it never starts an upscale. One GPU enhancement runs at a time. The process exits after each job, releasing its GPU memory. Each result is a separate PNG in **Compare with**, with a visible AI label, input/model checksums, GPU identity, precision, scale, blend, and runtime metadata. Original files and FITS detection arrays remain unchanged. No image upload or cloud account is involved.
+
+These general restoration models can alter stars, noise, and apparent structures. More GPU power does not make reconstructed detail an observation. The **Local CPU · legacy FSRCNN** option remains available without CUDA.
+
 ## Optional OpenAI enhancement
 
 In **Image lab**, open an image and select **OpenAI · cloud image editing**. Use **Cloud connection** to enter an OpenAI API key privately in the app, then choose **Verify & connect**. This checks account access to `gpt-image-2.5-sunburst`. The key stays in backend memory for the session unless you enable **Remember on this Windows account**, which stores it encrypted using Windows DPAPI. Keys are never returned by the status endpoint or stored in browser storage. `OPENAI_API_KEY` is also supported when supplied to the server environment.
@@ -222,7 +234,7 @@ If you prefer image enhancement in ChatGPT, select **ChatGPT · export & bring b
 
 ## Image Lab: Create 3D
 
-Open any saved image in **Image Lab → Create 3D**. **Astronomy scene** creates a local image-textured relief with source-derived star layers, adjustable depth and gentle orbit. **TRELLIS.2** generates an AI mesh with inferred unseen surfaces when its optional local GPU runtime is ready. Both preserve the original, save a self-contained GLB for Blender or other glTF viewers, and export a provenance JSON with source hashes and settings. Original FITS inputs use the selected display stretch; enhanced inputs use the latest saved cloud result, otherwise the local enhancement. Save pixel-mapping adjustments as a new image first to include them.
+Open any saved image in **Image Lab → Create 3D**. **Astronomy scene** creates a local image-textured relief with source-derived star layers, adjustable depth and gentle orbit. **TRELLIS.2** generates an AI mesh with inferred unseen surfaces when its optional local GPU runtime is ready. Both preserve the original, save a self-contained GLB for Blender or other glTF viewers, and export a provenance JSON with source hashes and settings. Original FITS inputs use the selected display stretch; enhanced inputs use the newest saved GPU or cloud result, otherwise the legacy local enhancement. Save pixel-mapping adjustments as a new image first to include them.
 
 The 3D workspace supports orbit, zoom, pan, reset, automatic rotation, cancellation and reopening saved models. All geometry is an interpretation; brightness does not measure distance. Astronomy scenes retain the source's front view and restrict orbit because a single exposure cannot supply the hidden side. TRELLIS can work poorly on diffuse nebulae and crowded star fields, since these are not isolated solid objects.
 
@@ -238,7 +250,7 @@ Space Telescope Live supplies **observation metadata**, not real-time camera fra
 
 The gas lenses are real wavelength datasets, not colored copies of one image. Narrowband views include continuum and sometimes neighboring lines; gas isolation requires continuum subtraction and appropriate calibration. They are not abundance measurements or automatic gas identification.
 
-The bundled **FSRCNN x2** model is a small, general image super-resolution model. It is not trained or validated for scientific astronomy reconstruction. It may introduce or distort apparent features. It processes the default display preview at a maximum 1,200 pixels on the long edge and creates a separate, watermarked 2x PNG. A changed FITS display stretch does not alter the input to local AI; cloud editing and ChatGPT exports use the selected stretch. New imports preserve original bytes separately from display previews with SHA-256 provenance. Local mode uses the CPU and does not require CUDA or send images to a cloud AI provider.
+The legacy **FSRCNN x2** CPU model processes the default display preview at a maximum 1,200 pixels on the long edge. The new **Local GPU** models instead process full-resolution inputs and honor the selected FITS display stretch. All are general image models, not validated scientific astronomy reconstruction. New imports preserve original bytes separately from display previews with SHA-256 provenance; AI outputs are separate, labeled visualizations. Local processing does not send images to a cloud provider.
 
 Browser image-lab imports are limited to **100 MB and 25 million image pixels**. The browser selects the first suitable SCI 2D HDU, otherwise the first 2D image HDU. Use the full **Aladin Desktop** window for cubes, other extensions and larger files. Light-curve FITS belongs in the transit lab.
 

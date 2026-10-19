@@ -30,6 +30,18 @@ async function telescopeLiveLoad(mission=telescopeLive.mission,id=null,{backgrou
   }catch(e){if(serial===t.serial){$('#telescope-live-mission').value=t.mission;$('#telescope-live-request').textContent=e.message;}if(!background&&serial===t.serial)throw e;}finally{if(serial===t.serial){t.busy=false;telescopeLiveRender();}}
 }
 function telescopeLiveStopFollowing(){telescopeLive.following=false;$('#telescope-live-follow').checked=false;}
+function telescopeLiveOpenExplorer(){
+  const sky=telescopeLive.sky;if(!sky||!state.sky)throw Error('Wait for both sky viewers to finish loading.');
+  const [ra,dec]=sky.getRaDec(),fov=sky.getFov()[0];
+  if(!telescopeLiveCoordinates({ra,dec})||!Number.isFinite(fov)||fov<=0)throw Error('The current map view has no usable coordinates.');
+  const projection=sky.getProjectionName?.()||(fov>180?'AIT':'SIN'),rotation=sky.getRotation?.()||0;
+  telescopeLiveStopFollowing();
+  flyTo({name:'Telescope Live field',ra,dec,fov,survey:telescopeLiveSurvey(),overview:fov>=359,
+    type:(telescopeLive.mission==='webb'?'WEBB':'HUBBLE')+' · EXPLORE THIS FIELD',
+    description:'The location and zoom you were viewing in Telescope Live. Explore the survey, switch wavelengths, or search for released observations here.'});
+  // Preserve the viewed field exactly, including manual panning, rather than recentering the reported target.
+  cancelAnimationFrame(travelFrame);state.sky.setProjection(projection);state.sky.gotoRaDec(ra,dec);state.sky.setFoV(fov);state.sky.setRotation?.(rotation);coordinates();
+}
 function telescopeLiveStep(direction){const id=telescopeLive.observation?.[direction+'_id'];if(!id)return;telescopeLiveStopFollowing();telescopeLiveLoad(telescopeLive.mission,id).catch(failure);}
 async function openTelescopeLive(){
   const t=telescopeLive;if(t.opening)return t.opening;
@@ -51,7 +63,7 @@ function initTelescopeLive(){
     </header>
     <div class="telescope-live-toolbar" role="group" aria-label="Telescope and map controls">
       <label class="telescope-live-mission-label">Telescope<select id="telescope-live-mission"><option value="webb">James Webb</option><option value="hubble">Hubble</option></select></label>
-      <div class="telescope-live-observation-controls"><button id="telescope-live-latest" class="button primary">Latest observation</button><div class="telescope-live-stepper"><button id="telescope-live-previous" class="button" aria-label="Previous observation" title="Previous observation" disabled>←</button><button id="telescope-live-next" class="button" aria-label="Next observation" title="Next observation" disabled>→</button></div></div>
+      <div class="telescope-live-observation-controls"><button id="telescope-live-latest" class="button primary">Latest observation</button><button id="telescope-live-open-explorer" class="button" title="Open this location and zoom in Explore the sky">Open in Explorer</button><div class="telescope-live-stepper"><button id="telescope-live-previous" class="button" aria-label="Previous observation" title="Previous observation" disabled>←</button><button id="telescope-live-next" class="button" aria-label="Next observation" title="Next observation" disabled>→</button></div></div>
       <label class="telescope-live-follow"><input type="checkbox" id="telescope-live-follow"> Follow updates</label>
       <div class="telescope-live-view-controls"><button id="telescope-live-target-button" class="button" disabled>Center target</button><button id="telescope-live-all" class="button">All sky</button><button id="telescope-live-fullscreen" class="button">Full screen</button></div>
     </div>
@@ -69,7 +81,8 @@ function initTelescopeLive(){
       <div id="telescope-live-coordinates"></div>
     </div>
     <footer class="telescope-live-footer"><span id="telescope-live-credit"></span><p id="telescope-live-note">Drag to pan · scroll to zoom</p></footer>`;
-  $('main').append(page);$('#telescope-live-explorer').onclick=()=>showPage('explore');
+  $('main').append(page);$('#telescope-live-explorer').onclick=()=>{try{telescopeLiveOpenExplorer();}catch(e){failure(e);}};
+  $('#telescope-live-open-explorer').onclick=$('#telescope-live-explorer').onclick;
   const pixelPanel=document.createElement('aside');pixelPanel.id='telescope-live-pixel-panel';pixelPanel.setAttribute('aria-label','Pixel mapping controls');$('#telescope-live-stage').append(pixelPanel);
   const pixelButton=document.createElement('button');pixelButton.id='telescope-live-pixels';pixelButton.className='button';pixelButton.textContent='Pixel mapping';pixelButton.setAttribute('aria-expanded','true');pixelButton.setAttribute('aria-controls','telescope-live-pixel-panel');$('#telescope-live-fullscreen').before(pixelButton);pixelButton.onclick=()=>telescopeLive.mapping?.setOpen(telescopeLive.mapping.host.hidden);
   $('#telescope-live-date').value=new Date().toISOString().slice(0,16);$('#telescope-live-previous').onclick=()=>telescopeLiveStep('previous');$('#telescope-live-next').onclick=()=>telescopeLiveStep('next');$('#telescope-live-date-form').onsubmit=e=>{e.preventDefault();telescopeLiveStopFollowing();busy($('#telescope-live-date-go'),'Loading schedule…',()=>telescopeLiveLoad(telescopeLive.mission,null,{at:$('#telescope-live-date').value+':00Z'}));};

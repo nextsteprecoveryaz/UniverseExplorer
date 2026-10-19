@@ -1,5 +1,6 @@
 # Local environments and test caches
 .venv/
+.venv-gpu/
 venv/
 __pycache__/
 *.py[cod]

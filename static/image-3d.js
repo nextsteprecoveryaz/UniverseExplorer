@@ -5,7 +5,7 @@ import {GLTFLoader} from '/vendor/three/GLTFLoader.js';
 const TERMINAL = new Set(['complete', 'failed', 'cancelled']);
 const MAX_POLLS = 360;
 const imageKey = image => /^[a-f0-9]{32}$/.test(image?.id || '') ? image.id : null;
-const enhancedSource = image => image?.cloud_ai || image?.ai || null;
+const enhancedSource = image => [image?.cloud_ai,...(image?.local_history||[]).slice(-1)].filter(Boolean).sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''))[0] || image?.ai || null;
 const sourceLabel = asset => {
   const variant = asset.source?.variant || '';
   return variant === 'original' || variant.startsWith('fits-display-') ? 'Original source' : variant ? 'Enhanced source' : 'Source image';
