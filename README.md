@@ -153,6 +153,10 @@ Open **Compare lenses** to see two independently rendered survey layers at the s
 
 All telescope and wavelength lenses, including the SDSS color and g/r/i layers, are available on either side. Each has a source description and loading status. The canvases have opaque backgrounds so absent coverage cannot masquerade as the other telescope's image. Angular alignment does not equal matched resolution, observing epoch, intensity calibration or gas abundance. The interface preserves these distinctions.
 
+## DESI Legacy Surveys DR11
+
+For deep, wide-area galaxy exploration, choose **DESI Legacy Surveys · DR11 color** in **Telescope views**. This continuous CDS HiPS map combines DR11 southern imaging (g/r/i/z) with DR9 northern imaging (g/r/z), covering approximately 76% of the sky. It uses the existing local tile cache, pan/zoom controls and comparison tools; no science cutouts are loaded. Coverage and observation dates vary by field. [DR11 data description](https://www.legacysurvey.org/dr11/description/), [CDS map provenance](https://alasky.cds.unistra.fr/DESI-legacy-surveys/DR11/CDS_P_DESI-Legacy-Surveys_DR11_color/properties).
+
 ## SDSS galaxies and MaNGA spectral maps
 
 Open **SDSS galaxies** for a 2048 × 2048 optical color image from the SkyServer DR20 service. Use a showcase, enter ICRS coordinates, or copy the current map position. Brightness, contrast and saturation controls create a display edit; **Save styled PNG** labels the exported pixels. Download the untouched JPEG or send it to **Image Lab** for the existing local and optional cloud enhancement workflows. The source URL, retrieval date and original SHA-256 are retained. The native SDSS camera sampling is about 0.396 arcseconds per pixel; larger output sizes do not add resolved detail. Very dark fields may be outside survey coverage.
