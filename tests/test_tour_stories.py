@@ -167,3 +167,102 @@ def test_citation_repair_never_changes_the_spoken_story():
     saved=stories.response_story(output(story),{}, {})
     assert saved['narration']=='\n\n'.join(TEXTS) and saved['story']==STORY
     assert saved['citation_repairs']==[{'original':mistyped,'retrieved_url':URL}]
+
+
+@pytest.mark.parametrize('suffix',[f' {URL}',f' {URL} {URL}',f' [NASA]({URL})',f' ({URL})',f' {URL}.'])
+def test_verified_trailing_citations_stay_clickable_but_out_of_speech(suffix):
+    story=deepcopy(STORY)
+    for p in story['paragraphs']:p['text']+=suffix
+    response=output(story);original=deepcopy(response)
+    saved=stories.response_story(response,{}, {})
+    assert saved['narration']=='\n\n'.join(TEXTS) and saved['story']==STORY
+    assert saved['sources'][0]['url']==URL and len(saved['text_repairs'])==3
+    assert response==original  # Keep the original paid response intact.
+
+
+@pytest.mark.parametrize('suffix',[
+    ' https://science.nasa.gov/invented-source',
+    ' See '+URL,
+    ' JWST Cycle 1 Outreach Campaign. '+URL,
+    ' https://science.nasa.gov/another-retrieved-page',
+    f' [This claim is uncertain]({URL})',
+])
+def test_cleanup_cannot_hide_unsupported_links_metadata_or_rewrite_prose(suffix):
+    story=deepcopy(STORY);story['paragraphs'][0]['text']+=suffix
+    response=output(story)
+    response['output'][0]['action']['sources'].append({'url':'https://science.nasa.gov/another-retrieved-page','title':'Different paragraph'})
+    with pytest.raises(stories.ResearchValidationError):stories.response_story(response,{}, {})
+
+
+def test_nasa_webb_host_repair_requires_exact_retrieved_article_path():
+    actual='https://www.nasa.gov/missions/webb/example-news/'
+    mistaken=actual.replace('www.nasa.gov','science.nasa.gov')
+    assert stories.match_citation(mistaken,{actual:'NASA'})==actual
+    for url in (mistaken+'different',mistaken+'?id=other',mistaken.replace('/missions/webb/','/missions/hubble/'),mistaken.replace('science.nasa.gov','assets.science.nasa.gov')):
+        with pytest.raises(ValueError):stories.match_citation(url,{actual:'NASA'})
+    with pytest.raises(ValueError):stories.match_citation(mistaken,{})
+
+
+def test_corrected_sources_and_citation_suffix_recover_without_paid_retry(isolated,monkeypatch):
+    context=stories.context_for(stories.expeditions.Stop(**STOP));key=stories.cache_key(context)
+    actual='https://www.nasa.gov/missions/webb/example-news/'
+    mistaken=actual.replace('www.nasa.gov','science.nasa.gov')
+    story=deepcopy(STORY)
+    for p in story['paragraphs']:p.update(text=p['text']+' '+mistaken,source_urls=[mistaken])
+    response=output(story);response['output'][0]['action']['sources']=[{'url':actual,'title':'NASA'}]
+    raw={'context':context,'catalog_context':{},'response':response}
+    stories.atomic_json(stories.ROOT/(key+'.response.json'),raw)
+    stories.atomic_json(stories.ROOT/(key+'.attempt.json'),{'context':context})
+    monkeypatch.setattr(stories.cloud_ai,'get_key',lambda:pytest.fail('Recovery must not read credentials'))
+    with TestClient(isolated) as c:
+        r=c.post('/api/navigation/stories',json={'stop':STOP,'retry':True})
+        assert r.status_code==200,r.text
+        assert r.json()['cached'] and r.json()['narration']=='\n\n'.join(TEXTS)
+        assert r.json()['sources']==[{'url':actual,'title':'NASA'}]
+    assert json.loads((stories.ROOT/(key+'.response.json')).read_text())==raw
+
+
+@pytest.mark.parametrize(('change','code','message'),[
+    ('limit','output_limit','response limit'),
+    ('format','story_format','unusable story format'),
+    ('citation','citation_mismatch','did not match'),
+    ('refusal','refusal','declined'),
+    ('sources','missing_sources','source links'),
+])
+def test_failure_reasons_are_specific_persisted_and_preserved_on_retry(isolated,monkeypatch,change,code,message):
+    response=output()
+    if change=='limit':response.update(status='incomplete',incomplete_details={'reason':'max_output_tokens'})
+    if change=='format':response['output'][1]['content'][0]['text']='private-test-key invalid JSON'
+    if change=='citation':
+        story=deepcopy(STORY);story['paragraphs'][0]['source_urls']=['https://science.nasa.gov/invented']
+        response=output(story)
+    if change=='refusal':response['output'][1]['content']=[{'type':'refusal','refusal':'private-test-key'}]
+    if change=='sources':response['output'][0]['action']['sources']=[]
+    mock(monkeypatch,lambda r:httpx.Response(200,json=response))
+    with TestClient(isolated) as c:
+        first=c.post('/api/navigation/stories',json={'stop':STOP})
+        assert first.status_code==502 and message in first.text and 'private-test-key' not in first.text
+        key=stories.cache_key(stories.context_for(stories.expeditions.Stop(**STOP)))
+        attempt=json.loads((stories.ROOT/(key+'.attempt.json')).read_text())
+        assert attempt['failure_code']==code
+        original=(stories.ROOT/(key+'.response.json')).read_bytes()
+        again=c.post('/api/navigation/stories',json={'stop':STOP})
+        assert again.status_code==409 and message in again.text
+        mock(monkeypatch,lambda r:httpx.Response(200,json=output()))
+        recovered=c.post('/api/navigation/stories',json={'stop':STOP,'retry':True})
+        assert recovered.status_code==200,recovered.text
+    history=list((stories.ROOT/'response-history'/key).glob('*.json'))
+    assert len(history)==2
+    assert any(p.read_bytes()==original for p in history)
+    assert any(json.loads(p.read_text()).get('failure_code')==code for p in history)
+
+
+def test_unreadable_archive_prevents_new_paid_request(isolated,monkeypatch):
+    context=stories.context_for(stories.expeditions.Stop(**STOP));key=stories.cache_key(context)
+    bad=output();bad['status']='incomplete'
+    stories.atomic_json(stories.ROOT/(key+'.response.json'),{'context':context,'catalog_context':{},'response':bad})
+    def fail(key):raise OSError('disk full')
+    monkeypatch.setattr(stories,'archive_response',fail)
+    with TestClient(isolated) as c:
+        r=c.post('/api/navigation/stories',json={'stop':STOP,'retry':True})
+        assert r.status_code==500 and 'disk space' in r.text

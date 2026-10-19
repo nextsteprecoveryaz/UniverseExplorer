@@ -75,6 +75,8 @@ In **Explore the sky**, click an object marker or object-list entry, then **Rese
 
 Research is saved immediately in `data/object-research/`, whether or not you create narration, save a notebook entry, or make a tour. Returning to the same catalog object reloads it without an API call. Closing the card while research finishes does not cancel the saved result. The folder has no automatic expiry; include the app's data folder in your backups.
 
+A research error does not necessarily mean the object has no published information. The card now distinguishes incomplete responses, unusable formatting, and citations that do not match retrieved sources. When OpenAI appends verified source links to otherwise complete paragraphs, the app separates those links from the speech without rewriting the prose. Reopening an unfinished card first tries to recover its saved response locally, without a new OpenAI or ElevenLabs request. Successful stories and their recordings remain unchanged. An explicit paid retry preserves the earlier response and diagnostics in `data/tour-stories/response-history/`.
+
 **Create narration** separately sends the exact saved paragraphs to ElevenLabs. Citations stay clickable in the card and are excluded from speech. The selected ElevenLabs voice is retained with the story (default `BNgbHR0DNeZixGQVzloa`). **Listen to narration** plays the saved MP3 locally, without another generation charge. **Add to tour** lets you create a tour or append to an existing waypoint tour before or after creating audio. Tours retain a portable copy of the story, sources, and voice, and reuse the same cached recording. Research never automatically starts narration.
 
 ## Glide through telescope imagery

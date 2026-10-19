@@ -1,5 +1,6 @@
 """Object biography lifecycle and billing boundaries, with all provider traffic mocked."""
 import asyncio
+from copy import deepcopy
 import json
 
 from fastapi import FastAPI
@@ -8,7 +9,7 @@ import httpx
 import pytest
 
 import object_research as objects
-from test_tour_stories import STORY, output
+from test_tour_stories import STORY, TEXTS, URL, output
 from test_elevenlabs_narration import MP3
 
 TARGET={'id':'simbad:M  16','name':'M 16','catalog':'SIMBAD','type':'Nebula',
@@ -158,3 +159,42 @@ def test_invalid_identity_and_damaged_research_cannot_trigger_generation(isolate
         objects.path_for(ident).write_text('{broken',encoding='utf-8')
         assert c.post('/api/object-research/research',json={'target':TARGET}).status_code==409
         assert c.post('/api/object-research/'+('a'*64)+'/narration').status_code==409
+
+
+@pytest.mark.parametrize('endpoint',['lookup','get'])
+def test_reopening_failed_object_recovers_verified_prose_without_billing(isolated,monkeypatch,endpoint):
+    calls=[];story=deepcopy(STORY)
+    for p in story['paragraphs']:p['text']+=' '+URL
+    response=output(story)
+    def research(request):calls.append(request);return httpx.Response(200,json=response)
+    monkeypatch.setattr(objects.tour_stories,'make_client',lambda:httpx.AsyncClient(transport=httpx.MockTransport(research)))
+    cleaner=objects.tour_stories.clean_citation_suffix
+    monkeypatch.setattr(objects.tour_stories,'clean_citation_suffix',lambda text,*args:(text,[]))
+    with TestClient(isolated) as c:
+        failed=c.post('/api/object-research/research',json={'target':TARGET})
+        assert failed.status_code==502
+        ident=objects.object_id(objects.Target(**TARGET))
+        assert objects.read(ident)['research'] is None
+        monkeypatch.setattr(objects.tour_stories,'clean_citation_suffix',cleaner)
+        monkeypatch.setattr(objects.tour_stories.cloud_ai,'get_key',lambda:pytest.fail('Local recovery needs no credentials'))
+        r=c.post('/api/object-research/lookup',json={'target':TARGET}) if endpoint=='lookup' else c.get('/api/object-research/'+ident)
+        assert r.status_code==200,r.text
+        saved=r.json()
+        assert saved['status']=='ready' and saved['audio'] is None and saved['error'] is None
+        assert saved['research']['narration']=='\n\n'.join(TEXTS) and saved['research']['cached']
+        assert objects.read(ident)['research']==saved['research']
+        assert c.get('/api/object-research/'+ident).json()['research']==saved['research']
+    assert len(calls)==1
+
+
+def test_ready_object_and_audio_identity_are_never_rewritten_by_recovery(isolated,monkeypatch):
+    providers(monkeypatch)
+    with TestClient(isolated) as c:
+        saved=research(c)
+        base='/api/object-research/'+saved['id']
+        audio=c.post(base+'/narration').json()
+        original=objects.path_for(saved['id']).read_bytes()
+        monkeypatch.setattr(objects.tour_stories,'recover_cache',lambda context:pytest.fail('Ready research must not be changed'))
+        again=c.post('/api/object-research/lookup',json={'target':TARGET}).json()
+        assert again['research']==saved['research'] and again['audio']['url']==audio['url']
+        assert objects.path_for(saved['id']).read_bytes()==original

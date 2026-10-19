@@ -93,9 +93,26 @@ def document(saved,ident):
 
 
 @router.post('/lookup')
-def lookup(body:Lookup):
+async def lookup(body:Lookup):
     ident=object_id(body.target)
-    return document(read(ident),ident)
+    return document(recover_saved(read(ident)),ident)
+
+
+def recover_saved(saved):
+    # Reopening a failed card can recover paid-for output after a parser fix.
+    # This never requests new research or audio and never changes a ready story.
+    if not saved or saved.get('research') or saved['id'] in _inflight:return saved
+    try:research=tour_stories.recover_cache(saved['context'])
+    except tour_stories.ResearchValidationError as error:
+        message=tour_stories.validation_message(error).replace('Replay narration','Retry research')
+        if saved.get('error')!=message:
+            saved={**saved,'error':message};write(saved)
+        return saved
+    except OSError:raise HTTPException(500,'Could not recover saved research on this PC. Check available disk space.') from None
+    if research:
+        saved={**saved,'research':research,'error':None,'updated_at':now()}
+        write(saved)
+    return saved
 
 
 async def generate(saved,retry):
@@ -140,8 +157,8 @@ async def tour_clip(guide:expeditions.ObjectGuide):
 
 
 @router.get('/{ident}')
-def get_research(ident:str):
-    saved=read(ident)
+async def get_research(ident:str):
+    saved=recover_saved(read(ident))
     if not saved:raise HTTPException(404,'Object research not found.')
     return document(saved,ident)
 
