@@ -6,11 +6,13 @@ const vm=require('node:vm');
 
 function harness(){
   const nodes=new Map(),layers=[],removed=[],surveys=[],listeners=new Map(),events=new Map();
+  let created=0;
   const element=id=>{
     if(!nodes.has(id)){
       const classes=new Set();
       nodes.set(id,{id:id.replace(/^#/,''),value:'1',hidden:false,disabled:false,open:false,checked:false,textContent:'',innerHTML:'',dataset:{},style:{},
         classList:{add(...values){values.forEach(v=>classes.add(v));},remove(...values){values.forEach(v=>classes.delete(v));},toggle(v,on){if(on??!classes.has(v))classes.add(v);else classes.delete(v);},contains:v=>classes.has(v)},
+        children:[],append(child){this.children.push(child);},replaceChildren(...children){this.children=children;},
         setAttribute(){},removeAttribute(name){delete this[name];},addEventListener(){}});
     }
     return nodes.get(id);
@@ -27,7 +29,7 @@ function harness(){
   };
   let frame=0;
   const context=vm.createContext({console,structuredClone,URLSearchParams,AbortSignal,Event,
-    document:{hidden:false,querySelector:element,querySelectorAll(selector){
+    document:{hidden:false,querySelector:element,createElement:()=>element('created-'+(++created)),querySelectorAll(selector){
       if(selector==='[data-tour-sky]')return selectors;
       if(selector==='#survey-select option')return options;
       if(selector==='#lens-chips button')return chips;
@@ -80,6 +82,26 @@ test('the ordinary survey controls retain SDSS bands and do not change the tour 
     assert.equal(h.run('tourSurveyActive()'),false);
   }
   assert.equal(h.run("setTourSkySurvey('sdss-color')"),false);
+});
+
+test('sparse survey field buttons retain their imagery, leave tours, and do not call research or narration APIs',async()=>{
+  const h=harness(),requests=[];
+  await h.start();
+  h.context.fetch=async url=>{requests.push(url);throw Error('Field navigation must not call an API');};
+  h.run(`state.config.surveys.push({id:'rubin-first-look',name:'Rubin First Look',description:'Published fields',tag:'2025',explore_fields:[
+    {name:'Lagoon & Trifid',ra:271.602278,dec:-23.8782252,fov:6},
+    {name:'Virgo',ra:186.3,dec:6.9,fov:3.4}
+  ]});chooseSurvey('rubin-first-look');`);
+  assert.equal(h.element('#survey-fields').hidden,false);
+  assert.equal(h.element('#survey-field-buttons').children.length,2);
+  h.element('#survey-field-buttons').children[1].onclick();
+  assert.equal(h.run('state.survey'),'rubin-first-look');
+  assert.deepEqual(h.sky.getRaDec(),[186.3,6.9]);assert.equal(h.sky.fov,3.4);
+  assert.equal(h.run('tourSurveyActive()'),false);
+  assert.deepEqual(requests,[]);
+  h.run("chooseSurvey('sdss-color')");
+  assert.equal(h.element('#survey-fields').hidden,true);
+  assert.equal(h.element('#survey-field-buttons').children.length,0);
 });
 
 test('survey changes cancel the previous narrated visit and refresh the matching destination shelf',()=>{

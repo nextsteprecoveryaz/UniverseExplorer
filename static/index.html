@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="Explore released Webb and Hubble imagery, switch real wavelength maps, and investigate with a local image and discovery lab.">
   <title>Universe Explorer — Your personal observatory</title>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=survey-fields-1">
   <link rel="stylesheet" href="/notebook.css?v=1">
   <link rel="stylesheet" href="/object-research.css?v=1">
   <link rel="stylesheet" href="/object-videos.css?v=1">
@@ -55,7 +55,7 @@
   <script src="/telescope-live.js?v=9" defer></script>
   <script src="/local-gpu.js?v=1" defer></script>
   <script src="/notebook.js?v=elevenlabs-1" defer></script>
-  <script src="/app.js?v=sdss-destinations-1" defer></script>
+  <script src="/app.js?v=rubin-1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -90,6 +90,7 @@
         <button data-survey="hydrogen">Hα</button><button data-survey="h2">H₂</button>
       </div>
       <p id="survey-description" class="muted small">Loading wavelength maps…</p>
+      <section id="survey-fields" class="survey-fields" aria-label="Available survey fields" hidden><p class="field-label">Explore observed fields</p><div id="survey-field-buttons"></div></section>
       <label class="field-label" for="sky-stretch">Display stretch</label>
       <select id="sky-stretch"><option value="native">Linear · original stretch</option><option value="asinh">Asinh · lift faint structure</option><option value="log">Log · reveal faint structure</option><option value="sqrt">Square root</option><option value="pow2">Squared</option></select>
       <p class="small subtle">Blank sky in a telescope layer usually means no coverage. Switch to Visible for context.</p>

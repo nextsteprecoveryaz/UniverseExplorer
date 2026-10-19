@@ -76,6 +76,18 @@ function coordinates(){
 }
 const HIDDEN_MAP_SURVEYS=new Set(['webb-color','hubble-color','oxygen','sulfur']);
 function skyMapSurveys(){return state.config.surveys.filter(s=>!HIDDEN_MAP_SURVEYS.has(s.id));}
+function renderSurveyFields(survey){
+  const root=$('#survey-fields'),buttons=$('#survey-field-buttons');
+  if(!root||!buttons)return;
+  const fields=survey.explore_fields||[];
+  buttons.replaceChildren();root.hidden=!fields.length;
+  for(const field of fields){
+    const button=document.createElement('button');
+    button.type='button';button.className='button';button.textContent=field.name;
+    button.onclick=()=>flyTo({...field,survey:survey.id});
+    buttons.append(button);
+  }
+}
 function chooseSurvey(id){
   // Keep older destinations and notebook entries usable without restoring hidden lenses.
   if(HIDDEN_MAP_SURVEYS.has(id))id='optical';
@@ -84,6 +96,7 @@ function chooseSurvey(id){
   if(typeof cancelDestinationVisit==='function'&&destinationVisit.active&&id!==state.survey)cancelDestinationVisit();
   if(!routePlayer.writing)leaveTourView('Paused · exploring another survey');
   state.survey=id;$('#survey-select').value=id;$('#survey-description').textContent=survey.description;
+  renderSurveyFields(survey);
   if(typeof renderDestinationShortcuts==='function')renderDestinationShortcuts();
   $$('#lens-chips button').forEach(b=>b.classList.toggle('selected',b.dataset.survey===id));
   $('#sky-stretch').value='native';

@@ -157,6 +157,12 @@ All telescope and wavelength lenses, including the SDSS color and g/r/i layers, 
 
 For deep, wide-area galaxy exploration, choose **DESI Legacy Surveys · DR11 color** in **Telescope views**. This continuous CDS HiPS map combines DR11 southern imaging (g/r/i/z) with DR9 northern imaging (g/r/z), covering approximately 76% of the sky. It uses the existing local tile cache, pan/zoom controls and comparison tools; no science cutouts are loaded. Coverage and observation dates vary by field. [DR11 data description](https://www.legacysurvey.org/dr11/description/), [CDS map provenance](https://alasky.cds.unistra.fr/DESI-legacy-surveys/DR11/CDS_P_DESI-Legacy-Surveys_DR11_color/properties).
 
+## Rubin Observatory
+
+Choose **Rubin Observatory · First Look** in **Telescope views**, then use **Explore observed fields** beneath the survey description to visit **Lagoon & Trifid nebulae** or **Virgo · Cosmic Treasure Chest**. These are the public color mosaics released on June 23, 2025, served as zoomable HiPS tiles by CDS. The layer has imagery only in these two fields; it does not replace missing coverage with another survey. Tiles use the existing local cache, and no science cutouts, research generation or narration charges are triggered by the field buttons.
+
+This public First Look layer is separate from the later DP2 science data and Rubin's live alerts. DP2 HiPS access through the Rubin Science Platform requires an access token with `read:image`; it is not included in this connection. [Rubin releases](https://rubinobservatory.org/for-scientists/data-products/recent-data-releases), [Rubin API access](https://data.lsst.cloud/api-aspect), [CDS First Look provenance](https://alasky.cds.unistra.fr/Rubin/CDS_P_Rubin_FirstLook/properties).
+
 ## SDSS galaxies and MaNGA spectral maps
 
 Open **SDSS galaxies** for a 2048 × 2048 optical color image from the SkyServer DR20 service. Use a showcase, enter ICRS coordinates, or copy the current map position. Brightness, contrast and saturation controls create a display edit; **Save styled PNG** labels the exported pixels. Download the untouched JPEG or send it to **Image Lab** for the existing local and optional cloud enhancement workflows. The source URL, retrieval date and original SHA-256 are retained. The native SDSS camera sampling is about 0.396 arcseconds per pixel; larger output sizes do not add resolved detail. Very dark fields may be outside survey coverage.

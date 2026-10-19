@@ -114,3 +114,4 @@
 .sed-table td,.sed-table th{padding:12px;border-bottom:1px solid #21313c}.sed-table td small{display:block;color:#8197a6;margin-top:5px}
 .sed-table tr{cursor:pointer}.sed-table tr.selected{background:#294452}.sed-table tbody tr:hover{background:#182d3b}
 #sed-target{min-width:270px}#sed-radius{width:140px}
+.survey-fields{margin:0 0 18px}.survey-fields>div{display:grid;gap:7px}.survey-fields .button{white-space:normal;text-align:left;justify-content:flex-start;font-size:11px;padding:8px 10px}
