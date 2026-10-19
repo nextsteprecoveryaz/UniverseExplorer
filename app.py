@@ -91,7 +91,7 @@ SURVEYS.extend([
 ])
 atlas.SURVEYS={s['id']:s for s in SURVEYS}
 expeditions.SURVEYS.update(atlas.SURVEYS)
-from destination_catalog import DESTINATIONS
+from destination_catalog import DESTINATIONS,SDSS_DESTINATIONS
 
 def db():
     return discovery_notebook.connect()
@@ -227,7 +227,7 @@ def health():
 
 @app.get('/api/config')
 def config():
-    return {'surveys':SURVEYS,'destinations':DESTINATIONS,'requested_observation':remote.REQUESTED_OBS,'sources':[
+    return {'surveys':SURVEYS,'destinations':DESTINATIONS,'sdss_destinations':SDSS_DESTINATIONS,'requested_observation':remote.REQUESTED_OBS,'sources':[
       {'name':'NASA Space Telescope Live','url':'https://spacetelescopelive.org'},
       {'name':'MAST public archive','url':'https://mast.stsci.edu/portal/Mashup/Clients/Mast/Portal.html'},
       {'name':'CDS Aladin / HiPS','url':'https://aladin.cds.unistra.fr/AladinLite/'},

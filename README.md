@@ -51,7 +51,7 @@ Image Lab has **Red, Yellow, Green and Blue** intensity sliders for either the o
 5. **Open this view in image lab** captures the current sky visualization. **Local GPU** offers full-resolution Real-ESRNet and Real-ESRGAN enhancement. The legacy CPU model and optional cloud providers remain available. Comparisons and exported PNGs are labeled. Open your own FITS, PNG, JPEG, TIFF, or WebP files as well.
 6. Save fields and images to the **Discovery notebook**. Recent images and their AI outputs remain in the image lab after reopening the app. Export notes and analyses as JSON.
 
-## Fifty narrated DSS2 destinations
+## Narrated DSS2 and SDSS destinations
 
 The **Optional Destination Shortcuts** strip includes 100 catalog-verified locations: nebulae, stellar remnants, open and globular clusters, nearby and interacting galaxies, bright-star fields, and the TRAPPIST-1 host-star field. The original six favorites remain represented. Every shortcut opens **Visible sky · DSS2** with a field width chosen for its target. Coordinates and canonical identifiers come from SIMBAD; the bundled catalog records its verification date and source links. Some nebula fields are anchored on their associated star cluster. Small details and exoplanets are not resolved by this survey.
 
@@ -60,6 +60,10 @@ Scroll sideways using the mouse wheel, trackpad, scrollbar, or previous/next arr
 With **Narrate visits** enabled (the default), a click flies to the destination, asks OpenAI for a source-backed story, saves it, then creates and plays ElevenLabs narration using the exact saved text. Generation happens on the first visit, not for all 100 at startup; new research and voice requests use the connected API accounts. Return visits load the saved story and MP3 locally. The same story remains available in the object card and can be added to a tour. Switching destinations or taking over the map prevents the old request from starting narration; completed research and audio remain saved. A browser that blocks autoplay offers **Listen to narration**. Unfinished provider requests require explicit retry in the card rather than automatic repeat billing.
 
 Turn **Narrate visits** off to browse positions and existing research without automatic research or narration. This preference is saved in this browser.
+
+Select **SDSS · galaxy color** in the sky survey menu to switch the same scrollable shortcut strip to **26 galaxy destinations**. Examples include Whirlpool, Pinwheel, Sombrero, the Leo Triplet, and Andromeda's central region. Clicking a shortcut stays in the SDSS DR9 g/r/i color map. Return to **Visible sky · DSS2** for the original 100 destinations. Search, scrolling, the object story card, videos, and **Narrate visits** work in both views.
+
+SDSS shortcuts use exactly the same catalog identities as DSS2. An existing object biography and ElevenLabs MP3 are reused without another generation charge; a new story and recording are saved once in the shared object library. Switching surveys during a visit prevents its unfinished research from starting speech afterward. The 26 fields were checked against the [CDS SDSS DR9 footprint](https://alasky.cds.unistra.fr/SDSS/DR9/color/Moc.fits) at their centers and 25 field samples, with decoded map tiles confirming image availability. Coverage evidence and framing are in `resources/sdss-destinations.json`; these checks do not guarantee every pixel of a wider viewport. No science cutout overlays are loaded.
 
 For an uncluttered view while listening, turn **Object map** off. This hides all object markers and labels while keeping the selected story card, pending research, and narration active. Turning it back on also preserves the card and playback position. Destination shortcuts respect this saved overlay preference. To hide only text labels and keep the dots, uncheck **Labels** instead.
 

@@ -1,7 +1,7 @@
 import math
 from fastapi.testclient import TestClient
 from app import app
-from destination_catalog import CATALOG,DESTINATIONS
+from destination_catalog import CATALOG,DESTINATIONS,SDSS_CATALOG,SDSS_DESTINATIONS
 from object_research import Target,object_id
 
 
@@ -37,3 +37,32 @@ def test_app_serves_catalog_without_generating_research_or_audio():
     config=response.json();assert config['destinations']==DESTINATIONS
     optical=next(s for s in config['surveys'] if s['id']=='optical')
     assert optical['url']=='https://alasky.cds.unistra.fr/DSS/DSSColor' and 'DSS2' in optical['name']
+    assert config['sdss_destinations']==SDSS_DESTINATIONS
+
+
+def test_sdss_destinations_preserve_complete_dss2_research_and_video_identity():
+    original={d['id']:d for d in DESTINATIONS}
+    assert len(SDSS_DESTINATIONS)==len({d['id'] for d in SDSS_DESTINATIONS})==26
+    for d in SDSS_DESTINATIONS:
+        a=original[d['id']]
+        def target(o):return Target(id=o['object_id'],name=o['research_name'],catalog=o['catalog'],ra=o['ra'],dec=o['dec'],type=o['type'],source_url=o['source_url'])
+        assert target(d)==target(a) and object_id(target(d))==object_id(target(a))
+        assert d['videos']==a['videos'] and len(d['videos'])>=2
+        assert d['survey']=='sdss-color' and a['survey']=='optical'
+        assert d['category']=='Galaxies' and 'SDSS DR9' in d['description']
+
+
+def test_sdss_framing_matches_verified_footprint_and_tile_evidence():
+    checks={d['id']:d for d in SDSS_CATALOG['destinations']}
+    assert SDSS_CATALOG['footprint_url']=='https://alasky.cds.unistra.fr/SDSS/DR9/color/Moc.fits'
+    for d in SDSS_DESTINATIONS:
+        check=checks[d['id']]
+        assert (d['ra'],d['dec'],d['fov'])==(check['ra'],check['dec'],check['fov'])
+        assert check['center_covered'] and check['covered_samples']==check['sample_count']==25
+        assert check['dark_fraction']<.98 and len(check['tile_sha256'])==64
+        assert check['tile'].startswith('Norder8/')
+    ids=set(checks)
+    assert {'whirlpool','andromeda','quintet','sombrero','m65','m66'}<=ids
+    assert not {'sculptor','centaurus-a','ngc4945','ngc891','antennae','southern-pinwheel','great-barred-spiral','ngc1300'}&ids
+    andromeda=next(d for d in SDSS_DESTINATIONS if d['id']=='andromeda')
+    assert andromeda['view_label']=='Central region' and andromeda['fov']==1.5

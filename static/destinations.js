@@ -1,11 +1,15 @@
 'use strict';
-const destinationVisit={serial:0,timer:null,resolveArrival:null,active:false};
+const destinationVisit={serial:0,timer:null,resolveArrival:null,active:false,survey:null};
+let destinationShelfSurvey=null;
+function destinationSurvey(){return state.survey==='sdss-color'?'sdss-color':'optical';}
+function destinationCatalog(){return destinationSurvey()==='sdss-color'?(state.config.sdss_destinations||[]):state.config.destinations;}
+function destinationSurveyName(survey=destinationSurvey()){return survey==='sdss-color'?'SDSS galaxy color':'DSS2';}
 function cancelDestinationVisit(){
   if(destinationVisit.active){$('#object-research-audio')?.pause();destinationStatus('Visit paused · select a shortcut to start its saved story.');}
   destinationVisit.serial++;destinationVisit.active=false;clearTimeout(destinationVisit.timer);
   if(destinationVisit.resolveArrival){destinationVisit.resolveArrival(false);destinationVisit.resolveArrival=null;}
 }
-function shortcutCurrent(serial,o){return serial===destinationVisit.serial&&mapUI.selected===o&&state.page==='explore'&&state.survey==='optical';}
+function shortcutCurrent(serial,o){return serial===destinationVisit.serial&&mapUI.selected===o&&state.page==='explore'&&state.survey===destinationVisit.survey;}
 function destinationStatus(text){const node=$('#destination-status');if(node)node.textContent=text;}
 function shortcutObject(d){return {...d,id:d.object_id,name:d.name,summary:d.description,featured:false};}
 function shortcutMatches(d,query,category){
@@ -32,15 +36,16 @@ function waitForDestination(d,serial,o){
 async function visitDestinationShortcut(d){
   cancelDestinationVisit();
   if(!state.sky){toast('Connect to the sky map before visiting a destination.',true);return;}
-  flyTo({...d,survey:'optical'});
+  const survey=d.survey==='sdss-color'?'sdss-color':'optical',surveyName=destinationSurveyName(survey);
+  flyTo({...d,survey});
   setMapPanel('objects',false);setMapPanel('destinations',false);
   const o=shortcutObject(d),loaded=showObjectDetail(o),serial=++destinationVisit.serial;
-  destinationVisit.active=true;
-  destinationStatus('Travelling to '+d.name+' in DSS2…');
+  destinationVisit.active=true;destinationVisit.survey=survey;
+  destinationStatus('Travelling to '+d.name+' in '+surveyName+'…');
   const arrival=waitForDestination(d,serial,o);
   await loaded;
   if(!await arrival||!shortcutCurrent(serial,o)){if(shortcutCurrent(serial,o))destinationStatus('Travel was interrupted. Select the destination again to start its story.');return;}
-  if(!$('#destination-auto-narrate').checked){destinationStatus(d.name+' · DSS2 · use the object card to research or listen.');return;}
+  if(!$('#destination-auto-narrate').checked){destinationStatus(d.name+' · '+surveyName+' · use the object card to research or listen.');return;}
   let record=objectResearchUI.record;
   if(!record){destinationStatus('Saved research could not be loaded. Use Reload saved research in the object card.');return;}
   const objectSerial=objectResearchUI.serial;
@@ -70,16 +75,23 @@ function updateDestinationScroll(){
   $('#destinations-next').disabled=strip.scrollLeft+strip.clientWidth>=strip.scrollWidth-2;
 }
 function renderDestinationShortcuts(){
+  const survey=destinationSurvey(),catalog=destinationCatalog(),categories=[...new Set(catalog.map(d=>d.category))];
+  const categoryNode=$('#destination-category'),previousCategory=categoryNode.value;
+  categoryNode.innerHTML='<option value="">All destinations</option>'+categories.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  categoryNode.value=categories.includes(previousCategory)?previousCategory:'';
+  if(destinationShelfSurvey!==survey){
+    if(destinationShelfSurvey!==null){$('#destination-search').value='';categoryNode.value='';}
+    destinationShelfSurvey=survey;
+    destinationStatus(survey==='sdss-color'?'Explore covered SDSS galaxy fields · existing DSS2 stories and recordings are reused.':'Scroll for 100 destinations · first visit creates a story and narration; saved visits replay locally.');
+  }
   const query=$('#destination-search').value,category=$('#destination-category').value;
-  const rows=state.config.destinations.map((d,i)=>({d,i})).filter(({d})=>shortcutMatches(d,query,category));
-  $('#destination-count').textContent=`${rows.length} of ${state.config.destinations.length} · DSS2`;
-  $('#destinations').innerHTML=rows.length?rows.map(({d,i})=>`<button class="destination-card ${state.destination?.id===d.id?'active':''}" data-name="${esc(d.name)}" data-destination="${i}" title="${esc(d.name+' · '+d.research_name)}"><span class="num">${String(i+1).padStart(2,'0')}</span><small>${esc(d.type)}</small><strong>${esc(d.name)}</strong><span class="destination-catalog">${esc(d.research_name)}</span></button>`).join(''):'<p class="small muted">No destinations match. Try a name, catalog number, or another category.</p>';
-  $$('[data-destination]').forEach(button=>button.onclick=()=>visitDestinationShortcut(state.config.destinations[Number(button.dataset.destination)]).catch(failure));
+  const rows=catalog.map((d,i)=>({d,i})).filter(({d})=>shortcutMatches(d,query,category));
+  $('#destination-count').textContent=`${rows.length} of ${catalog.length} · ${destinationSurveyName(survey)}`;
+  $('#destinations').innerHTML=rows.length?rows.map(({d,i})=>`<button class="destination-card ${state.destination?.id===d.id?'active':''}" data-name="${esc(d.name)}" data-destination="${i}" title="${esc(d.name+' · '+d.research_name)}"><span class="num">${String(i+1).padStart(2,'0')}</span><small>${esc(d.type)}</small><strong>${esc(d.name)}</strong><span class="destination-catalog">${esc(d.research_name+(d.view_label?' · '+d.view_label:''))}</span></button>`).join(''):'<p class="small muted">No destinations match. Try a name, catalog number, or another category.</p>';
+  $$('[data-destination]').forEach(button=>button.onclick=()=>visitDestinationShortcut(catalog[Number(button.dataset.destination)]).catch(failure));
   $('#destinations').scrollLeft=0;requestAnimationFrame(updateDestinationScroll);
 }
 function initDestinationShortcuts(){
-  const categories=[...new Set(state.config.destinations.map(d=>d.category))];
-  $('#destination-category').innerHTML='<option value="">All destinations</option>'+categories.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
   try{$('#destination-auto-narrate').checked=localStorage.getItem('universe-destination-narration')!=='false';}catch{}
   $('#destination-auto-narrate').onchange=()=>{cancelDestinationVisit();stopObjectVideo();try{localStorage.setItem('universe-destination-narration',String($('#destination-auto-narrate').checked));}catch{}destinationStatus($('#destination-auto-narrate').checked?'Select a destination to research, narrate and save its story.':'Automatic narration off · destination cards still open their saved research.');};
   $('#destination-search').oninput=renderDestinationShortcuts;$('#destination-category').onchange=renderDestinationShortcuts;

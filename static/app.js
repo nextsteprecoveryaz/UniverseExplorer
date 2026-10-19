@@ -77,13 +77,14 @@ function coordinates(){
 const HIDDEN_MAP_SURVEYS=new Set(['webb-color','hubble-color','oxygen','sulfur']);
 function skyMapSurveys(){return state.config.surveys.filter(s=>!HIDDEN_MAP_SURVEYS.has(s.id));}
 function chooseSurvey(id){
-  if(typeof cancelDestinationVisit==='function'&&destinationVisit.active&&id!=='optical')cancelDestinationVisit();
   // Keep older destinations and notebook entries usable without restoring hidden lenses.
   if(HIDDEN_MAP_SURVEYS.has(id))id='optical';
   const survey=state.config.surveys.find(s=>s.id===id);
   if(!survey)return;
+  if(typeof cancelDestinationVisit==='function'&&destinationVisit.active&&id!==state.survey)cancelDestinationVisit();
   if(!routePlayer.writing)leaveTourView('Paused · exploring another survey');
   state.survey=id;$('#survey-select').value=id;$('#survey-description').textContent=survey.description;
+  if(typeof renderDestinationShortcuts==='function')renderDestinationShortcuts();
   $$('#lens-chips button').forEach(b=>b.classList.toggle('selected',b.dataset.survey===id));
   $('#sky-stretch').value='native';
   $('#sky-credit').textContent=`${survey.name} · CDS Aladin / HiPS`;

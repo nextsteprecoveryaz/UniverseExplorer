@@ -1,6 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const read=file=>fs.readFileSync(path.join(__dirname,'../static',file),'utf8');
 const catalog=JSON.parse(fs.readFileSync(path.join(__dirname,'../resources/dss2-destinations.json'),'utf8')).destinations;
+const sdssCatalog=JSON.parse(fs.readFileSync(path.join(__dirname,'../resources/sdss-destinations.json'),'utf8')).destinations.map(d=>({...catalog.find(o=>o.id===d.id),survey:'sdss-color',fov:d.fov,view_label:d.view_label||''}));
 const settle=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 const record=(id='a'.repeat(64),audio=null)=>({id,status:'ready',research:{narration:'The approved astronomy story.',story:{identified:true,paragraphs:[]},sources:[],created_at:'2026-10-19'},audio});
 function harness(){
@@ -8,7 +9,7 @@ function harness(){
   const $=id=>{if(!nodes.has(id))nodes.set(id,{value:'',checked:true,innerHTML:'',textContent:'',hidden:false,disabled:false,ended:false,currentTime:0,scrollLeft:0,clientWidth:600,scrollWidth:11000,events:{},
     pause(){calls.push('pause');},play(){calls.push('play');return this.failPlay?Promise.reject(Error('gesture')):Promise.resolve();},addEventListener(e,f){this.events[e]=f;},scrollBy(v){this.scrollLeft+=v.left;}});return nodes.get(id);};
   const c=vm.createContext({$, $$:()=>[],console,document:{activeElement:null},window:{addEventListener(){}},
-    state:{sky:{},page:'explore',survey:'2mass',config:{destinations:catalog}},mapUI:{enabled:false,selected:null},
+    state:{sky:{},page:'explore',survey:'2mass',config:{destinations:catalog,sdss_destinations:sdssCatalog}},mapUI:{enabled:false,selected:null},
     esc:s=>String(s??''),date:()=>'',tourStoryMarkup:()=>'<p>Saved story</p>',storySourcesMarkup:()=>'',failure:e=>{throw e;},
     localStorage:{getItem:()=>null,setItem(){}},performance:{now:()=>clock},requestAnimationFrame:fn=>fn(),
     setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id),
@@ -22,7 +23,7 @@ function harness(){
   vm.runInContext(read('object-research.js'),c);vm.runInContext(read('destinations.js'),c);
   c.showObjectDetail=o=>{c.cancelDestinationVisit();c.mapUI.selected=o;return c.loadObjectResearch(o);};
   return {c,$,requests,calls,run:s=>vm.runInContext(s,c),visit:i=>c.visitDestinationShortcut(catalog[i]),
-    async arrive(i){field={...catalog[i]};clock+=3500;const pending=[...timers.values()];timers.clear();for(const fn of pending)fn();await settle();},
+    async arrive(i,library=catalog){field={...library[i]};clock+=3500;const pending=[...timers.values()];timers.clear();for(const fn of pending)fn();await settle();},
   };
 }
 
@@ -95,4 +96,56 @@ test('mouse-wheel scrolls the strip without zooming the sky and arrows reach lat
   h.$('#destinations').events.wheel({deltaY:140,deltaX:0,deltaMode:0,preventDefault(){prevented=true;},stopPropagation(){stopped=true;}});
   assert.equal(h.$('#destinations').scrollLeft,140);assert.ok(prevented&&stopped);
   h.$('#destinations-next').onclick();assert.ok(h.$('#destinations').scrollLeft>140);
+});
+
+test('SDSS shelf shows only covered galaxies and switching restores the DSS2 collection',()=>{
+  const h=harness();h.run('initDestinationShortcuts()');
+  h.$('#destination-search').value='Orion';h.$('#destination-category').value='Nebulae';
+  h.c.state.survey='sdss-color';h.run('renderDestinationShortcuts()');
+  assert.equal((h.$('#destinations').innerHTML.match(/data-destination=/g)||[]).length,26);
+  assert.equal(h.$('#destination-count').textContent,'26 of 26 · SDSS galaxy color');
+  assert.equal(h.$('#destination-search').value,'');assert.equal(h.$('#destination-category').value,'');
+  assert.match(h.$('#destinations').innerHTML,/Central region/);
+  assert.doesNotMatch(h.$('#destinations').innerHTML,/Sculptor Galaxy|Eagle Nebula/);
+  h.$('#destination-search').value='Whirlpool';h.run('renderDestinationShortcuts()');
+  assert.match(h.$('#destination-count').textContent,/1 of 26/);
+  h.c.state.survey='optical';h.run('renderDestinationShortcuts()');
+  assert.equal((h.$('#destinations').innerHTML.match(/data-destination=/g)||[]).length,100);
+  assert.equal(h.$('#destination-count').textContent,'100 of 100 · DSS2');
+});
+
+test('SDSS visit keeps its survey and replays exactly the same object audio as DSS2',async()=>{
+  const h=harness(),d=sdssCatalog[0],original=catalog.find(o=>o.id===d.id);
+  h.c.state.survey='sdss-color';const done=h.c.visitDestinationShortcut(d);
+  assert.equal(h.c.state.survey,'sdss-color');
+  assert.deepEqual(JSON.parse(JSON.stringify(h.requests[0].body.target)),JSON.parse(JSON.stringify(h.c.researchTarget(h.c.shortcutObject(original)))));
+  h.requests[0].resolve(record('b'.repeat(64),{url:'/dss2-original-recording.mp3',cached:true}));
+  await h.arrive(0,sdssCatalog);await done;
+  assert.equal(h.requests.length,1);assert.equal(h.calls.filter(v=>v==='play').length,1);
+  assert.equal(h.c.state.survey,'sdss-color');assert.equal(h.run('objectResearchUI.record.audio.url'),'/dss2-original-recording.mp3');
+});
+
+test('first SDSS visit researches the object then saves its narration in the shared library',async()=>{
+  const h=harness();h.c.state.survey='sdss-color';const done=h.c.visitDestinationShortcut(sdssCatalog[0]);
+  h.requests[0].resolve({id:record().id,status:'empty'});await h.arrive(0,sdssCatalog);
+  assert.equal(h.requests[1].url,'/api/object-research/research');
+  assert.equal(h.requests[1].body.target.name,sdssCatalog[0].research_name);
+  assert.equal(h.requests[1].body.target.survey,undefined);
+  h.requests[1].resolve(record());await settle();h.requests[2].resolve({url:'/shared.mp3'});await done;
+  assert.equal(h.c.state.survey,'sdss-color');assert.equal(h.calls.filter(v=>v==='play').length,1);
+});
+
+test('changing survey during SDSS research prevents late synthesis and playback',async()=>{
+  const h=harness();h.c.state.survey='sdss-color';const done=h.c.visitDestinationShortcut(sdssCatalog[0]);
+  h.requests[0].resolve({id:record().id,status:'empty'});await h.arrive(0,sdssCatalog);
+  h.c.state.survey='optical';h.requests[1].resolve(record());await done;
+  assert.equal(h.requests.length,2);assert.equal(h.calls.includes('play'),false);
+});
+
+test('SDSS can be browsed without paid requests or speech when Narrate visits is off',async()=>{
+  const h=harness();h.$('#destination-auto-narrate').checked=false;h.c.state.survey='sdss-color';
+  const done=h.c.visitDestinationShortcut(sdssCatalog[0]);h.requests[0].resolve({id:record().id,status:'empty'});
+  await h.arrive(0,sdssCatalog);await done;
+  assert.equal(h.requests.length,1);assert.equal(h.calls.includes('play'),false);
+  assert.match(h.$('#destination-status').textContent,/SDSS galaxy color/);
 });

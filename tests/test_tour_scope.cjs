@@ -82,6 +82,19 @@ test('the ordinary survey controls retain SDSS bands and do not change the tour 
   assert.equal(h.run("setTourSkySurvey('sdss-color')"),false);
 });
 
+test('survey changes cancel the previous narrated visit and refresh the matching destination shelf',()=>{
+  const h=harness(),cancelled=[],rendered=[];
+  h.context.destinationVisit={active:true};
+  h.context.cancelDestinationVisit=()=>{cancelled.push(h.run('state.survey'));h.context.destinationVisit.active=false;};
+  h.context.renderDestinationShortcuts=()=>rendered.push(h.run('state.survey'));
+  h.run("chooseSurvey('sdss-color')");
+  h.context.destinationVisit.active=true;h.run("chooseSurvey('optical')");
+  assert.deepEqual(cancelled,['optical','sdss-color']);
+  assert.deepEqual(rendered,['sdss-color','optical']);
+  h.context.destinationVisit.active=true;h.run("chooseSurvey('not-a-survey')");
+  assert.equal(cancelled.length,2);assert.equal(rendered.length,2);
+});
+
 test('a new manual destination leaves the tour even without visiting another workspace first',async()=>{
   const h=harness();await h.start();h.run('sdssExploreImage()');
   assert.equal(h.run('state.survey'),'sdss-color');assert.equal(h.run('tourSurveyActive()'),false);
