@@ -33,6 +33,9 @@ def main():
             receipt[args.mode+'_job']=post('/api/research/'+args.mode,{'ra':274.730583,'dec':-13.844944,'fov':args.fov,'ids':args.ids})
         elif args.mode=='evidence':receipt['evidence_job']=post('/api/research/evidence',{'image_id':args.ids[0],'threshold':6,'fwhm':2.5})
         elif args.mode=='guide':receipt['guide']=post('/api/research/guide',{'ra':274.730583,'dec':-13.844944,'radius':.025,'question':'Which observations cover here?'});print('Guide claims',len(receipt['guide']['claims']))
-        elif args.mode=='detail':receipt['detail_job']=post('/api/atlas/prepare',{'record_id':'1167721488','ra':159.2128828,'dec':-58.620046,'fov':.01,'quality':1024})
+        elif args.mode=='detail':
+            response=c.post('/api/atlas/prepare',json={'record_id':'1167721488','ra':159.2128828,'dec':-58.620046,'fov':.01,'quality':1024})
+            assert response.status_code==410,response.text
+            receipt['science_cutouts_removed']={'status':response.status_code,'detail':response.json()['detail']}
         path.parent.mkdir(exist_ok=True);path.write_text(json.dumps(receipt,indent=2,allow_nan=False));print('Saved',path)
 if __name__=='__main__':main()

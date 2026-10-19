@@ -26,42 +26,9 @@ function automatic(){
   const result={state:'complete',result:{url:'/cutout',ra:12,dec:70,fov:.01,min_cut:0,max_cut:1}};
   return {c,$,view,layers,removed,run,queued,finish:()=>release(result)};
 }
-test('late science responses never place an old field after the user moves away',async()=>{
-  const p=automatic(),pending=p.run('loadAutomaticScience()');await p.queued;
-  p.view.ra=30;p.finish();await pending;
-  assert.equal(p.layers.length,0);assert.match(p.$('#atlas-message').textContent,/cached/);
-});
-test('turning automatic layers off invalidates in-flight responses',async()=>{
-  const p=automatic(),pending=p.run('loadAutomaticScience()');await p.queued;
-  p.run('atlasUI.enabled=false;atlasClear()');p.finish();await pending;assert.equal(p.layers.length,0);
-});
-test('a current science image preserves camera position and uses measured intensity cuts',async()=>{
-  const p=automatic(),pending=p.run('loadAutomaticScience()');await p.queued;p.finish();await pending;
-  assert.equal(p.layers.length,1);assert.equal(p.layers[0].opts.minCut,0);assert.equal(p.layers[0].opts.maxCut,1);
-  assert.equal(p.layers[0].opacity,0);p.layers[0].opts.successCallback();assert.equal(p.layers[0].opacity,.85);assert.equal(p.view.ra,12);
-});
 test('prepared tour renderings release to detailed tiles while downloaded packs remain visible',()=>{
   const p=automatic();p.run('atlasUI.packLayer={};atlasRetirePreview(atlasUI.packLayer)');assert.equal(p.run('atlasUI.packLayer'),null);
   p.run('atlasUI.pack={id:"saved"};atlasUI.packLayer={id:"view"};atlasRetirePreview(atlasUI.packLayer)');assert.equal(p.run('atlasUI.packLayer.id'),'view');
-});
-
-test('visible map detail pauses offscreen flight work and defers automatic science until tiles settle',async()=>{
-  const p=automatic(),timers=new Map();let next=0;
-  p.c.setTimeout=fn=>{timers.set(++next,fn);return next;};p.c.clearTimeout=id=>timers.delete(id);
-  p.c.state.sky.isStillActive=()=>true;
-  p.run('flight.active=true;flight.camera={};flight.velocity=[1,0,0,0];atlasWarmFlight()');
-  assert.equal(p.run('atlasUI.warm'),null);
-  await p.run('loadAutomaticScience()');await p.run('loadAutomaticScience()');
-  assert.equal(p.run('atlasUI.busy'),false);assert.equal(timers.size,1);
-  p.c.state.sky.isStillActive=()=>false;
-  const pending=[...timers.values()][0]();await p.queued;p.finish();await pending;
-  assert.equal(p.layers.length,1);
-});
-
-test('manual science loading remains available while the visible map is busy',async()=>{
-  const p=automatic();p.c.state.sky.isStillActive=()=>true;
-  const pending=p.run('loadAutomaticScience(true)');await p.queued;p.finish();await pending;
-  assert.equal(p.layers.length,1);
 });
 
 test('upcoming tour previews wait for detail and discard a replaced tour',async()=>{
@@ -119,73 +86,6 @@ test('online prepared views replace sparse source surveys with the selected full
   assert.equal(p.c.route.stops[0].survey,'cefca-virgo');
 });
 
-test('a survey opting out of automatic science schedules no download but manual loading remains available',async()=>{
-  const p=automatic(),timers=[],queries=[];
-  p.c.state.config={surveys:[{id:'cefca-virgo',auto_science:false}]};
-  p.c.state.survey='cefca-virgo';p.c.state.fov=p.view.fov;
-  p.c.setTimeout=fn=>{timers.push(fn);return timers.length;};
-  const api=p.c.api;p.c.api=async url=>{queries.push(url);return api(url);};
-  p.run('onAtlasViewChanged()');
-  await p.run('loadAutomaticScience()');
-  assert.equal(queries.length,0);assert.equal(timers.length,0);
-  assert.match(p.$('#atlas-message').textContent,/Load here/);
-  const pending=p.run('loadAutomaticScience(true)');await p.queued;p.finish();await pending;
-  assert.equal(queries.length,1);
-  assert.equal(p.layers.length,1);
-});
-
-test('a late automatic cutout cannot cover a newly selected survey that opts out',async()=>{
-  const p=automatic();
-  p.c.state.config={surveys:[{id:'optical'},{id:'cefca-virgo',auto_science:false}]};
-  p.c.state.survey='optical';
-  const pending=p.run('loadAutomaticScience()');await p.queued;
-  p.c.state.survey='cefca-virgo';p.finish();await pending;
-  assert.equal(p.layers.length,0);
-  assert.equal(p.run('atlasUI.busy'),false);
-  assert.match(p.$('#atlas-message').textContent,/cached/);
-});
-
-test('an open tour blocks automatic and manual science and their view-change scheduler',async()=>{
-  const p=automatic(),requests=[],timers=[];p.c.tourActive=true;p.c.state.fov=.1;
-  p.c.api=async url=>{requests.push(url);return {rows:[]};};
-  p.c.setTimeout=fn=>{timers.push(fn);return timers.length;};
-  p.run('onAtlasViewChanged()');await p.run('loadAutomaticScience()');await p.run('loadAutomaticScience(true)');
-  assert.equal(requests.length,0);assert.equal(timers.length,0);assert.equal(p.layers.length,0);
-  assert.match(p.$('#atlas-message').textContent,/full-sky survey/);
-});
-
-test('starting a tour during the footprint lookup prevents a science download',async()=>{
-  const p=automatic();let resolve,prepares=0;
-  p.c.api=()=>new Promise(done=>{resolve=done;});p.c.jsonPost=()=>{prepares++;throw Error('Unexpected prepare');};
-  const pending=p.run('loadAutomaticScience()');p.c.tourActive=true;
-  resolve({rows:[{id:'old',contains_view_center:true}]});await pending;
-  assert.equal(prepares,0);assert.equal(p.run('atlasUI.busy'),false);
-});
-
-test('starting a tour while the science job is pending discards its result',async()=>{
-  const p=automatic(),pending=p.run('loadAutomaticScience(true)');await p.queued;
-  p.c.tourActive=true;p.finish();await pending;
-  assert.equal(p.layers.length,0);assert.equal(p.run('atlasUI.busy'),false);
-});
-
-test('a native science-layer callback stays invisible when a tour starts or its field changes',async()=>{
-  for(const invalidate of [p=>{p.c.tourActive=true;},p=>{p.view.ra=140;}]){
-    const p=automatic(),pending=p.run('loadAutomaticScience()');await p.queued;p.finish();await pending;
-    invalidate(p);p.layers[0].opts.successCallback();
-    assert.equal(p.layers[0].opacity,0);assert.equal(p.run('atlasUI.loaded'),null);
-  }
-});
-
-test('a queued science refinement cannot run over an open tour',async()=>{
-  const p=automatic(),timers=[];let queries=0;
-  const api=p.c.api;p.c.api=async url=>{queries++;return api(url);};
-  p.c.setTimeout=fn=>{timers.push(fn);return timers.length;};
-  const pending=p.run('loadAutomaticScience()');await p.queued;p.finish();await pending;
-  p.layers[0].opts.successCallback();assert.equal(timers.length,1);
-  p.c.tourActive=true;timers[0]();await Promise.resolve();
-  assert.equal(queries,1);
-});
-
 test('prepared views discard late responses across survey changes, including switching back',async()=>{
   const p=automatic(),pending=[];
   p.c.route={id:'tour',revision:1,stops:[{ra:1,dec:2,fov:.3,survey:'cefca-virgo'}]};
@@ -238,7 +138,7 @@ test('playing legacy downloads keeps route facts but removes photo previews and 
   assert.equal(played.pack,p.c.saved);
 });
 
-test('download controls request the chosen survey and manual load leaves an active tour unchanged',async()=>{
+test('download controls preserve survey choices and expose no science cutout controls',async()=>{
   const p=automatic(),created=[],requests=[];
   const element=()=>({dataset:{},append(){},before(){},after(){},innerHTML:''});
   p.c.document={createElement:()=>{const node=element();created.push(node);return node;}};
@@ -250,7 +150,7 @@ test('download controls request the chosen survey and manual load leaves an acti
   p.c.tourChoice='dust';p.$('#atlas-download-route').value='tour/id';
   await p.$('#atlas-download-start').onclick();
   assert.equal(requests.at(-1).url,'/api/atlas/packs/tour%2Fid?survey=dust');assert.equal(requests.at(-1).options.method,'POST');
-  p.c.tourActive=true;p.run('atlasUI.enabled=false');p.$('#atlas-load').onclick();
+  assert.doesNotMatch(created.map(node=>node.innerHTML).join(' '),/atlas-(auto|mission|opacity|load|details|refine)|Auto-load science/);
   assert.equal(p.run('atlasUI.enabled'),false);assert.equal(requests.length,2);
 });
 
@@ -271,4 +171,31 @@ test('comparison blend endpoints and swipe divider do not expose old clipping',(
   assert.equal($('#compare-right-map').style.clipPath,'inset(0 0 0 100%)');
   $('#compare-mode').value='blend';$('#compare-slider').value='0';vm.runInContext('compareBlend()',c);
   assert.equal($('#compare-right-map').style.clipPath,'none');assert.equal($('#compare-right-map').style.opacity,0);assert.equal($('#compare-divider').hidden,true);
+});
+
+test('science cutouts never schedule requests or layers, even through old forced callers',async()=>{
+  for(const tourActive of [false,true])for(const busy of [false,true]){
+    const p=automatic(),requests=[],timers=[];p.c.tourActive=tourActive;p.c.state.sky.isStillActive=()=>busy;
+    p.c.api=async url=>{requests.push(url);throw Error('Unexpected request');};p.c.jsonPost=p.c.api;
+    p.c.setTimeout=fn=>{timers.push(fn);return timers.length;};
+    p.run('atlasUI.enabled=true;state.fov=.01;onAtlasViewChanged()');
+    await p.run('loadAutomaticScience()');await p.run('loadAutomaticScience(true,1024)');
+    assert.equal(requests.length,0);assert.equal(timers.length,0);assert.equal(p.layers.length,0);
+    assert.equal(p.run('atlasUI.enabled'),false);
+  }
+});
+
+test('retiring cutouts clears legacy layers without touching the selected survey or downloaded tour view',()=>{
+  const p=automatic();p.c.state.sky.getStackLayers=()=>['base','science-trail-old','science-overlay','downloaded-tour-view'];
+  p.run('atlasClear()');assert.deepEqual(p.removed,['science-trail-old','science-overlay']);
+  assert.equal(p.run('atlasUI.loaded'),null);
+});
+
+test('late science layer events are rejected even when no tour is open',()=>{
+  const p=automatic();let callback;const sky=p.c.state.sky;
+  sky.addListener=(event,fn)=>callback=fn;sky.getBaseImageLayer=()=>({layer:'base'});
+  p.c.localStorage={getItem:()=>null};vm.runInContext(source('tour-display.js'),p.c);
+  p.run('installTourLayerGuard(state.sky)');
+  for(const key of ['science-trail-old','science-overlay','base'])callback({detail:{layer:{layer:key}}});
+  assert.deepEqual(p.removed,['science-trail-old','science-overlay']);
 });

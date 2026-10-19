@@ -17,7 +17,7 @@ function harness(){
   const c=vm.createContext({$,console,Number,Math,Date,Promise,Error,JSON,Set,
     state:{sky},atlasUI:{enabled:false},travelFrame:0,cancelAnimationFrame(){},
     tourSurveyActive:()=>active,toast:(...args)=>messages.push(args),
-    showPage(){},atlasMessage(){},coordinates(){},fmt:n=>String(n),
+    showPage(){},atlasMessage(){},atlasClear(){},coordinates(){},fmt:n=>String(n),
     flyTo:o=>visits.push(o),
     jsonPost:(url,body)=>new Promise(resolve=>pending.push({url,body,resolve})),
     A:{image(url,options){

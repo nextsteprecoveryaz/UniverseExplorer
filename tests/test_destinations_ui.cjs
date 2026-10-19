@@ -83,11 +83,11 @@ test('browser autoplay restrictions leave the saved recording ready for a click'
   assert.match(h.$('#destination-status').textContent,/click Listen/);assert.equal(h.requests.length,1);
 });
 
-test('all 50 are rendered with two-digit numbering and searchable catalog names and categories',()=>{
+test('all 100 are rendered with readable numbering and searchable catalog names and categories',()=>{
   const h=harness();h.run('initDestinationShortcuts()');const html=h.$('#destinations').innerHTML;
-  assert.equal((html.match(/data-destination=/g)||[]).length,50);assert.match(html,/>50<\/span>/);assert.doesNotMatch(html,/>050</);
+  assert.equal((html.match(/data-destination=/g)||[]).length,100);assert.match(html,/>100<\/span>/);assert.doesNotMatch(html,/>050</);
   assert.equal(h.c.shortcutMatches(catalog[0],'M16',''),true);assert.equal(h.c.shortcutMatches(catalog[4],'Andromeda','Nebulae'),false);
-  h.$('#destination-search').value='Whirlpool';h.run('renderDestinationShortcuts()');assert.match(h.$('#destination-count').textContent,/1 of 50/);
+  h.$('#destination-search').value='Whirlpool';h.run('renderDestinationShortcuts()');assert.match(h.$('#destination-count').textContent,/1 of 100/);
 });
 
 test('mouse-wheel scrolls the strip without zooming the sky and arrows reach later destinations',()=>{

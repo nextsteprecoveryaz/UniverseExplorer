@@ -5,9 +5,9 @@ from destination_catalog import CATALOG,DESTINATIONS
 from object_research import Target,object_id
 
 
-def test_fifty_unique_catalog_anchored_destinations_all_use_visible_dss2():
-    assert len(DESTINATIONS)==50
-    assert len({d['id'] for d in DESTINATIONS})==len({d['object_id'] for d in DESTINATIONS})==50
+def test_one_hundred_unique_catalog_anchored_destinations_all_use_visible_dss2():
+    assert len(DESTINATIONS)==100
+    assert len({d['id'] for d in DESTINATIONS})==len({d['object_id'] for d in DESTINATIONS})==100
     assert {d['category'] for d in DESTINATIONS}=={'Nebulae','Galaxies','Star clusters','Stellar remnants','Stars & planets'}
     assert CATALOG['coordinate_frame']=='ICRS' and CATALOG['coordinate_source']=='CDS SIMBAD TAP'
     for d in DESTINATIONS:

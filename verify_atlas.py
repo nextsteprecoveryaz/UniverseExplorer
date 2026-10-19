@@ -1,33 +1,16 @@
-"""Live local-server checks of source cutouts, spatial search, and saved views."""
+"""Live local-server checks of cutout removal, spatial search, and saved views."""
 import hashlib
-import io
 import json
-import time
 from pathlib import Path
 import httpx
-import numpy as np
-from astropy.io import fits
-from astropy.wcs import WCS
 from integrations import now
 
-report={'checked_at':now(),'cutouts':[]}
+report={'checked_at':now(),'blocked_cutouts':[]}
 with httpx.Client(base_url='http://127.0.0.1:8765',timeout=180) as c:
-    for ident,fov in [('1167721488',.02),('1208797559',.007)]:
-        o=c.get('/api/recent/observations/'+ident).json()
-        r=c.post('/api/atlas/prepare',json={'record_id':ident,'ra':o['s_ra'],'dec':o['s_dec'],'fov':fov});r.raise_for_status();job=r.json()
-        deadline=time.monotonic()+200
-        while job['state'] in ('queued','running') and time.monotonic()<deadline:
-            time.sleep(1);job=c.get('/api/atlas/jobs/'+job['id']).json()
-        assert job['state']=='complete',job
-        m=job['result'];raw=c.get(m['url']);raw.raise_for_status()
-        assert hashlib.sha256(raw.content).hexdigest()==m['sha256']
-        with fits.open(io.BytesIO(raw.content)) as h:
-            assert h[0].data.shape==(512,512) and h[0].header['VISONLY']
-            w=WCS(h[0].header);pos=w.pixel_to_world(255.5,255.5)
-            assert abs(pos.icrs.dec.deg-o['s_dec'])<1e-7
-            assert abs((pos.icrs.ra.deg-o['s_ra']+180)%360-180)<1e-7
-            assert np.isfinite(h[0].data).any()
-        report['cutouts'].append(m)
+    for quality in [512,1024]:
+        response=c.post('/api/atlas/prepare',json={'record_id':'1167721488','ra':159.216,'dec':-58.621,'fov':.02,'quality':quality})
+        assert response.status_code==410,response.text
+        report['blocked_cutouts'].append({'quality':quality,'status':response.status_code})
     status=c.get('/api/atlas/status').json();report['coverage']=status['coverage']
     assert status['coverage']['ready']
     nearby=c.get('/api/navigation/nearby',params={'ra':159.216,'dec':-58.621,'radius':.2,'limit':6}).json()
@@ -50,4 +33,4 @@ with httpx.Client(base_url='http://127.0.0.1:8765',timeout=180) as c:
         report['cached_only']={'cached_survey_http':r.status_code,'uncached_tile_http':missing.status_code,'uncached_detail':missing.json()['detail']}
     finally:c.post('/api/atlas/cached-only',params={'enabled':previous}).raise_for_status()
 path=Path(__file__).parent/'data'/'verification'/'atlas-api.json';path.write_text(json.dumps(report,indent=2),encoding='utf-8')
-print(json.dumps({'verified':True,'cutouts':len(report['cutouts']),'observations':report['coverage']['indexed'],'packs':len(report['packs']),'receipt':str(path)}))
+print(json.dumps({'verified':True,'blocked_cutouts':len(report['blocked_cutouts']),'observations':report['coverage']['indexed'],'packs':len(report['packs']),'receipt':str(path)}))

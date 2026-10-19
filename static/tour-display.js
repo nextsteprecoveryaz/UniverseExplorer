@@ -34,8 +34,9 @@ function installTourLayerGuard(sky){
   // Native image decoding can finish after a tour starts and after a removal call.
   // This public event fires when the decoded layer is actually added to the sky.
   sky.addListener('AL:Layer.added',event=>{
-    if(!tourSurveyActive())return;
     const layer=event.detail?.layer,key=layer?.layer;
+    if(key&&(String(key).startsWith('science-trail-')||key==='science-overlay')){sky.removeImageLayer(key);return;}
+    if(!tourSurveyActive())return;
     if(!key||layer===sky.getBaseImageLayer())return;
     if(key==='downloaded-tour-view'&&atlasUI.packLayer===layer)return;
     sky.removeImageLayer(key);

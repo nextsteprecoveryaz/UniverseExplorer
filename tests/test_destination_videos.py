@@ -2,7 +2,7 @@ import re
 from destination_catalog import DESTINATIONS,VIDEO_CATALOG
 
 
-def test_all_fifty_destinations_have_multiple_verified_youtube_choices():
+def test_all_one_hundred_destinations_have_multiple_verified_youtube_choices():
     assert set(VIDEO_CATALOG['destinations'])=={d['id'] for d in DESTINATIONS}
     for destination in DESTINATIONS:
         videos=destination['videos']

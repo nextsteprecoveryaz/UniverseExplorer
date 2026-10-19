@@ -122,7 +122,7 @@ def test_cached_only_never_fetches_and_bad_tile_paths(tmp_path,monkeypatch):
         assert client.get('/api/atlas/surveys/optical/properties').status_code==503
         assert client.get('/api/atlas/surveys/unknown/properties').status_code==404
         assert client.get('/api/atlas/files/not-a-hash').status_code==400
-        assert client.post('/api/atlas/prepare',json={'record_id':'123','ra':0,'dec':0,'fov':.1}).status_code==409
+        assert client.post('/api/atlas/prepare',json={'record_id':'123','ra':0,'dec':0,'fov':.1}).status_code==410
     for bad in ['../../x','Norder1/Dir0/Npix1.jpg?url=evil','Norder1/Dir0/Npix1.svg','Norder30/Allsky.png']:
         assert not atlas.tile_path(bad)
 
@@ -169,3 +169,21 @@ def test_expired_tile_falls_back_to_local_copy_when_network_is_unavailable(tmp_p
     response=atlas.survey_tile('optical','properties')
     assert response.status_code==200 and response.body==b'hips_order=9'
     assert response.headers['X-Atlas-Stale']=='true'
+
+
+def test_removed_cutouts_never_start_jobs_or_reuse_cached_files(tmp_path,monkeypatch):
+    monkeypatch.setattr(cache,'ROOT',tmp_path/'cache')
+    monkeypatch.setattr(atlas,'begin',lambda *a,**kw:pytest.fail('Removed cutouts cannot start jobs'))
+    payload={'record_id':'123','ra':0.,'dec':0.,'fov':.1}
+    ident=cache.key('science-v1:'+json.dumps(payload,sort_keys=True))
+    cache.put(ident,b'old science bytes','application/fits',{'kind':'science-cutout'})
+    client=TestClient(app)
+    for cached_only in [False,True]:
+        monkeypatch.setattr(atlas,'CACHED_ONLY',cached_only)
+        for quality in [512,1024]:
+            response=client.post('/api/atlas/prepare',json={**payload,'quality':quality})
+            assert response.status_code==410 and 'removed' in response.json()['detail']
+    assert client.get('/api/atlas/files/'+ident).status_code==410
+    assert cache.get(ident) is not None  # Preserve existing local files.
+    survey=cache.put(cache.key('saved-survey'),b'survey bytes','image/png',{'kind':'survey-view'})
+    assert client.get('/api/atlas/files/'+survey['id']).content==b'survey bytes'

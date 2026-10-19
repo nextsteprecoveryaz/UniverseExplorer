@@ -6,8 +6,7 @@ Launch `Launch.cmd`, then choose **Research desk** in the sidebar. The app remai
 
 - **Fly → Autopilot to observations** builds a saved journey through distinct nearby archive pointings. **Take controls**, **Stop**, Escape, leaving the window, or opening another workspace stops movement.
 - Standard gamepads: enable **Gamepad** during flight; left stick steers, right stick zooms and rolls, A or Start stops. Stopping disarms gamepad input; enable it again to resume. Keyboard and mouse remain available. Hardware input needs a standard-mapped browser gamepad.
-- Automatic science cutouts first load at 512 pixels. **Refine settled views to 1024 pixels** requests a larger original-data display after a stationary pause. Up to four adjoining cutouts from the same original are retained while crossing that product. Changing products clears that trail. HiPS maps continue their normal progressive tile loading.
-- **Time & mosaics** can assemble up to four compatible original products on a common 1024-pixel sky grid. Click **Fly over this mosaic** to place it at its FITS coordinates. The sidebar provides **Remove research mosaic**. Automatic science loading is turned off when placing a research mosaic to avoid obscuring it; turn it back on when desired.
+- **Time & mosaics** can assemble up to four compatible original products on a common 1024-pixel sky grid. Click **Fly over this mosaic** to place it at its FITS coordinates. The sidebar provides **Remove research mosaic**. Science cutouts have been removed from the explorer; this manually requested research mosaic remains a separate tool.
 - Mosaic pixels use the first valid source, with later sources filling gaps. FITS `SOURCE` and `COVERAGE` extensions identify the contributing input and number of valid inputs. No generated pixels, feathering or photometric coaddition. Different observation dates can contribute; provenance lists them.
 
 ## Time and original imagery
@@ -22,7 +21,7 @@ Brightness stretching is shared when image units agree. Different/unknown units 
 
 WCS alignment is not a guarantee of absolute astrometric agreement. Calibration differences, sampling, PSF structure, detector artifacts and correlated noise remain possible. Difference images have no discovery or detection-significance claims. Derived display FITS files are marked `VISONLY` and cannot enter the new source-measurement pipeline.
 
-Each partial source read is bounded: automatic quick views use 96 MB; refined views, epoch displays and mosaic inputs use 192 MB per product, with transfer deadlines. Native crop size limits the actual field. Uncovered pixels remain missing. The existing 1 GB atlas cache holds derived files and exact downloaded TESS products; unpinned files can be evicted.
+Each partial source read is bounded: epoch displays and mosaic inputs use 192 MB per product, with transfer deadlines. Native crop size limits the actual field. Uncovered pixels remain missing. The existing 1 GB atlas cache holds derived files and exact downloaded TESS products; unpinned files can be evicted.
 
 ## Source evidence
 

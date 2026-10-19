@@ -1,4 +1,4 @@
-"""Automatic original-FITS cutouts, trusted survey cache, and saved tour views."""
+"""Trusted survey cache and saved tour views; legacy science cutouts are retired."""
 import io
 import json
 import re
@@ -13,23 +13,20 @@ from typing import Literal
 from urllib.parse import urlsplit
 import httpx
 from PIL import Image
-from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import Response, FileResponse
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
 import atlas_cache as cache
 import coverage_index
-import recent_archive
 import expeditions
 import tour_surveys
 from integrations import now
-from sky_cutout import from_archive, view_header
-from range_fits import RangeFITS
+from sky_cutout import view_header
 
 router=APIRouter(prefix='/api/atlas')
 SURVEYS={}
 JOBS={}
 LOCK=threading.Lock()
-SCIENCE=ThreadPoolExecutor(max_workers=1,thread_name_prefix='fits-cutout')
 DOWNLOADS=ThreadPoolExecutor(max_workers=1,thread_name_prefix='atlas-download')
 CACHED_ONLY=False
 REMOTE_LOCK=threading.Lock()
@@ -215,6 +212,8 @@ def file(ident:str):
     try:item=cache.get(ident)
     except ValueError:raise HTTPException(400,'Invalid atlas file.')
     if not item:raise HTTPException(404,'This atlas file is no longer cached.')
+    if item['metadata'].get('kind')=='science-cutout':
+        raise HTTPException(410,'Science cutouts have been removed and cannot be loaded.')
     # Read while holding the eviction lock; no path can disappear during the response.
     with cache.LOCK:
         try:data=item['path'].read_bytes()
@@ -223,20 +222,7 @@ def file(ident:str):
 
 @router.post('/prepare')
 def prepare(request:Cutout):
-    params=request.model_dump();
-    if request.quality==512:params.pop('quality')
-    ident=cache.key('science-v1:'+json.dumps(params,sort_keys=True))
-    item=cache.get(ident)
-    if item:return {'id':ident,'state':'complete','result':public(item)}
-    if CACHED_ONLY:raise HTTPException(409,'This science cutout is not cached.')
-    observation=recent_archive.observation(request.record_id)
-    if observation.get('mtFlag'):raise HTTPException(400,'Moving-target products are not placed on the fixed sky atlas.')
-    def work(job):
-        if request.quality==1024:
-            content,meta=from_archive(observation,request.ra,request.dec,request.fov,size=1024,native_limit=1280,reader_factory=lambda uri:RangeFITS(uri,budget=192*1024*1024))
-        else:content,meta=from_archive(observation,request.ra,request.dec,request.fov)
-        return public(cache.put(ident,content,'application/fits',{'kind':'science-cutout','created_at':now(),**meta}))
-    return begin(ident,work,SCIENCE)
+    raise HTTPException(410,'Science cutouts have been removed. Explore the continuous sky survey instead.')
 
 @router.post('/view')
 def prepare_view(view:ViewRequest):
