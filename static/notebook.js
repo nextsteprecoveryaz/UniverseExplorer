@@ -15,26 +15,30 @@ function notebookLocation(event,sky,rect){
   let world;try{world=sky.pix2world(x,y,'ICRS');}catch{return null;}
   const marker=event.target?.closest?.('#image-markers [data-ra][data-dec]');
   if(marker)world=[Number(marker.dataset.ra),Number(marker.dataset.dec)];
+  const label=event.target?.closest?.('#object-markers [data-map-id]');
+  const object=label&&typeof mapUI!=='undefined'?mapUI.rows.find(o=>o.id===label.dataset.mapId):null;
+  if(object)world=[object.ra,object.dec];
   if(!world||!Number.isFinite(world[0])||!Number.isFinite(world[1])||Math.abs(world[1])>90)return null;
   const [ra,dec]=sky.getRaDec(),fov=sky.getFov()[0];
   return {ra:(world[0]%360+360)%360,dec:world[1],fov,survey:state.survey,
     view:{ra,dec,fov,roll:sky.getRotation?.()||0,projection:sky.getProjectionName?.()||'AIT'},
-    click:{x,y,width:rect.width,height:rect.height},search_radius_arcsec:Math.min(180,Math.max(3,fov/rect.width*6*3600))};
+    click:{x,y,width:rect.width,height:rect.height},search_radius_arcsec:Math.min(180,Math.max(3,fov/rect.width*6*3600)),
+    ...(object?{object_hint:{id:object.id,name:object.name,ra:object.ra,dec:object.dec}}:{})};
 }
 function initNotebookSky(){
   const host=$('#aladin-lite-div');if(host.dataset.notebookMenu)return;host.dataset.notebookMenu='true';host.tabIndex=0;
   const menu=document.createElement('div');menu.id='sky-notebook-menu';menu.className='sky-notebook-menu';menu.hidden=true;menu.setAttribute('role','menu');
-  menu.innerHTML='<div class="small muted" id="notebook-menu-position"></div><button class="button primary" role="menuitem" id="notebook-menu-save">+ Add to discovery notebook</button><p class="small muted">Saves this location and a snapshot, then researches nearby catalog objects. Shift + right-click opens Aladin actions.</p>';
+  menu.innerHTML='<div class="small muted" id="notebook-menu-position"></div><button class="button primary" role="menuitem" id="notebook-menu-save">+ Add to discovery notebook</button><p class="small muted">Saves this location and a snapshot, then researches named objects in the field, even with labels hidden. Shift + right-click opens Aladin actions.</p>';
   $('#explore-page').append(menu);notebookUI.menu=menu;
   $('#explore-page').addEventListener('contextmenu',event=>{
-    const marker=event.target.closest('#image-markers [data-ra][data-dec]');
+    const marker=event.target.closest('#image-markers [data-ra][data-dec],#object-markers [data-map-id]');
     if(!host.contains(event.target)&&!marker)return;
     if((event.shiftKey&&(event.clientX||event.clientY))||(!marker&&event.target.closest('button,input,select,a')))return;
     event.preventDefault();event.stopImmediatePropagation();
     interruptTour('Paused to save a discovery');if(flight.active)pauseFlight();cancelAnimationFrame(travelFrame);
     const rect=host.getBoundingClientRect(),selection=notebookLocation(event,state.sky,rect);
     if(!selection){closeNotebookMenu();toast('Choose a point inside the sky projection.',true);return;}
-    notebookUI.selection=selection;$('#notebook-menu-position').textContent=`RA ${selection.ra.toFixed(5)}° · Dec ${selection.dec.toFixed(5)}°`;
+    notebookUI.selection=selection;$('#notebook-menu-position').textContent=`${selection.object_hint?.name?selection.object_hint.name+' · ':''}RA ${selection.ra.toFixed(5)}° · Dec ${selection.dec.toFixed(5)}°`;
     menu.hidden=false;menu.style.left=Math.max(8,Math.min(event.clientX||rect.left+rect.width/2,window.innerWidth-menu.offsetWidth-12))+'px';
     menu.style.top=Math.max(8,Math.min(event.clientY||rect.top+rect.height/2,window.innerHeight-menu.offsetHeight-12))+'px';
     $('#notebook-menu-save').focus();
@@ -52,7 +56,7 @@ async function captureNotebookLocation(selection){
   if(['ra','dec','fov','roll','projection','survey'].some(k=>current[k]!==({...selection.view,survey:selection.survey})[k]))throw Error('The view changed. Right-click the location again.');
   const capture=await explorePixelMapping.controller.capturePNG({creditFooter:true});
   const survey=capture.metadata.survey;
-  noteDialog({title:`Sky discovery · ${selection.ra.toFixed(4)}, ${selection.dec.toFixed(4)}`,ra:selection.ra,dec:selection.dec,survey:selection.survey,
+  noteDialog({title:selection.object_hint?.name||`Sky discovery · ${selection.ra.toFixed(4)}, ${selection.dec.toFixed(4)}`,ra:selection.ra,dec:selection.dec,survey:selection.survey,
     provenance:{...selection,kind:'notebook-sky-snapshot',captured_at:capture.metadata.created_at,survey_url:survey.url,snapshot_credit:survey.credit,pixel_mapping:capture.metadata}},capture);
 }
 async function attachNotebookSnapshot(values,capture){
@@ -66,13 +70,14 @@ function renderNotebookEntries(rows){
     const r=n.research||{},image=notebookImage(n),pending=notebookBusy(n),script=notebookScript(n);
     return `<article class="note-card" data-notebook-id="${esc(n.id)}"><span class="badge teal">${esc(n.kind.toUpperCase())}</span><h2>${esc(n.title)}</h2>${image?`<img class="notebook-snapshot" src="${image}" alt="Saved sky view for ${esc(n.title)}" loading="lazy">`:''}${n.body?`<p class="notebook-personal">${esc(n.body)}</p>`:''}<div class="small">${date(n.created_at)}<br>${notebookLocated(n)?`RA ${n.ra.toFixed(5)}° · Dec ${n.dec.toFixed(5)}°`:'Pixel coordinates recorded in provenance'}</div>
       <div class="notebook-research"><span class="overline">${esc(pending?'RESEARCH IN PROGRESS':r.edited_narration?'YOUR NARRATION':r.status?'RESEARCHED FIELD GUIDE':'READY TO RESEARCH')}</span><p class="small muted" role="status">${esc(r.message||'Research this saved position to prepare a narrated tour stop.')}${r.catalog_stale?' Using cached catalog data.':''}</p>${r.identity_label?`<strong>${esc(r.identity_label)}</strong>`:''}
-      ${r.candidates?.length>1?`<details><summary>Review nearby catalog matches (${r.candidates.length})</summary><label>Object discussed<select data-note-match="${i}" ${pending?'disabled':''}>${r.candidates.map(o=>`<option value="${esc(o.id)}" ${o.id===r.selected_id?'selected':''}>${esc(o.name)} · ${esc(o.type)} · ${o.separation_arcsec}″ away</option>`).join('')}</select></label><p class="small muted">A nearby position is a possible association. Your saved coordinates stay unchanged.</p></details>`:''}
+      ${r.detail_warning?`<p class="small muted">${esc(r.detail_warning)}</p>`:''}${r.field_truncated?'<p class="small muted">The label query reached its catalog limit. Zoom in for a more complete local search.</p>':''}
+      ${r.candidates?.length>1?`<details><summary>Review nearby catalog matches (${r.candidates.length})</summary><label>Object discussed<select data-note-match="${i}" ${pending?'disabled':''}>${r.candidates.map(o=>`<option value="${esc(o.id)}" ${o.id===r.selected_id?'selected':''}>${esc(o.name)} · ${esc(o.type)} · ${o.separation_arcsec}″ away${o.match_scope==='field'?' · wider field':''}</option>`).join('')}</select></label><p class="small muted">Choose which named object the story discusses. A field association does not identify the exact clicked pixel. Your saved coordinates, image and edited narration stay unchanged.</p></details>`:''}
       ${script?`<details class="notebook-story" open><summary>Tour story · ${Math.ceil(script.split(/\s+/).length/145*60)} sec</summary>${notebookParagraphs(script)}</details>`:''}${notebookSources(r.sources)}${r.checked_at?`<div class="small muted">Checked ${date(r.checked_at)}${r.edited_narration?' · narration edited by you':''}</div>`:''}</div>
       <div class="note-actions">${notebookLocated(n)?`<button class="text-button" data-note-research="${i}" ${pending?'disabled':''}>${pending?'Researching…':script?'Research again':'Research this location'}</button><button class="text-button" data-note-story="${i}" ${pending?'disabled':''}>Edit narration</button><button class="text-button" data-note-tour="${i}" ${pending||!script?'disabled':''}>Use in tour</button><button class="text-button" data-note-visit="${i}">Revisit field ↗</button>`:''}${image?`<button class="text-button" data-note-image="${i}">Open saved image</button>`:''}<button class="text-button delete-note" data-note-delete="${i}">Delete</button></div><details><summary>Data provenance</summary><pre>${esc(JSON.stringify({capture:n.provenance,research:r},null,2))}</pre></details></article>`;
   }).join(''):'<div class="empty-state"><span class="empty-symbol">▤</span><h2>Every discovery starts with a question.</h2><p>Right-click a location in Explore the sky to save its image and start a researched guide.</p></div>';
   $$('[data-note-research]').forEach(b=>b.onclick=()=>busy(b,'Researching…',async()=>{await jsonPost('/api/notebook/'+rows[Number(b.dataset.noteResearch)].id+'/research',{});await loadNotes();}));
   $$('[data-note-story]').forEach(b=>b.onclick=()=>editNotebookStory(rows[Number(b.dataset.noteStory)]));
-  $$('[data-note-match]').forEach(el=>el.onchange=async()=>{const n=rows[Number(el.dataset.noteMatch)];try{await api('/api/notebook/'+n.id+'/identify',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:n.revision,candidate_id:el.value})});await loadNotes();}catch(e){failure(e);await loadNotes();}});
+  $$('[data-note-match]').forEach(el=>el.onchange=async()=>{const n=rows[Number(el.dataset.noteMatch)];el.disabled=true;try{await api('/api/notebook/'+n.id+'/identify',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:n.revision,candidate_id:el.value})});await loadNotes();}catch(e){failure(e);await loadNotes();}finally{el.disabled=false;}});
   $$('[data-note-tour]').forEach(b=>b.onclick=()=>{const id=rows[Number(b.dataset.noteTour)].id;if(!notebookUI.selected.includes(id))notebookUI.selected.push(id);showPage('routes');$('#notebook-tour-builder').scrollIntoView({behavior:'smooth'});});
   $$('[data-note-visit]').forEach(b=>b.onclick=()=>{const n=rows[Number(b.dataset.noteVisit)];flyTo({name:n.title,ra:n.ra,dec:n.dec,fov:n.provenance.fov||.2,survey:n.survey||'optical',type:'FROM YOUR NOTEBOOK',description:n.research?.identity_label||n.body});});
   $$('[data-note-image]').forEach(b=>b.onclick=()=>api('/api/images/'+rows[Number(b.dataset.noteImage)].provenance.image_id).then(openImage).catch(failure));

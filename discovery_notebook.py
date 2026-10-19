@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
 import integrations as remote
 import object_map
+import object_facts
 import science
 
 PATH=Path(__file__).parent/'data'/'notebook.sqlite3'
@@ -69,15 +70,46 @@ def radius_for(note):
     return min(180,max(3,value if math.isfinite(value) else 15))/3600
 
 
-def candidates_for(note,result):
+def field_query(note):
+    p=note.get('provenance',{});v=p.get('view',p)
+    fov=remote.number(v.get('fov'));ra=remote.number(v.get('ra'));dec=remote.number(v.get('dec'))
+    if ra is None or dec is None or not 0<=ra<360 or abs(dec)>90:ra,dec=note['ra'],note['dec']
+    # Match the object-label layer's bounded field query, even when it is hidden.
+    radius=min(1,max(.005,fov*.7)) if fov and 0<fov<=5 else max(radius_for(note),.005)
+    if object_map.separation(ra,dec,note['ra'],note['dec'])>radius:ra,dec=note['ra'],note['dec']
+    return ra,dec,radius
+
+
+def candidates_for(note,result,field=False):
     rows=[]
+    center_ra,center_dec,radius=field_query(note) if field else (note['ra'],note['dec'],radius_for(note))
     for obj in result.get('rows',[]):
         try:distance=object_map.separation(note['ra'],note['dec'],float(obj['ra']),float(obj['dec']))*3600
         except (TypeError,ValueError,KeyError):continue
-        if not math.isfinite(distance) or distance>radius_for(note)*3600+.1:continue
-        rows.append({**obj,'separation_arcsec':round(distance,3)})
+        if not math.isfinite(distance) or object_map.separation(center_ra,center_dec,obj['ra'],obj['dec'])>radius+.1/3600:continue
+        rows.append({**obj,'separation_arcsec':round(distance,3),'match_scope':'point' if distance<=radius_for(note)*3600+.1 else 'field'})
     rows.sort(key=lambda o:(o['separation_arcsec'],not o.get('featured')))
-    return rows[:16]
+    return rows[:120]
+
+
+def selected_object(research,selected=None):
+    candidates=research.get('candidates',[])
+    return (next((o for o in candidates if o['id']==selected),None)
+            or next((o for o in candidates if o.get('featured') and o['separation_arcsec']<=3),None)
+            or next(iter(candidates),None))
+
+
+async def enrich(research,obj):
+    if not obj or obj.get('featured'):return research
+    details=dict(research.get('object_details',{}))
+    try:
+        detail=await asyncio.wait_for(object_facts.lookup(obj['name']),timeout=25)
+        if detail and object_map.separation(obj['ra'],obj['dec'],detail['ra'],detail['dec'])*3600<=3:
+            details[obj['id']]=detail
+            candidates=[{**o,'type':detail['type'],'type_code':detail['type_code']} if o['id']==obj['id'] else o for o in research.get('candidates',[])]
+            return {**research,'candidates':candidates,'object_details':details,'detail_warning':('Using cached object measurements; their live refresh was unavailable.' if detail.get('stale') else None)}
+    except (ValueError,KeyError,TypeError,TimeoutError):pass
+    return {**research,'object_details':details,'detail_warning':'Detailed measurements could not be refreshed. Available catalog information and previous measurements are preserved.'}
 
 
 def background(obj):
@@ -95,10 +127,7 @@ def background(obj):
 
 def compose(note,research,selected=None):
     candidates=research.get('candidates',[])
-    obj=next((o for o in candidates if o['id']==selected),None)
-    # A known extended target at the same few-arcsecond position is a useful field
-    # guide even when its nucleus has many closer subcomponent catalog records.
-    if obj is None:obj=next((o for o in candidates if o.get('featured') and o['separation_arcsec']<=3),None) or next(iter(candidates),None)
+    obj=selected_object(research,selected)
     sources=[]
     if obj:
         label=f"{obj['name']} · {obj['separation_arcsec']:.1f} arcsec from saved point"
@@ -109,6 +138,11 @@ def compose(note,research,selected=None):
             opening+=f"SIMBAD classifies this nearby catalog entry as {obj['type'].lower()} (code {obj.get('type_code','not reported')})."
         context,source=background(obj);sources=[{'title':obj['name']+' · '+obj['catalog'],'url':obj['source_url']},source]
         story=opening+'\n\n'+context+'\n\nPause here and compare the visible and near-infrared surveys. Notice what remains visible and what changes with wavelength. The catalog match is a positional association; it does not establish that every visible feature belongs to the same object.'
+        detail=research.get('object_details',{}).get(obj['id'])
+        if detail:
+            facts,sources=object_facts.prose(detail)
+            story='This stop explores the field near '+detail['name']+'.\n\n'+facts+'\n\n'+context+'\n\nCompare the saved image with other wavelengths. A catalog association does not establish that every feature in the image belongs to this object.'
+            sources.append(source)
         # Reuse the app's checked, object-specific Virgo stories only for a very close catalog match.
         import cefca_tours
         known=next((m for m in cefca_tours.media_items() if object_map.separation(obj['ra'],obj['dec'],m['ra'],m['dec'])*3600<3),None)
@@ -118,6 +152,9 @@ def compose(note,research,selected=None):
         status='ready' if research.get('catalog_available') else 'partial'
         message='Nearby catalog match; review the position and sources.'
         if len(candidates)>1 and candidates[1]['separation_arcsec']<max(3,obj['separation_arcsec']*2):message='Several catalog entries are close to this point. '+('Using the published guide for the nearby extended target; review the matches below.' if obj.get('featured') else 'Review the match below.')
+        if obj.get('match_scope')=='field':
+            label=f"{obj['name']} · in the saved field, {obj['separation_arcsec']:.1f} arcsec from saved point"
+            message='Using a named object from the wider field. Review the matches to choose the object you intended; the saved point and image are unchanged.'
     else:
         label='Identity unresolved'
         story=(f"This stop preserves a sky field at right ascension {note['ra']:.5f} degrees and declination {note['dec']:.5f} degrees. "
@@ -125,23 +162,50 @@ def compose(note,research,selected=None):
                'Use the saved image as a starting point: compare surveys, zoom in on the feature that caught your attention, and repeat the lookup at its position. '
                'The saved view records a direction on the sky; apparent proximity in the image does not establish physical proximity in space.')
         status='unidentified' if research.get('catalog_available') else 'unavailable'
-        message='No catalog entry returned in the search radius.' if research.get('catalog_available') else 'SIMBAD is unavailable. The saved image and location are safe; retry the research later.'
+        message='No catalog entry returned in the point or wider field search.' if research.get('catalog_available') else 'SIMBAD is unavailable. The saved image and location are safe; retry the research later.'
     return {**research,'status':status,'message':message,'selected_id':obj['id'] if obj else None,'identity_label':label,'story':story[:3500],'sources':sources,'checked_at':remote.now(),
-            'method':'Catalog positions and checked source summaries, assembled locally. Background paragraphs describe the object class, not measured properties of this target.'}
+            'method':'Named catalog records, referenced measurements and checked summaries, assembled locally. Field associations are distinct from exact point matches. General background is separate from target measurements.','research_version':2,'selection_method':research.get('selection_method','automatic')}
 
 
 async def investigate(note):
-    result=await asyncio.wait_for(object_map.objects(note['ra'],note['dec'],radius_for(note)),timeout=55)
+    result,field=await asyncio.wait_for(asyncio.gather(object_map.objects(note['ra'],note['dec'],radius_for(note)),object_map.objects(*field_query(note))),timeout=55)
     old=note.get('research',{})
-    research={**old,'candidates':candidates_for(note,result),'catalog_available':result.get('catalog_available',False),
-              'catalog_stale':result.get('stale',False),'catalog_fetched_at':result.get('fetched_at'),'radius_arcsec':radius_for(note)*3600}
-    return compose(note,research,old.get('selected_id'))
+    rows={o['id']:o for o in candidates_for(note,field,True)+candidates_for(note,result)}
+    preferred=old.get('selected_id') if old.get('selection_method')=='manual' or old.get('research_version')!=2 else None
+    # An explicitly clicked label is resolved by name, never by the label's screen pixels.
+    hint=note.get('provenance',{}).get('object_hint',{})
+    if isinstance(hint,dict) and hint.get('name'):
+        try:
+            named=await asyncio.wait_for(object_facts.lookup(hint['name']),timeout=25)
+            matches=candidates_for(note,{'rows':[named]},True) if named else []
+            if matches:
+                rows[named['id']]=matches[0];preferred=preferred or named['id']
+                old={**old,'object_details':{**old.get('object_details',{}),named['id']:named}}
+        except (ValueError,KeyError,TypeError,TimeoutError):pass
+    candidates=sorted(rows.values(),key=lambda o:(o['id']!=preferred,o['separation_arcsec']))[:120]
+    research={**old,'candidates':candidates,'catalog_available':result.get('catalog_available',False) or field.get('catalog_available',False),
+              'catalog_stale':result.get('stale',False) or field.get('stale',False),'catalog_fetched_at':field.get('fetched_at') or result.get('fetched_at'),
+              'radius_arcsec':radius_for(note)*3600,'field_radius_arcsec':field_query(note)[2]*3600,'field_truncated':field.get('truncated',False)}
+    if not candidates and old.get('story') and not research['catalog_available']:raise ValueError('Catalog unavailable; preserving the previous story.')
+    first=selected_object(research,preferred)
+    if not preferred and first and first.get('match_scope')=='field':
+        # A galaxy's disk may contain nearer component/transient records. Prefer
+        # its familiar catalog guide only when its measured extent reaches the
+        # saved point; keep all candidates and the field-association disclosure.
+        parent=next((o for o in candidates if re.fullmatch(r'(M|NGC|IC)\s*\d+',o['name'].strip(),re.I)),None)
+        if parent and parent['id']!=first['id']:
+            research=await enrich(research,parent)
+            detail=research.get('object_details',{}).get(parent['id'],{})
+            diameter=remote.number(detail.get('measurements',{}).get('galdim_majaxis'))
+            if diameter and parent['separation_arcsec']<=diameter*30:preferred=parent['id']
+    research=await enrich(research,selected_object(research,preferred))
+    return compose(note,research,preferred)
 
 
 def worker(ident,token):
     try:
         with LOCK:
-            note=read(ident);research={**note['research'],'status':'researching','message':'Checking SIMBAD and source-backed guides…'}
+            note=read(ident);research={**note['research'],'status':'researching','message':'Checking field labels, named objects and referenced measurements…'}
             write_research(ident,research)
         result=asyncio.run(investigate(note))
         with LOCK:
@@ -209,12 +273,15 @@ def edit_story(ident:str,body:StoryEdit):
 
 
 @router.put('/{ident}/identify')
-def identify(ident:str,body:Identification):
+async def identify(ident:str,body:Identification):
     with LOCK:
         note=read(ident)
         if ident in PENDING:raise HTTPException(409,'Wait for research to finish before selecting an object.')
         if not any(o['id']==body.candidate_id for o in note['research'].get('candidates',[])):raise HTTPException(422,'Select an object returned for this saved location.')
-        return write_research(ident,compose(note,note['research'],body.candidate_id),body.revision)
+        if note['revision']!=body.revision:raise HTTPException(409,'This notebook entry changed. Reload it before saving.')
+    research=await enrich(note['research'],selected_object(note['research'],body.candidate_id))
+    with LOCK:
+        return write_research(ident,compose(note,{**research,'selection_method':'manual'},body.candidate_id),body.revision)
 
 
 @router.post('/tour')

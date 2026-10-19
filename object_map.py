@@ -42,6 +42,8 @@ def separation(ra,dec,other_ra,other_dec):
 # Preserve unknown catalog classifications verbatim instead of guessing their meaning.
 TYPE_NAMES.pop('H2O',None)
 TYPE_NAMES.update({'Rad':'Radio source','smm':'Submillimeter source'})
+TYPE_NAMES.update({'EmG':'Emission-line galaxy','SyG':'Seyfert galaxy','AGN':'Active galactic nucleus','LSB':'Low surface brightness galaxy','GinCl':'Galaxy in a cluster'})
+TYPE_NAMES.update({'Sy1':'Seyfert 1 galaxy','Sy2':'Seyfert 2 galaxy','SN*':'Supernova'})
 
 async def objects(ra,dec,radius):
  ra,dec,radius=round(ra,6),round(dec,6),round(radius,4)

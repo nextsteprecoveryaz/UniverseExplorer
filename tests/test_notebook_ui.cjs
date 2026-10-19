@@ -34,6 +34,13 @@ test('keyboard context menu uses the map center and zero sky coordinates remain 
   const r=h.context.notebookLocation({clientX:0,clientY:0},sky,{left:10,top:10,width:500,height:400});
   assert.deepEqual(point,[250,200]);assert.equal(r.ra,0);assert.equal(r.search_radius_arcsec,180);
 });
+test('catalog label right-click saves its anchor and name even when label text is offset',()=>{
+  const h=harness();h.context.mapUI={rows:[{id:'simbad:NGC  1635',name:'NGC 1635',ra:70.0328375,dec:-.5475611}],enabled:false};
+  const sky={pix2world:()=>[70.04,-.54],getRaDec:()=>[70.0328,-.5475],getFov:()=>[.04]};
+  const event={clientX:150,clientY:100,target:{closest:selector=>selector.startsWith('#object-markers')?{dataset:{mapId:'simbad:NGC  1635'}}:null}};
+  const result=h.context.notebookLocation(event,sky,{left:0,top:0,width:500,height:400});
+  assert.ok(Math.abs(result.ra-70.0328375)<1e-9);assert.equal(result.object_hint.name,'NGC 1635');assert.equal(result.dec,-.5475611);
+});
 test('narrated notebook routes restore their explicitly selected provider and enable speech',()=>{
   const h=harness();h.context.activateNotebookNarration({stops:[{guide:{narrator:'browser'}}]});
   assert.equal(h.$('#route-narration').checked,true);assert.equal(h.$('#tour-narration-provider').value,'browser');assert.equal(h.$('#tour-narration-voice').disabled,true);

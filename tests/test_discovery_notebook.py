@@ -13,6 +13,8 @@ import science
 
 @pytest.fixture
 def client(tmp_path,monkeypatch):
+    async def no_details(name):return None
+    monkeypatch.setattr(notebook.object_facts,'lookup',no_details)
     monkeypatch.setattr(notebook,'PATH',tmp_path/'notes.sqlite3')
     monkeypatch.setattr(expeditions,'PATH',tmp_path/'routes.sqlite3')
     images=tmp_path/'images';images.mkdir();monkeypatch.setattr(science,'IMAGES',images)
@@ -166,3 +168,81 @@ def test_missing_local_snapshot_does_not_break_portable_tour_story(client):
     note=researched(client);guide={'note_id':note['id'],'note_revision':note['revision'],'narration':'Saved story','description':'Saved story','image_id':'f'*32,'image_sha256':'a'*64,'sources':[],'identity_label':'Field'}
     media=expeditions.resolve_notebook({'title':'Test','ra':0,'dec':0,'guide':guide})
     assert media['available'] and media['snapshot_missing'] and media['preview_url'] is None and media['narration']=='Saved story'
+
+
+def test_hidden_field_labels_resolve_outside_tiny_click_radius(client,monkeypatch):
+    note=add(client,ra=70.0314,dec=-.5449,provenance={'view':{'ra':70.0328,'dec':-.5475,'fov':.04},'search_radius_arcsec':3})
+    galaxy=candidate(id='simbad:NGC  1635',name='NGC 1635',ra=70.0328375,dec=-.5475611,type_code='EmG',type='Emission-line galaxy')
+    calls=[]
+    async def objects(ra,dec,radius):
+        calls.append((ra,dec,radius))
+        return {'rows':[galaxy] if radius>.001 else [],'catalog_available':True}
+    monkeypatch.setattr(notebook.object_map,'objects',objects)
+    result=asyncio.run(notebook.investigate(note))
+    assert len(calls)==2 and result['selected_id']==galaxy['id']
+    assert result['candidates'][0]['match_scope']=='field' and 'wider field' in result['message']
+    assert result['identity_label'].startswith('NGC 1635 · in the saved field')
+    assert notebook.read(note['id'])['ra']==70.0314
+
+
+def test_explicit_named_label_beats_closer_star_and_rejects_off_field_name(client,monkeypatch):
+    note=add(client,provenance={'object_hint':{'name':'M31'},'fov':.1,'search_radius_arcsec':3})
+    star=candidate(id='star',name='Star',ra=note['ra']+.00001)
+    named={**candidate(),'name':'M31','measurements':{},'distances':[],'constellation':'Andromeda'}
+    async def objects(*args):return {'rows':[star],'catalog_available':True}
+    async def lookup(name):return named if name in ('M31','M 31') else None
+    monkeypatch.setattr(notebook.object_map,'objects',objects);monkeypatch.setattr(notebook.object_facts,'lookup',lookup)
+    result=asyncio.run(notebook.investigate(note));assert result['selected_id']==named['id']
+    named['ra']=50
+    result=asyncio.run(notebook.investigate(note));assert result['selected_id']=='star'
+
+
+def test_fact_refresh_keeps_manual_script_and_immutable_tour(client,monkeypatch):
+    note=researched(client)
+    note=client.put('/api/notebook/'+note['id']+'/story',json={'revision':note['revision'],'narration':'My original narration.'}).json()
+    route=client.post('/api/notebook/tour',json={'title':'Keep my story','entries':[{'id':note['id'],'revision':note['revision']}]}).json()
+    async def objects(*args):return {'rows':[candidate()],'catalog_available':True}
+    async def lookup(name):return {**candidate(),'measurements':{},'distances':[],'constellation':'Andromeda'}
+    monkeypatch.setattr(notebook.object_map,'objects',objects);monkeypatch.setattr(notebook.object_facts,'lookup',lookup)
+    notebook.start_research(note['id']);fn,*args=client.tasks.pop();fn(*args)
+    updated=notebook.read(note['id'])
+    assert 'constellation Andromeda' in updated['research']['story']
+    assert updated['research']['edited_narration']=='My original narration.'
+    assert client.get('/api/navigation/routes/'+route['id']).json()['media'][0]['narration']=='My original narration.'
+
+
+def test_failed_catalog_refresh_preserves_existing_draft(client,monkeypatch):
+    note=researched(client)
+    async def offline(*args):return {'rows':[],'catalog_available':False}
+    monkeypatch.setattr(notebook.object_map,'objects',offline)
+    notebook.start_research(note['id']);fn,*args=client.tasks.pop();fn(*args)
+    updated=notebook.read(note['id'])
+    assert updated['research']['status']=='failed' and updated['research']['story']==note['research']['story']
+
+
+def test_switching_match_enriches_new_object_without_overwriting_concurrent_edit(client,monkeypatch):
+    note=researched(client);other={**candidate(id='other',name='Other galaxy'),'separation_arcsec':1}
+    r={**note['research'],'candidates':note['research']['candidates']+[other]}
+    note=notebook.write_research(note['id'],r)
+    async def lookup(name):
+        notebook.write_research(note['id'],{**r,'edited_narration':'Concurrent change'})
+        return None
+    monkeypatch.setattr(notebook.object_facts,'lookup',lookup)
+    response=client.put('/api/notebook/'+note['id']+'/identify',json={'revision':note['revision'],'candidate_id':'other'})
+    assert response.status_code==409 and notebook.read(note['id'])['research']['edited_narration']=='Concurrent change'
+
+
+@pytest.mark.parametrize('diameter,expected',[(2,'parent'),(.1,'supernova')])
+def test_field_guide_prefers_named_galaxy_only_when_its_measured_extent_reaches_point(client,monkeypatch,diameter,expected):
+    note=add(client,ra=10,dec=10,provenance={'fov':.1,'search_radius_arcsec':3})
+    supernova=candidate(id='supernova',name='SN 1999cl',ra=10.006,dec=10)
+    parent=candidate(id='parent',name='M 88',ra=10.01,dec=10)
+    async def objects(*args):return {'rows':[supernova,parent],'catalog_available':True}
+    async def lookup(name):
+        if name!='M 88':return None
+        return {**parent,'measurements':{'galdim_majaxis':diameter},'distances':[],'constellation':'Virgo'}
+    monkeypatch.setattr(notebook.object_map,'objects',objects);monkeypatch.setattr(notebook.object_facts,'lookup',lookup)
+    result=asyncio.run(notebook.investigate(note))
+    assert result['selected_id']==expected
+    note['research']={**result,'selected_id':'supernova','selection_method':'manual'}
+    assert asyncio.run(notebook.investigate(note))['selected_id']=='supernova'
