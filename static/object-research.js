@@ -26,7 +26,7 @@ function renderObjectResearch(o,record,serial){
     try{await audio.play();}catch{objectResearchStatus('Press play on the audio player to listen.');}
   };
   if($('#object-research-audio')){
-    $('#object-research-audio').onplay=()=>{if(typeof pauseTourNarration==='function')pauseTourNarration();};
+    $('#object-research-audio').onplay=()=>{if(typeof pauseObjectVideos==='function')pauseObjectVideos();if(typeof pauseTourNarration==='function')pauseTourNarration();};
     $('#object-research-audio').onerror=()=>objectResearchStatus('Saved audio could not play. Reopen the object to check its recording; research remains saved.');
   }
   if($('#object-add-tour'))$('#object-add-tour').onclick=()=>openObjectTour(o,record).catch(failure);

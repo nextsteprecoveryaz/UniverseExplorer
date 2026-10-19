@@ -7,7 +7,7 @@ let topazModelsReady=false;
 const topazModelValues=new Map();
 let enhancementRunning=false;
 
-function stopObjectVideo(){if(typeof cancelDestinationVisit==='function')cancelDestinationVisit();document.querySelectorAll('#object-detail video, #object-detail audio').forEach(media=>media.pause());}
+function stopObjectVideo(){if(typeof stopObjectVideoLibrary==='function')stopObjectVideoLibrary();if(typeof cancelDestinationVisit==='function')cancelDestinationVisit();document.querySelectorAll('#object-detail video, #object-detail audio').forEach(media=>media.pause());}
 function onSkyViewChanged(){
   if(!mapUI.enabled||!state.sky)return;
   cancelAnimationFrame(mapUI.frame);mapUI.frame=requestAnimationFrame(positionObjectMarkers);
@@ -102,13 +102,17 @@ function showObjectDetail(o){
   if(!o)return;stopObjectVideo();mapUI.selected=o;
   syncObjectMapVisibility();
   $('#object-list-view').hidden=true;$('#object-detail').hidden=false;$('#object-panel-back').hidden=false;
-  $('#object-detail').innerHTML=`<span class="badge teal">${esc(o.catalog)}</span><h2>${esc(o.name)}</h2><div class="object-kind">${esc(o.type)}</div><section id="object-research" aria-label="Object research"></section><div class="object-coordinates">RA ${Number(o.ra).toFixed(6)}°<br>Dec ${Number(o.dec).toFixed(6)}° · ICRS</div><a href="${esc(o.source_url)}" target="_blank" rel="noopener">${o.featured?'Read the source & credits':'Open SIMBAD record & references'} ↗</a>${o.video_url?`<div class="object-video"><h3>${esc(o.video_title)}</h3><video id="object-video" controls playsinline preload="metadata" aria-label="${esc(o.video_title)}"><source src="${esc(o.video_url)}" type="video/mp4"></video><p class="video-kind">${esc(o.video_kind)}</p><a href="${esc(o.video_page)}" target="_blank" rel="noopener">Video source, description & full credits ↗</a><p id="video-error" class="small muted" hidden>Video playback is unavailable here. Open the publisher’s video page above.</p></div>`:'<p class="video-unavailable">No object-specific video is linked for this catalog entry.</p>'}<div class="object-actions"><button id="object-center" class="button">Center on object</button><button id="object-save" class="button">+ Save to notebook</button></div>`;
+  $('#object-detail').innerHTML=`<span class="badge teal">${esc(o.catalog)}</span><h2>${esc(o.name)}</h2><div class="object-kind">${esc(o.type)}</div><section id="object-research" aria-label="Object research"></section><div class="object-coordinates">RA ${Number(o.ra).toFixed(6)}°<br>Dec ${Number(o.dec).toFixed(6)}° · ICRS</div><a href="${esc(o.source_url)}" target="_blank" rel="noopener">${o.featured?'Read the source & credits':'Open SIMBAD record & references'} ↗</a>${o.video_url?`<div class="object-video"><h3>${esc(o.video_title)}</h3><video id="object-video" controls playsinline preload="metadata" aria-label="${esc(o.video_title)}"><source src="${esc(o.video_url)}" type="video/mp4"></video><p class="video-kind">${esc(o.video_kind)}</p><a href="${esc(o.video_page)}" target="_blank" rel="noopener">Video source, description & full credits ↗</a><p id="video-error" class="small muted" hidden>Video playback is unavailable here. Open the publisher’s video page above.</p></div>`:''}<section id="object-videos" aria-label="Destination videos"></section><div class="object-actions"><button id="object-center" class="button">Center on object</button><button id="object-save" class="button">+ Save to notebook</button></div>`;
   $('#object-panel').scrollTop=0;
   $('#object-center').onclick=()=>flyTo({name:o.name,ra:o.ra,dec:o.dec,fov:o.fov||Math.min(currentField().fov,.15),survey:o.survey||state.survey,type:o.type,description:o.summary});
   $('#object-save').onclick=()=>noteDialog({title:o.name,body:o.summary,ra:o.ra,dec:o.dec,provenance:{view:skyView(),object_hint:{id:o.id,name:o.name,ra:o.ra,dec:o.dec},catalog:o.catalog,source_url:o.source_url,video_page:o.video_page||null,classification:o.type_code||o.type}});
   const sed=document.createElement('button');sed.className='button';sed.textContent='VizieR photometry';$('.object-actions').append(sed);sed.onclick=()=>openPhotometry(`${o.ra} ${o.dec>=0?'+':''}${o.dec}`);
   const tess=document.createElement('button');tess.className='button';tess.textContent='Find TESS light curves';$('.object-actions').append(tess);tess.onclick=()=>openTessStar(o);
-  if(o.video_url)$('#object-video').onerror=()=>$('#video-error').hidden=false;
+  if(o.video_url){
+    $('#object-video').onerror=()=>$('#video-error').hidden=false;
+    $('#object-video').onplay=()=>{if(typeof pauseObjectVideos==='function'){pauseObjectVideos(true);pauseNarrationForVideo();}};
+  }
+  if(typeof renderObjectVideos==='function')renderObjectVideos(o);
   positionObjectMarkers();
   return loadObjectResearch(o);
 }

@@ -1,0 +1,1137 @@
+{
+  "version": 1,
+  "checked_at": "2026-10-19T17:47:07.172951+00:00",
+  "verification": "YouTube oEmbed metadata; curated matches to destination names. Playback remains subject to YouTube availability and publisher embedding settings.",
+  "destinations": {
+    "pillars": [
+      {
+        "provider": "youtube",
+        "id": "fNeM3S6b1Ts",
+        "title": "M16 - Eagle Nebula and THAT amazing image - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=fNeM3S6b1Ts",
+        "duration": "",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "mjYR-mpVN-A",
+        "title": "Hubble’s Inside The Image: The Eagle Nebula",
+        "channel": "NASA Goddard",
+        "channel_url": "https://www.youtube.com/@NASAGoddard",
+        "url": "https://www.youtube.com/watch?v=mjYR-mpVN-A",
+        "duration": "3:04",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "carina": [
+      {
+        "provider": "youtube",
+        "id": "fCOUIa3GKr8",
+        "title": "Star Formation from the Carina Nebula to the Cosmic Cliffs",
+        "channel": "Space Telescope Science Institute",
+        "channel_url": "https://www.youtube.com/@spacetelescopevision",
+        "url": "https://www.youtube.com/watch?v=fCOUIa3GKr8",
+        "duration": "4:25",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "dEnHVL0FjhI",
+        "title": "Exploring the Cosmic Cliffs in 3D",
+        "channel": "Space Telescope Science Institute",
+        "channel_url": "https://www.youtube.com/@spacetelescopevision",
+        "url": "https://www.youtube.com/watch?v=dEnHVL0FjhI",
+        "duration": "1:44",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "PBZ7GJHFcLc",
+        "title": "The Cosmic Cliffs Image Is Gorgeous, But What Is It?",
+        "channel": "Museum of Science",
+        "channel_url": "https://www.youtube.com/@museumofscience",
+        "url": "https://www.youtube.com/watch?v=PBZ7GJHFcLc",
+        "duration": "5:02",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "orion": [
+      {
+        "provider": "youtube",
+        "id": "KOXm7W8f6wo",
+        "title": "M42 - Orion Nebula - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=KOXm7W8f6wo",
+        "duration": "",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "fkWrjrdT3Zg",
+        "title": "Flight Through Orion Nebula in Visible and Infrared Light",
+        "channel": "NASA",
+        "channel_url": "https://www.youtube.com/@NASA",
+        "url": "https://www.youtube.com/watch?v=fkWrjrdT3Zg",
+        "duration": "3:05",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "quintet": [
+      {
+        "provider": "youtube",
+        "id": "WMgLtMjz2E4",
+        "title": "Hubble’s Inside the Image: Stephan's Quintet",
+        "channel": "NASA Goddard",
+        "channel_url": "https://www.youtube.com/@NASAGoddard",
+        "url": "https://www.youtube.com/watch?v=WMgLtMjz2E4",
+        "duration": "3:01",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "anpEBQQbQNU",
+        "title": "Stephan's Quintet: A Multi-wavelength Exploration",
+        "channel": "Space Telescope Science Institute",
+        "channel_url": "https://www.youtube.com/@spacetelescopevision",
+        "url": "https://www.youtube.com/watch?v=anpEBQQbQNU",
+        "duration": "5:06",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "RXmIAwgPnyA",
+        "title": "Stephan's Quintet: Caltech Expert Gives a Guided Tour of the New JWST Image",
+        "channel": "caltech",
+        "channel_url": "https://www.youtube.com/@caltech",
+        "url": "https://www.youtube.com/watch?v=RXmIAwgPnyA",
+        "duration": "7:25",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "andromeda": [
+      {
+        "provider": "youtube",
+        "id": "N5fdsSRTJfg",
+        "title": "M31 - Andromeda Galaxy - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=N5fdsSRTJfg",
+        "duration": "",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "TijClV4uHIk",
+        "title": "Zooming in on the Andromeda Galaxy",
+        "channel": "HubbleWebbESA",
+        "channel_url": "https://www.youtube.com/@HubbleESA",
+        "url": "https://www.youtube.com/watch?v=TijClV4uHIk",
+        "duration": "0:57",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "trappist": [
+      {
+        "provider": "youtube",
+        "id": "bnKFaAS30X8",
+        "title": "NASA & TRAPPIST-1: A Treasure Trove of Planets Found",
+        "channel": "NASA Jet Propulsion Laboratory",
+        "channel_url": "https://www.youtube.com/@NASAJPL",
+        "url": "https://www.youtube.com/watch?v=bnKFaAS30X8",
+        "duration": "1:57",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "o2MgG6KhO1E",
+        "title": "NASA VR: On the Surface of Planet TRAPPIST-1d (360 view)",
+        "channel": "NASA Jet Propulsion Laboratory",
+        "channel_url": "https://www.youtube.com/@NASAJPL",
+        "url": "https://www.youtube.com/watch?v=o2MgG6KhO1E",
+        "duration": "1:24",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "lagoon": [
+      {
+        "provider": "youtube",
+        "id": "PmND3stF1Hg",
+        "title": "M8 - The Lagoon Nebula and Space Tornadoes - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=PmND3stF1Hg",
+        "duration": "7:27",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "fiqxVLEH7t4",
+        "title": "Zooming in on the Lagoon Nebula",
+        "channel": "HubbleWebbESA",
+        "channel_url": "https://www.youtube.com/@HubbleESA",
+        "url": "https://www.youtube.com/watch?v=fiqxVLEH7t4",
+        "duration": "0:50",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "trifid": [
+      {
+        "provider": "youtube",
+        "id": "ji-mk64ATzw",
+        "title": "M20 - Trifid Tebula - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=ji-mk64ATzw",
+        "duration": "",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "2UhDSRvqD74",
+        "title": "Explore the Trifid Nebula",
+        "channel": "Space Telescope Science Institute",
+        "channel_url": "https://www.youtube.com/@spacetelescopevision",
+        "url": "https://www.youtube.com/watch?v=2UhDSRvqD74",
+        "duration": "0:46",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "omega": [
+      {
+        "provider": "youtube",
+        "id": "KfRpihLGIMw",
+        "title": "M17 - Omega Nebula - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=KfRpihLGIMw",
+        "duration": "8:08",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "IC2TTJiaUFo",
+        "title": "Let's Photograph the Omega Nebula",
+        "channel": "AstroBackyard",
+        "channel_url": "https://www.youtube.com/@AstroBackyard",
+        "url": "https://www.youtube.com/watch?v=IC2TTJiaUFo",
+        "duration": "10:23",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "north-america": [
+      {
+        "provider": "youtube",
+        "id": "qpSytSFlbFE",
+        "title": "The North America and Pelican nebulae: This Week in Astronomy with Dave Eicher 7/15/2024",
+        "channel": "Astronomy magazine",
+        "channel_url": "https://www.youtube.com/@astronomymagazine",
+        "url": "https://www.youtube.com/watch?v=qpSytSFlbFE",
+        "duration": "2:10",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "g6hrFXrleIQ",
+        "title": "Exploring The North America Nebula from my Backyard",
+        "channel": "AstroBackyard",
+        "channel_url": "https://www.youtube.com/@AstroBackyard",
+        "url": "https://www.youtube.com/watch?v=g6hrFXrleIQ",
+        "duration": "8:47",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "pelican": [
+      {
+        "provider": "youtube",
+        "id": "qpSytSFlbFE",
+        "title": "The North America and Pelican nebulae: This Week in Astronomy with Dave Eicher 7/15/2024",
+        "channel": "Astronomy magazine",
+        "channel_url": "https://www.youtube.com/@astronomymagazine",
+        "url": "https://www.youtube.com/watch?v=qpSytSFlbFE",
+        "duration": "2:10",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "X0HrIyu6_Yc",
+        "title": "The Pelican Nebula in 75 Minutes! Deep Sky with the Player One Uranus C",
+        "channel": "lukomatico",
+        "channel_url": "https://www.youtube.com/@lukomatico",
+        "url": "https://www.youtube.com/watch?v=X0HrIyu6_Yc",
+        "duration": "7:17",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "california": [
+      {
+        "provider": "youtube",
+        "id": "eDhI9WoXyQQ",
+        "title": "Astronomy Photographer of the Year: photographing the  California Nebula",
+        "channel": "BBC Sky at Night Magazine",
+        "channel_url": "https://www.youtube.com/@bbcskyatnightmag",
+        "url": "https://www.youtube.com/watch?v=eDhI9WoXyQQ",
+        "duration": "1:36",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "CbVZ8cIIoLs",
+        "title": "My CALIFORNIA NEBULA Project is DONE! (CANON EOS Ra)",
+        "channel": "AstroBackyard",
+        "channel_url": "https://www.youtube.com/@AstroBackyard",
+        "url": "https://www.youtube.com/watch?v=CbVZ8cIIoLs",
+        "duration": "10:27",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "heart": [
+      {
+        "provider": "youtube",
+        "id": "UA2sv1ZTt0I",
+        "title": "Capturing the Heart Nebula Once and For All (Astrophotography)",
+        "channel": "Chuck's Astrophotography",
+        "channel_url": "https://www.youtube.com/@ChucksAstrophotography",
+        "url": "https://www.youtube.com/watch?v=UA2sv1ZTt0I",
+        "duration": "4:42",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "CKV5mY_s_C8",
+        "title": "Melotte 15 (Heart of the Heart Nebula) Captured",
+        "channel": "Chuck's Astrophotography",
+        "channel_url": "https://www.youtube.com/@ChucksAstrophotography",
+        "url": "https://www.youtube.com/watch?v=CKV5mY_s_C8",
+        "duration": "6:34",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "soul": [
+      {
+        "provider": "youtube",
+        "id": "55mx5FSzR5g",
+        "title": "My BEST Capture of the Soul Nebula",
+        "channel": "Chuck's Astrophotography",
+        "channel_url": "https://www.youtube.com/@ChucksAstrophotography",
+        "url": "https://www.youtube.com/watch?v=55mx5FSzR5g",
+        "duration": "10:27",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "4CC_6BbjBZM",
+        "title": "Classroom Aid - Heart & Soul Nebula",
+        "channel": "David Butler",
+        "channel_url": "https://www.youtube.com/@howfarawayisit",
+        "url": "https://www.youtube.com/watch?v=4CC_6BbjBZM",
+        "duration": "0:21",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "elephant-trunk": [
+      {
+        "provider": "youtube",
+        "id": "gb4aJ_A6Py0",
+        "title": "Elephant's Trunk Nebula Captured With Large Telescope",
+        "channel": "Chuck's Astrophotography",
+        "channel_url": "https://www.youtube.com/@ChucksAstrophotography",
+        "url": "https://www.youtube.com/watch?v=gb4aJ_A6Py0",
+        "duration": "5:50",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "xTNZPgnfpT4",
+        "title": "Let's Photograph the Elephant's Trunk Nebula",
+        "channel": "AstroBackyard",
+        "channel_url": "https://www.youtube.com/@AstroBackyard",
+        "url": "https://www.youtube.com/watch?v=xTNZPgnfpT4",
+        "duration": "9:35",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "rosette": [
+      {
+        "provider": "youtube",
+        "id": "rQ4n2HjppWo",
+        "title": "Chandra Presents the Rosette Nebula",
+        "channel": "NASA",
+        "channel_url": "https://www.youtube.com/@NASA",
+        "url": "https://www.youtube.com/watch?v=rQ4n2HjppWo",
+        "duration": "1:41",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "SWpNQAn0HYc",
+        "title": "Zooming into the Rosette Nebula",
+        "channel": "NOIRLabAstro",
+        "channel_url": "https://www.youtube.com/@NOIRLabAstro",
+        "url": "https://www.youtube.com/watch?v=SWpNQAn0HYc",
+        "duration": "1:00",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "carina-nebula": [
+      {
+        "provider": "youtube",
+        "id": "w5IqQCiHF64",
+        "title": "Hubble’s Inside The Image: Carina Nebula",
+        "channel": "NASA Goddard",
+        "channel_url": "https://www.youtube.com/@NASAGoddard",
+        "url": "https://www.youtube.com/watch?v=w5IqQCiHF64",
+        "duration": "3:00",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "fCOUIa3GKr8",
+        "title": "Star Formation from the Carina Nebula to the Cosmic Cliffs",
+        "channel": "Space Telescope Science Institute",
+        "channel_url": "https://www.youtube.com/@spacetelescopevision",
+        "url": "https://www.youtube.com/watch?v=fCOUIa3GKr8",
+        "duration": "4:25",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "tarantula": [
+      {
+        "provider": "youtube",
+        "id": "qsaKxyljCjg",
+        "title": "Most Massive Star in the Universe - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=qsaKxyljCjg",
+        "duration": "",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "iI9Uf6XAKaY",
+        "title": "Most Massive Star and the Tarantula Nebula | Hubble Images 4K | Episode 5",
+        "channel": "Astrum",
+        "channel_url": "https://www.youtube.com/@astrumspace",
+        "url": "https://www.youtube.com/watch?v=iI9Uf6XAKaY",
+        "duration": "11:22",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "flame": [
+      {
+        "provider": "youtube",
+        "id": "jXhRNzxoMRA",
+        "title": "Tour of the Flame Nebula",
+        "channel": "NASA's Marshall Space Flight Center",
+        "channel_url": "https://www.youtube.com/@NASAMarshall",
+        "url": "https://www.youtube.com/watch?v=jXhRNzxoMRA",
+        "duration": "1:33",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "H4KPPR--Hz8",
+        "title": "A Tour of Flame Nebula",
+        "channel": "Chandra X-ray Observatory",
+        "channel_url": "https://www.youtube.com/@ChandraXray",
+        "url": "https://www.youtube.com/watch?v=H4KPPR--Hz8",
+        "duration": "2:15",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "horsehead": [
+      {
+        "provider": "youtube",
+        "id": "-PQpNb_yJVE",
+        "title": "Zooming in on the Horsehead Nebula (3D)",
+        "channel": "HubbleWebbESA",
+        "channel_url": "https://www.youtube.com/@HubbleESA",
+        "url": "https://www.youtube.com/watch?v=-PQpNb_yJVE",
+        "duration": "1:01",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "Mk9ISAgoxM4",
+        "title": "Take a Tour of the Horsehead Nebula",
+        "channel": "James Webb Space Telescope (JWST)",
+        "channel_url": "https://www.youtube.com/@NASAWebbTelescope",
+        "url": "https://www.youtube.com/watch?v=Mk9ISAgoxM4",
+        "duration": "1:30",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "veil": [
+      {
+        "provider": "youtube",
+        "id": "K-RHVKM6fOk",
+        "title": "Hubble’s Inside the Image: The Veil Nebula",
+        "channel": "NASA Goddard",
+        "channel_url": "https://www.youtube.com/@NASAGoddard",
+        "url": "https://www.youtube.com/watch?v=K-RHVKM6fOk",
+        "duration": "3:27",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "EB7EK9d6juM",
+        "title": "Hubblecast 07: Uncovering the Veil Nebula",
+        "channel": "HubbleWebbESA",
+        "channel_url": "https://www.youtube.com/@HubbleESA",
+        "url": "https://www.youtube.com/watch?v=EB7EK9d6juM",
+        "duration": "6:18",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "crab": [
+      {
+        "provider": "youtube",
+        "id": "lBfCQt6TTms",
+        "title": "M1 - Crab Nebula - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=lBfCQt6TTms",
+        "duration": "10:25",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "4K3_uNPJ1D8",
+        "title": "Tour the Crab Nebula",
+        "channel": "James Webb Space Telescope (JWST)",
+        "channel_url": "https://www.youtube.com/@NASAWebbTelescope",
+        "url": "https://www.youtube.com/watch?v=4K3_uNPJ1D8",
+        "duration": "1:54",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "ring": [
+      {
+        "provider": "youtube",
+        "id": "_TovLkVHfZE",
+        "title": "M57 - Ring Nebula - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=_TovLkVHfZE",
+        "duration": "",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "4QVbxJzY7IA",
+        "title": "Hubblecast 66: Hubble uncovers the secrets of the Ring Nebula — The ESA astronomy podcast",
+        "channel": "HubbleWebbESA",
+        "channel_url": "https://www.youtube.com/@HubbleESA",
+        "url": "https://www.youtube.com/watch?v=4QVbxJzY7IA",
+        "duration": "5:30",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "dumbbell": [
+      {
+        "provider": "youtube",
+        "id": "uP6eChP7i44",
+        "title": "M27 - Dumbbell Nebula and Biscuits - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=uP6eChP7i44",
+        "duration": "6:46",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "izddeodjYRE",
+        "title": "This Week in Astronomy with Dave Eicher: The Dumbbell Nebula",
+        "channel": "Astronomy magazine",
+        "channel_url": "https://www.youtube.com/@astronomymagazine",
+        "url": "https://www.youtube.com/watch?v=izddeodjYRE",
+        "duration": "2:59",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "helix": [
+      {
+        "provider": "youtube",
+        "id": "F3nm9oUggrE",
+        "title": "Helix Nebula — Observatory Comparison (Hubble/Spitzer/Webb)",
+        "channel": "Space Telescope Science Institute",
+        "channel_url": "https://www.youtube.com/@spacetelescopevision",
+        "url": "https://www.youtube.com/watch?v=F3nm9oUggrE",
+        "duration": "0:14",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "YLdnATv1eZM",
+        "title": "Hubble Image of Helix Nebula Converted to Sound",
+        "channel": "SYSTEM Sounds",
+        "channel_url": "https://www.youtube.com/@SYSTEMSounds",
+        "url": "https://www.youtube.com/watch?v=YLdnATv1eZM",
+        "duration": "0:15",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "cats-eye": [
+      {
+        "provider": "youtube",
+        "id": "Aikr9zYQdHE",
+        "title": "Hubble’s Inside the Image: Cat’s Eye Nebula",
+        "channel": "NASA Goddard",
+        "channel_url": "https://www.youtube.com/@NASAGoddard",
+        "url": "https://www.youtube.com/watch?v=Aikr9zYQdHE",
+        "duration": "2:54",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "goIsr5EgEmQ",
+        "title": "Zoom Video: Cat's Eye Nebula",
+        "channel": "HubbleWebbESA",
+        "channel_url": "https://www.youtube.com/@HubbleESA",
+        "url": "https://www.youtube.com/watch?v=goIsr5EgEmQ",
+        "duration": "1:30",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "saturn": [
+      {
+        "provider": "youtube",
+        "id": "XXKy2ofhxBg",
+        "title": "ESOcast 129 Light: The Strange Structures of the Saturn Nebula (4K UHD)",
+        "channel": "European Southern Observatory (ESO)",
+        "channel_url": "https://www.youtube.com/@ESOobservatory",
+        "url": "https://www.youtube.com/watch?v=XXKy2ofhxBg",
+        "duration": "1:35",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "pKzPpE5gmYo",
+        "title": "I photographed the Saturn Nebula with my telescope and DSLR camera!",
+        "channel": "David Shane (Starman)",
+        "channel_url": "https://www.youtube.com/@DavidShaneTrueCosmology",
+        "url": "https://www.youtube.com/watch?v=pKzPpE5gmYo",
+        "duration": "2:11",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "pleiades": [
+      {
+        "provider": "youtube",
+        "id": "t31lVCPMEZc",
+        "title": "M45 - Seven Sisters or Pleiades - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=t31lVCPMEZc",
+        "duration": "",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "8ZeWpx4t_kY",
+        "title": "Pleiades Star Cluster (Messier 45) in Taurus the Bull Constellation",
+        "channel": "Learn the Sky",
+        "channel_url": "https://www.youtube.com/@learnthesky",
+        "url": "https://www.youtube.com/watch?v=8ZeWpx4t_kY",
+        "duration": "16:29",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "double-cluster": [
+      {
+        "provider": "youtube",
+        "id": "9cYWzt1CoSU",
+        "title": "Not one but TWO ways to find The Double Cluster in Perseus",
+        "channel": "Eyes on the Sky",
+        "channel_url": "https://www.youtube.com/@Eyesonthesky",
+        "url": "https://www.youtube.com/watch?v=9cYWzt1CoSU",
+        "duration": "8:21",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "uiBA9fYod3M",
+        "title": "Perseus Double Cluster | Amazing Clusters NGC 884 & NGC 869 | Astrophotography & Observation",
+        "channel": "My Astronomy Nights",
+        "channel_url": "https://www.youtube.com/@MyAstronomyNights",
+        "url": "https://www.youtube.com/watch?v=uiBA9fYod3M",
+        "duration": "8:34",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "beehive": [
+      {
+        "provider": "youtube",
+        "id": "NbjCsbQGLCw",
+        "title": "M44 - Exoplanets in the Beehive Cluster - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=NbjCsbQGLCw",
+        "duration": "9:06",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "UJ1Gs7yG0s4",
+        "title": "Beehive Star Cluster (Messier 44) in Cancer the Crab Constellation",
+        "channel": "Learn the Sky",
+        "channel_url": "https://www.youtube.com/@learnthesky",
+        "url": "https://www.youtube.com/watch?v=UJ1Gs7yG0s4",
+        "duration": "8:47",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "hercules": [
+      {
+        "provider": "youtube",
+        "id": "HISG5N04P2A",
+        "title": "M13 - Alien Life - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=HISG5N04P2A",
+        "duration": "",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "sLrx_bxo8Qk",
+        "title": "Explore the Hercules Cluster: This Week in Astronomy with Dave Eicher 8/5/2024",
+        "channel": "Astronomy magazine",
+        "channel_url": "https://www.youtube.com/@astronomymagazine",
+        "url": "https://www.youtube.com/watch?v=sLrx_bxo8Qk",
+        "duration": "2:29",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "omega-centauri": [
+      {
+        "provider": "youtube",
+        "id": "jKbGe7FxF7s",
+        "title": "Hubble Finds New Evidence for Intermediate-Mass Black Hole in Omega Centauri",
+        "channel": "NASA Goddard",
+        "channel_url": "https://www.youtube.com/@NASAGoddard",
+        "url": "https://www.youtube.com/watch?v=jKbGe7FxF7s",
+        "duration": "1:45",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "QI3FDzn7p3k",
+        "title": "Zooming in on Omega Centauri Stellar Motion",
+        "channel": "NASA Video",
+        "channel_url": "https://www.youtube.com/@NASAgovVideo",
+        "url": "https://www.youtube.com/watch?v=QI3FDzn7p3k",
+        "duration": "0:50",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "47-tucanae": [
+      {
+        "provider": "youtube",
+        "id": "vA45oZNcqEc",
+        "title": "A Tour of X9 in 47 Tucanae",
+        "channel": "Chandra X-ray Observatory",
+        "channel_url": "https://www.youtube.com/@ChandraXray",
+        "url": "https://www.youtube.com/watch?v=vA45oZNcqEc",
+        "duration": "2:57",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "3wxyy1aYowE",
+        "title": "47 Tucanae in 60 Seconds",
+        "channel": "Chandra X-ray Observatory",
+        "channel_url": "https://www.youtube.com/@ChandraXray",
+        "url": "https://www.youtube.com/watch?v=3wxyy1aYowE",
+        "duration": "1:55",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "sagittarius-cluster": [
+      {
+        "provider": "youtube",
+        "id": "wy-C5kI4jGs",
+        "title": "M22 - Black Hole Clusters - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=wy-C5kI4jGs",
+        "duration": "4:01",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "63TKjTruiA4",
+        "title": "This Week in Astronomy with Dave Eicher: Globular cluster M22",
+        "channel": "Astronomy magazine",
+        "channel_url": "https://www.youtube.com/@astronomymagazine",
+        "url": "https://www.youtube.com/watch?v=63TKjTruiA4",
+        "duration": "2:18",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "wild-duck": [
+      {
+        "provider": "youtube",
+        "id": "8ye5hCcGM5Q",
+        "title": "M11 - Wild Duck Cluster - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=8ye5hCcGM5Q",
+        "duration": "9:51",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "9bGggtF-e_U",
+        "title": "How to find Messier 11, Aquila and Scutum",
+        "channel": "Eyes on the Sky",
+        "channel_url": "https://www.youtube.com/@Eyesonthesky",
+        "url": "https://www.youtube.com/watch?v=9bGggtF-e_U",
+        "duration": "7:46",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "triangulum": [
+      {
+        "provider": "youtube",
+        "id": "4shqOBkCki8",
+        "title": "M33 - Triangulum Galaxy - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=4shqOBkCki8",
+        "duration": "",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "hrTpNkVYYAU",
+        "title": "Zooming in on the Triangulum Galaxy",
+        "channel": "HubbleWebbESA",
+        "channel_url": "https://www.youtube.com/@HubbleESA",
+        "url": "https://www.youtube.com/watch?v=hrTpNkVYYAU",
+        "duration": "0:50",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "whirlpool": [
+      {
+        "provider": "youtube",
+        "id": "yiv6a8BVzPE",
+        "title": "M51 - The Whirlpool Galaxy - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=yiv6a8BVzPE",
+        "duration": "6:56",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "4S9gCsfnSGE",
+        "title": "Once Around the Whirlpool Galaxy",
+        "channel": "Paul Fellows",
+        "channel_url": "https://www.youtube.com/@paulfellows5411",
+        "url": "https://www.youtube.com/watch?v=4S9gCsfnSGE",
+        "duration": "12:17",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "bodes": [
+      {
+        "provider": "youtube",
+        "id": "CR53616RPi0",
+        "title": "M81 - Bode's Galaxy - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=CR53616RPi0",
+        "duration": "8:10",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "B-xcjNL9MCw",
+        "title": "Once Around Bodes Galaxy",
+        "channel": "Paul Fellows",
+        "channel_url": "https://www.youtube.com/@paulfellows5411",
+        "url": "https://www.youtube.com/watch?v=B-xcjNL9MCw",
+        "duration": "10:55",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "cigar": [
+      {
+        "provider": "youtube",
+        "id": "X0PgDIHBs7s",
+        "title": "M82 and Microwave Popcorn - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=X0PgDIHBs7s",
+        "duration": "6:49",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "bajlrBeYSJI",
+        "title": "M82 in 60 Seconds (High Definition)",
+        "channel": "Chandra X-ray Observatory",
+        "channel_url": "https://www.youtube.com/@ChandraXray",
+        "url": "https://www.youtube.com/watch?v=bajlrBeYSJI",
+        "duration": "1:10",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "pinwheel": [
+      {
+        "provider": "youtube",
+        "id": "flxa5hJV7OA",
+        "title": "M101 - Supernova and Pinwheel Galaxy - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=flxa5hJV7OA",
+        "duration": "6:44",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "o8Q_GWXL9Gw",
+        "title": "Photographing the PINWHEEL GALAXY with a Small Telescope",
+        "channel": "AstroBackyard",
+        "channel_url": "https://www.youtube.com/@AstroBackyard",
+        "url": "https://www.youtube.com/watch?v=o8Q_GWXL9Gw",
+        "duration": "12:32",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "sombrero": [
+      {
+        "provider": "youtube",
+        "id": "I4NyGLHy2Rk",
+        "title": "M104 - Sombrero Galaxy - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=I4NyGLHy2Rk",
+        "duration": "",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "J2NwqfJZ1qc",
+        "title": "Zoom video: Sombrero Galaxy",
+        "channel": "HubbleWebbESA",
+        "channel_url": "https://www.youtube.com/@HubbleESA",
+        "url": "https://www.youtube.com/watch?v=J2NwqfJZ1qc",
+        "duration": "1:30",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "GBB2xQe8nMw",
+        "title": "Sombrero Galaxy in 60 Seconds (in HIGH DEFINITION)",
+        "channel": "Chandra X-ray Observatory",
+        "channel_url": "https://www.youtube.com/@ChandraXray",
+        "url": "https://www.youtube.com/watch?v=GBB2xQe8nMw",
+        "duration": "1:46",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "sculptor": [
+      {
+        "provider": "youtube",
+        "id": "w4m60bFG6ks",
+        "title": "Zooming into a thousand-colour image of the Sculptor Galaxy",
+        "channel": "European Southern Observatory (ESO)",
+        "channel_url": "https://www.youtube.com/@ESOobservatory",
+        "url": "https://www.youtube.com/watch?v=w4m60bFG6ks",
+        "duration": "0:56",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "maFz2pTkGYw",
+        "title": "Infrared Universe: Barred Galaxy NGC 253",
+        "channel": "Space Telescope Science Institute",
+        "channel_url": "https://www.youtube.com/@spacetelescopevision",
+        "url": "https://www.youtube.com/watch?v=maFz2pTkGYw",
+        "duration": "0:19",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "centaurus-a": [
+      {
+        "provider": "youtube",
+        "id": "OSsGTu6nVjI",
+        "title": "Zooming in on the strange galaxy Centaurus A",
+        "channel": "European Southern Observatory (ESO)",
+        "channel_url": "https://www.youtube.com/@ESOobservatory",
+        "url": "https://www.youtube.com/watch?v=OSsGTu6nVjI",
+        "duration": "1:02",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "CdEj5zX4bzc",
+        "title": "Data Sonification: Centaurus A (Optical)",
+        "channel": "Chandra X-ray Observatory",
+        "channel_url": "https://www.youtube.com/@ChandraXray",
+        "url": "https://www.youtube.com/watch?v=CdEj5zX4bzc",
+        "duration": "0:33",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "ngc4945": [
+      {
+        "provider": "youtube",
+        "id": "hD0AubdRQZc",
+        "title": "Finding a New Galactic \"Fossil\"",
+        "channel": "NASA Goddard",
+        "channel_url": "https://www.youtube.com/@NASAGoddard",
+        "url": "https://www.youtube.com/watch?v=hD0AubdRQZc",
+        "duration": "2:04",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "rwJ5piznRGc",
+        "title": "What Is This Galaxy Hiding? Capturing NGC 4945 with My C9.25",
+        "channel": "Astro Down Under",
+        "channel_url": "https://www.youtube.com/@AstroDU_AU",
+        "url": "https://www.youtube.com/watch?v=rwJ5piznRGc",
+        "duration": "7:05",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "needle": [
+      {
+        "provider": "youtube",
+        "id": "Sp_Qk-1kNpM",
+        "title": "NGC 4565 | THE NEEDLE GALAXY  amazing edge on spiral | Visual & Astrophotography",
+        "channel": "My Astronomy Nights",
+        "channel_url": "https://www.youtube.com/@MyAstronomyNights",
+        "url": "https://www.youtube.com/watch?v=Sp_Qk-1kNpM",
+        "duration": "8:52",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "5gauv9lg4rI",
+        "title": "Imaging the Needle Galaxy (NGC 4565)",
+        "channel": "Chuck's Astrophotography",
+        "channel_url": "https://www.youtube.com/@ChucksAstrophotography",
+        "url": "https://www.youtube.com/watch?v=5gauv9lg4rI",
+        "duration": "6:27",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "ngc891": [
+      {
+        "provider": "youtube",
+        "id": "lohN7JaJ_dw",
+        "title": "NGC 891 | Andromeda's other great galaxy \"SILVER SLIVER GALAXY\" | DSLR astrophotography Observing",
+        "channel": "My Astronomy Nights",
+        "channel_url": "https://www.youtube.com/@MyAstronomyNights",
+        "url": "https://www.youtube.com/watch?v=lohN7JaJ_dw",
+        "duration": "10:12",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "OACYNyuHgk0",
+        "title": "I Photographed NGC-891 The Silver Sliver Galaxy",
+        "channel": "Astro Pilot",
+        "channel_url": "https://www.youtube.com/@AstroPilotchannel",
+        "url": "https://www.youtube.com/watch?v=OACYNyuHgk0",
+        "duration": "3:28",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "black-eye": [
+      {
+        "provider": "youtube",
+        "id": "slbN5zGxGmQ",
+        "title": "M64 - Black Eye Galaxy - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=slbN5zGxGmQ",
+        "duration": "8:23",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "2c0ADIXlYm0",
+        "title": "Let's Photograph the BLACK EYE GALAXY!",
+        "channel": "AstroBackyard",
+        "channel_url": "https://www.youtube.com/@AstroBackyard",
+        "url": "https://www.youtube.com/watch?v=2c0ADIXlYm0",
+        "duration": "11:33",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "m87": [
+      {
+        "provider": "youtube",
+        "id": "ppIk7h0XHBE",
+        "title": "M87 - Infinity in your Hand - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=ppIk7h0XHBE",
+        "duration": "",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "n97-28mHeRs",
+        "title": "Hubble’s Inside The Image: M87 Jet",
+        "channel": "NASA Goddard",
+        "channel_url": "https://www.youtube.com/@NASAGoddard",
+        "url": "https://www.youtube.com/watch?v=n97-28mHeRs",
+        "duration": "2:51",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "antennae": [
+      {
+        "provider": "youtube",
+        "id": "ynjNentVaxk",
+        "title": "Hubble’s Inside The Image: Antennae Galaxies",
+        "channel": "NASA Goddard",
+        "channel_url": "https://www.youtube.com/@NASAGoddard",
+        "url": "https://www.youtube.com/watch?v=ynjNentVaxk",
+        "duration": "2:53",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "w_1UvqeHHBQ",
+        "title": "Zoom into the Antennae Galaxies",
+        "channel": "Space Telescope Science Institute",
+        "channel_url": "https://www.youtube.com/@spacetelescopevision",
+        "url": "https://www.youtube.com/watch?v=w_1UvqeHHBQ",
+        "duration": "0:29",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      }
+    ],
+    "southern-pinwheel": [
+      {
+        "provider": "youtube",
+        "id": "ZuxD2kB5JFA",
+        "title": "M83 - Southern Pinwheel Galaxy - Deep Sky Videos",
+        "channel": "DeepSkyVideos",
+        "channel_url": "https://www.youtube.com/@DeepSkyVideos",
+        "url": "https://www.youtube.com/watch?v=ZuxD2kB5JFA",
+        "duration": "4:05",
+        "checked_at": "2026-10-19T17:47:07.172951+00:00"
+      },
+      {
+        "provider": "youtube",
+        "id": "iaPY7CAUlH0",
+        "title": "Zooming and panning on barred spiral galaxy Messier 83",
+        "channel": "HubbleWebbESA",
+        "channel_url": "https://www.youtube.com/@HubbleESA",
+        "url": "https://www.youtube.com/watch?v=iaPY7CAUlH0",
+        "duration": "0:57",
+        "checked_at": "2026-10-19T17:49:05.992206+00:00"
+      }
+    ]
+  }
+}

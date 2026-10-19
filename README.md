@@ -63,6 +63,12 @@ Turn **Narrate visits** off to browse positions and existing research without au
 
 For an uncluttered view while listening, turn **Object map** off. This hides all object markers and labels while keeping the selected story card, pending research, and narration active. Turning it back on also preserves the card and playback position. Destination shortcuts respect this saved overlay preference. To hide only text labels and keep the dots, uncheck **Labels** instead.
 
+### Destination videos
+
+Each of the 50 destination cards has a **Watch & explore** shelf with two or three curated YouTube videos (101 distinct videos across the collection). Scroll the list and click a title to watch inside the card, or choose **Larger view** for fullscreen. Publisher names appear alongside the titles. Selections favor NASA, ESA/Hubble, ESO, STScI, Chandra, and astronomy educators, with observing and imaging demonstrations where useful. Titles and publisher metadata were checked through YouTube; the catalog is bundled locally in `resources/destination-videos.json`.
+
+The original direct telescope videos remain available in the featured cards. Starting either kind of video pauses narration; **Listen to narration** pauses video playback and resumes the saved story. Hiding object markers leaves the player alone. Changing objects, leaving the explorer, or minimizing the card stops its video. Only the selected YouTube player loads, and it uses YouTube's privacy-enhanced embed. Playback needs internet and remains subject to the publisher's embedding settings; **Watch on YouTube** is always available if a video cannot play in the card. Opening the video shelf does not generate new research or audio.
+
 ## Research an object from its sky card
 
 In **Explore the sky**, click an object marker or object-list entry, then **Research Object** in its card. OpenAI writes a source-backed object story in complete paragraphs, shown in place of the generic catalog summary. Sparse object-specific evidence is identified as such; general stellar or galaxy science is distinguished from measurements of that individual object. This biography is independent of the selected sky survey.
