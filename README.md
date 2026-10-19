@@ -205,6 +205,18 @@ Choose **Standard 2**, **High Fidelity 2**, or **High Fidelity 3** for precision
 
 The app sends the full raster original or a stretched FITS display image, with a 25-million-pixel output limit. Results retain the selected model and settings in provenance and join the comparison picker. Original files remain unchanged. Failed submissions are not automatically retried; a saved pending job is resumed only with the same model and settings. Keys can be kept in backend memory or encrypted for your Windows account using DPAPI; `TOPAZ_API_KEY` is also supported. Keys are never returned to the browser or committed to Git.
 
+## From sky discoveries to narrated tours
+
+In **Explore the sky**, right-click a point and choose **Add to discovery notebook**. Name the entry and save it. The app keeps the clicked ICRS coordinates, the original view center, zoom and rotation, a PNG snapshot with display settings and credits, and your notes. Right-click outside the sky projection does not create a position. **Shift + right-click** retains Aladin's own actions.
+
+Saving a location starts background catalog research automatically. The notebook shows nearby SIMBAD entries, angular separations, source links, the lookup time, and a tour-ready story assembled locally from catalog descriptions and checked guides. For a closely coincident known extended target, its published field guide can be preferred over individual nucleus components. **Review nearby catalog matches** lets you choose another returned entry. Positional matches are associations; unresolved identities and unavailable services remain explicit. General educational context is distinguished from target measurements. No LLM or paid API is required for this research. Existing entries can use **Research this location**.
+
+Use **Edit narration** to write your own script. It is stored separately from the researched draft and survives **Research again**. Research failures preserve the image, notes and any earlier story; interrupted jobs can be retried after restarting the app. The app makes a local database backup before upgrading an older notebook.
+
+In **Tours & routes → Build a tour from Notebook**, select entries, reorder the stops, choose a voice, and use **Create & play narrated tour** or save it for later. **Windows voice** is the default: it uses an installed Windows speech voice, renders a reusable WAV on this PC, and needs no cloud account or browser speech support. Browser speech is also available when supported. OpenAI voice is optional, sends the script to OpenAI, and uses your API account. Playback enables the saved narrator automatically, follows the existing continuous-sky tour controls, shows the saved snapshot, and waits for narration before advancing.
+
+Each tour stores a copy of its stories, citations, note revisions and image references. Later notebook edits or deletion do not rewrite existing tours. Route export/import retains the scripts and citations; PNG files remain in the local image library and are not embedded in a route JSON. If an image is missing on another PC, the story still plays. Notebook snapshots are rendered visualizations, not calibrated science data.
+
 ## Local NVIDIA enhancement in Image Lab
 
 Select **Local GPU · Real-ESRNet / Real-ESRGAN** after running **Setup-GPU.cmd**. **Gentle restoration** uses RealESRNet x4plus; **Strong detail** uses RealESRGAN x4plus. These are 16.7-million-parameter restoration networks running on CUDA, tested on an RTX 5090. They read the full-resolution original raster, or the selected FITS display stretch at full resolution; they do not upscale the small library thumbnail. Display processing uses RGB, not calibrated detector values.

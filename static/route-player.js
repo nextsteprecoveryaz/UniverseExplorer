@@ -56,6 +56,7 @@ async function startRouteDocument(route,pack=null,resume=false){
   const progress=resume?route.progress:null;
   const origin=tourSurveyView(progress?.origin||skyView());
   Object.assign(routePlayer,{route,pack,timeline:RouteTimeline.build(route,origin),elapsed:progress?.elapsed||0,index:-1,waitKey:'',waitSince:0,skipWait:false,projection:null,survey:null});
+  if(typeof activateNotebookNarration==='function')activateNotebookNarration(route);
   $('#route-player').hidden=false;$('#explore-page').classList.add('route-active');$('#route-playing-title').textContent=route.title;
   syncTourSkyControls();
   $('#route-play-seek').max=routePlayer.timeline.total;$('#route-play-seek').value=routePlayer.elapsed;
@@ -105,6 +106,10 @@ function updateRouteGuide(index){
   $('#route-stop-facts').textContent=facts.join('\n');
   const img=$('#route-stop-image');img.hidden=true;img.dataset.loaded='none';img.onload=null;img.onerror=null;img.removeAttribute('src');
   $('#route-image-message').textContent=media?.available===false?'Story source unavailable in the current index.':'';
+  if(media?.kind==='notebook'){
+    $('#route-image-message').textContent=media.snapshot_missing?'The saved snapshot is unavailable on this installation. The tour story is preserved.':'';
+    if(media.preview_url){img.src=media.preview_url;img.hidden=false;img.onerror=()=>{img.hidden=true;$('#route-image-message').textContent='Saved snapshot unavailable. The tour story is preserved.';};}
+  }
   const link=$('#route-stop-source');link.hidden=!media?.source_url;if(media?.source_url)link.href=media.source_url;
   $('#route-stop-credit').textContent=media?[media.location_note,media.credit].filter(Boolean).join(' '):'User-saved sky position.';
   $('#route-stop-actions').hidden=false;$('#route-stop-inspect').disabled=!media?.available;
@@ -125,7 +130,8 @@ function applyRouteFrame(frame){
     const previous=p.lastView;
     if(!previous||previous.ra!==v.ra||previous.dec!==v.dec)state.sky.gotoRaDec(v.ra,v.dec);
     if(!previous||previous.fov!==v.fov)state.sky.setFoV(v.fov);
-    if(!previous||previous.roll!==v.roll)state.sky.setRotation(v.roll||0);
+    // This bundled Aladin build rejects zero as falsy; 360 is the same orientation.
+    if(!previous||previous.roll!==v.roll)state.sky.setRotation(v.roll||360);
     p.lastView={...v};
     if(p.route.kind==='recording'){if(p.index<0)updateRouteGuide(0);}else if(p.index!==frame.index)updateRouteGuide(frame.index);
   }finally{p.writing=false;}

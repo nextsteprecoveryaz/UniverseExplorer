@@ -36,6 +36,8 @@ import narration
 import image_3d
 import live_enhancement
 import gpu_enhancement
+import discovery_notebook
+import local_narration
 
 ROOT=Path(__file__).parent
 DATA=ROOT/'data'
@@ -55,6 +57,8 @@ app.include_router(narration.router)
 app.include_router(image_3d.router)
 app.include_router(live_enhancement.router)
 app.include_router(gpu_enhancement.router)
+app.include_router(discovery_notebook.router)
+app.include_router(local_narration.router)
 app.add_middleware(TrustedHostMiddleware,allowed_hosts=['127.0.0.1','localhost','testserver'])
 HEAVY=asyncio.Semaphore(1)
 CLOUD_BUSY=asyncio.Lock()
@@ -91,10 +95,7 @@ DESTINATIONS=[
 ]
 
 def db():
-    c=sqlite3.connect(DATA/'notebook.sqlite3')
-    c.row_factory=sqlite3.Row
-    c.execute('CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, ra REAL, dec REAL, survey TEXT, kind TEXT NOT NULL, provenance TEXT NOT NULL)')
-    return c
+    return discovery_notebook.connect()
 
 with db() as c: c.commit()
 
@@ -389,21 +390,23 @@ class Note(BaseModel):
     survey:str=Field(default='',max_length=150)
     kind:Literal['field','source candidate','transit candidate']='field'
     provenance:dict=Field(default_factory=dict)
+    research_on_save:bool=True
 
 @app.get('/api/notes')
 def notes():
-    with db() as c:
-        rows=[dict(r) for r in c.execute('SELECT * FROM notes ORDER BY created_at DESC')]
-    for r in rows: r['provenance']=json.loads(r['provenance'])
-    return {'rows':rows}
+    return {'rows':discovery_notebook.all_notes()}
 
 @app.post('/api/notes')
 def add_note(note:Note):
-    n={**note.model_dump(),'id':uuid.uuid4().hex,'created_at':remote.now()}
+    n={**note.model_dump(exclude={'research_on_save'}),'id':uuid.uuid4().hex,'created_at':remote.now()}
     with db() as c:
-        c.execute('INSERT INTO notes VALUES (?,?,?,?,?,?,?,?,?)',(n['id'],n['created_at'],n['title'],n['body'],n['ra'],n['dec'],n['survey'],n['kind'],json.dumps(n['provenance'])))
+        c.execute('INSERT INTO notes(id,created_at,title,body,ra,dec,survey,kind,provenance) VALUES (?,?,?,?,?,?,?,?,?)',(n['id'],n['created_at'],n['title'],n['body'],n['ra'],n['dec'],n['survey'],n['kind'],json.dumps(n['provenance'])))
         c.commit()
-    return n
+    if note.research_on_save and n['ra'] is not None and n['dec'] is not None:
+        try:return discovery_notebook.start_research(n['id'])
+        except HTTPException as error:
+            if error.status_code!=429:raise
+    return discovery_notebook.read(n['id'])
 
 @app.delete('/api/notes/{note_id}')
 def delete_note(note_id:str):

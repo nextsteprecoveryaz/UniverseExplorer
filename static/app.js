@@ -37,6 +37,7 @@ function currentField(){
   return {ra:state.ra,dec:state.dec,fov:state.fov,survey:state.survey};
 }
 function showPage(page){
+  if(page!=='explore'&&typeof closeNotebookMenu==='function')closeNotebookMenu();
   if(page!=='lab')window.ImageLab3D?.close();
   if(typeof researchLeaving==='function'&&page!=='research')researchLeaving();
   cancelAnimationFrame(travelFrame);
@@ -124,6 +125,7 @@ async function initSky(){
     state.sky.on('zoomChanged',()=>coordinates());
     initExplorePixelMapping();
     initLiveEnhancement();
+    initNotebookSky();
     $('#aladin-lite-div').style.opacity='1';
     $('#sky-fallback').classList.add('loaded');
     $('#sky-status').innerHTML='<i></i> RELEASED IMAGERY · SKY ATLAS';
@@ -307,17 +309,14 @@ function plotTransit(){
   for(const [x,y] of [[-r.period_days/2,1],[-half,1],[-half,1-r.depth],[half,1-r.depth],[half,1],[r.period_days/2,1]]){c.lineTo(xp(x),yp(y));}c.stroke();
   c.fillStyle='#9ab7c1';c.fillText('Phase (days from fitted mid-transit)',w/2-130,h-14);c.fillText((-r.period_days/2).toFixed(2),pad,h-32);c.fillText('0',xp(0),h-32);c.fillText((r.period_days/2).toFixed(2),w-50,h-32);
 }
-function noteDialog(overrides={}){
+function noteDialog(overrides={},capture=null){
   const field=currentField();const values={title:state.destination?.name||'Sky field',body:'',ra:field.ra,dec:field.dec,survey:state.survey,kind:'field',provenance:{...field,survey_url:state.config.surveys.find(s=>s.id===state.survey)?.url},...overrides};
   modal('Save to discovery notebook',`<form id="note-form" class="note-form"><span class="badge teal">${esc(values.kind.toUpperCase())}</span><label for="note-title">Title</label><input id="note-title" maxlength="200" required value="${esc(values.title)}"><label for="note-body">What caught your attention?</label><textarea id="note-body" maxlength="20000" placeholder="Describe the feature, your hypothesis, and what to check next.">${esc(values.body)}</textarea><p class="small muted">Coordinates and data provenance are attached. Saved locally on this PC.</p><button type="submit" class="button primary">Save to notebook</button></form>`);
-  $('#note-form').onsubmit=async event=>{event.preventDefault();const button=$('#note-form button');await busy(button,'Saving…',async()=>{await jsonPost('/api/notes',{...values,title:$('#note-title').value,body:$('#note-body').value});closeModal();await loadNotes();toast('Saved to your discovery notebook.');});};
+  if(capture){const preview=document.createElement('img');preview.className='notebook-snapshot-preview';preview.alt='Sky snapshot to save with this location';preview.src=URL.createObjectURL(capture.blob);$('#note-form').prepend(preview);$('#modal').addEventListener('close',()=>URL.revokeObjectURL(preview.src),{once:true});}
+  $('#note-form').onsubmit=async event=>{event.preventDefault();const button=$('#note-form button');await busy(button,'Saving…',async()=>{const image=await attachNotebookSnapshot(values,capture);if(image)values.provenance.image_id=image.id;await jsonPost('/api/notes',{...values,title:$('#note-title').value,body:$('#note-body').value});closeModal();await loadNotes();toast('Saved to your discovery notebook. Catalog research will prepare its tour story.');});};
 }
 async function loadNotes(){
-  const result=await api('/api/notes');state.notes=result.rows;$('#note-count').textContent=result.rows.length;
-  $('#notes-list').innerHTML=result.rows.length?result.rows.map((n,i)=>`<article class="note-card"><span class="badge teal">${esc(n.kind.toUpperCase())}</span><h2>${esc(n.title)}</h2><p>${esc(n.body||'No notes added yet.')}</p><div class="small">${date(n.created_at)}<br>${n.ra!==null?'RA '+Number(n.ra).toFixed(5)+'° · Dec '+Number(n.dec).toFixed(5)+'°':'Pixel coordinates recorded in provenance'}</div><details><summary>Data provenance</summary><pre>${esc(JSON.stringify(n.provenance,null,2))}</pre></details><div class="note-actions">${n.ra!==null?`<button class="text-button" data-note-visit="${i}">Revisit field ↗</button>`:''}${n.provenance.image_id?`<button class="text-button" data-note-image="${i}">Open image</button>`:''}<button class="text-button delete-note" data-note-delete="${i}">Delete</button></div></article>`).join(''):'<div class="empty-state"><span class="empty-symbol">▤</span><h2>Every discovery starts with a question.</h2><p>Save a sky position, record an interesting feature, and return to investigate it. Your notes and provenance stay on this computer.</p></div>';
-  $$('[data-note-visit]').forEach(b=>b.onclick=()=>{const n=state.notes[Number(b.dataset.noteVisit)];flyTo({name:n.title,ra:n.ra,dec:n.dec,fov:n.provenance.fov||.2,survey:n.survey||'optical',type:'FROM YOUR NOTEBOOK',description:n.body});});
-  $$('[data-note-image]').forEach(b=>b.onclick=async()=>{try{openImage(await api('/api/images/'+state.notes[Number(b.dataset.noteImage)].provenance.image_id));}catch(e){failure(e);}});
-  $$('[data-note-delete]').forEach(b=>b.onclick=async()=>{const n=state.notes[Number(b.dataset.noteDelete)];if(!confirm(`Delete the note “${n.title}”?`))return;try{await api('/api/notes/'+n.id,{method:'DELETE'});await loadNotes();toast('Note deleted.');}catch(e){failure(e);}});
+  const request=++notebookUI.request,result=await api('/api/notes');if(request!==notebookUI.request)return;renderNotebookEntries(result.rows);
 }
 function about(){
   modal('Your personal observatory',`<div class="modal-body"><h3>Explore light that has reached us.</h3><p>This is a 2D celestial atlas of observed fields. You can pan across the sky and zoom into released imagery; distances and depth are not reconstructed as a physical 3D universe.</p><h3>Two views of the telescopes</h3><p>Space Telescope Live supplies schedules and pointing metadata. MAST supplies released science products. The current pointing is not a live camera feed. CDS sky mosaics are selected, cached representations with incomplete coverage.</p><h3>Lenses with a scientific basis</h3><p>Wavelength buttons switch real datasets. Narrowband images may contain continuum and multiple emission lines. They do not automatically measure gas abundance. Blank fields indicate coverage limits.</p><h3>AI for visualization</h3><p>FSRCNN 2× neural upscaling runs on this PC’s CPU. Originals are preserved with SHA-256 hashes. AI images are labeled in the exported pixels and never enter the source detector.</p><h3>Candidate tools</h3><p>FITS source detection, Gaia checks, and box least squares transit fits help organize follow-up work. An unmatched peak or repeating dip is an unconfirmed candidate. Confirm discoveries through independent observations, calibration, artifact rejection, and catalog comparison.</p><h3>Sources & credits</h3><p>${state.config.sources.map(s=>`<a href="${s.url}" target="_blank" rel="noopener">${s.name} ↗</a>`).join('<br>')}<br><a href="https://github.com/Saafke/FSRCNN_Tensorflow" target="_blank" rel="noopener">FSRCNN model by Saafke / OpenCV ↗</a><br><a href="https://docs.astropy.org/en/stable/timeseries/bls.html" target="_blank" rel="noopener">Astropy BLS analysis ↗</a></p><p class="small muted">Telescope images: NASA, ESA, CSA, STScI and their credited observing teams; survey projections: CDS. Use the original product’s attribution for publication.</p></div>`);
@@ -352,6 +351,7 @@ async function boot(){
     $('#image-upload').onchange=async e=>{try{e.target.disabled=true;await uploadImage(e.target.files[0]);}catch(error){failure(error);}finally{e.target.disabled=false;e.target.value='';}};
     initObservatoryFeatures();
     initLocalGPU();
+    initNotebook();
     initImageLabColors();
     initImageJourneys();
     initPhotometry();

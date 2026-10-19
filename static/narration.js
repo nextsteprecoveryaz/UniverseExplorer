@@ -15,7 +15,7 @@ async function playNarrationAudio(){
   const n=tourNarration;if(!n.audio?.src||n.audio.ended)return;
   const serial=n.serial;n.started=true;
   n.audio.playbackRate=Number($('#route-play-speed').value)||1;
-  try{await n.audio.play();if(serial!==n.serial)return;n.error=false;narrationStatus('Playing OpenAI narration · AI-generated voice');}
+  try{await n.audio.play();if(serial!==n.serial)return;n.error=false;narrationStatus($('#tour-narration-provider').value==='windows'?'Playing Windows narration · generated on this PC':'Playing OpenAI narration · AI-generated voice');}
   catch{if(serial!==n.serial)return;n.error=true;narrationStatus('Audio needs a click to play. Choose Replay narration.');}
 }
 function resumeTourNarration(){
@@ -29,27 +29,27 @@ async function startTourNarration(replay=false){
   const provider=$('#tour-narration-provider').value,voice=$('#tour-narration-voice').value;
   const text=narrationFor(route.media[index],route.stops[index]);if(!text)return;
   const context=[route.id,route.revision,index,provider,voice,text].join('|');
-  if(n.context===context&&!replay){if(n.pending||n.error)return;if(provider==='openai'&&n.audio?.src&&!n.audio.ended&&p.playing)await playNarrationAudio();return;}
+  if(n.context===context&&!replay){if(n.pending||n.error)return;if(provider!=='browser'&&n.audio?.src&&!n.audio.ended&&p.playing)await playNarrationAudio();return;}
   resetTourNarration();n.context=context;const serial=n.serial;
   const current=()=>serial===n.serial&&routePlayer.route===route&&routePlayer.index===index&&narrationEnabled();
   if(provider==='browser'){
-    if(!window.speechSynthesis){n.error=true;narrationStatus('Browser narration is unavailable. Choose OpenAI voice.');return;}
+    if(!window.speechSynthesis){n.error=true;narrationStatus('Browser narration is unavailable. Choose Windows local voice or OpenAI voice.');return;}
     const speech=new SpeechSynthesisUtterance(text);speech.rate=Math.min(1.6,Number($('#route-play-speed').value)||1);
     n.browserPending=true;speech.onend=()=>{if(current()){n.browserPending=false;narrationStatus('Narration complete');}};
     speech.onerror=()=>{if(current()){n.browserPending=false;n.error=true;narrationStatus('Browser narration stopped. Choose Replay narration to retry.');}};
     window.speechSynthesis.resume();window.speechSynthesis.speak(speech);narrationStatus('Playing browser narration');return;
   }
-  n.pending=true;narrationStatus('Preparing OpenAI narration…');
+  n.pending=true;narrationStatus(provider==='windows'?'Preparing Windows narration on this PC…':'Preparing OpenAI narration…');
   try{
-    const clip=await jsonPost('/api/narration/clip',{text,voice});if(!current())return;
+    const clip=await jsonPost(provider==='windows'?'/api/narration/local/clip':'/api/narration/clip',provider==='windows'?{text}:{text,voice});if(!current())return;
     n.audio.src=clip.url;n.audio.load();n.pending=false;
-    narrationStatus(clip.cached?'Saved narration ready · AI-generated voice':'Narration saved on this PC · AI-generated voice');
+    narrationStatus(provider==='windows'?'Windows narration ready · '+clip.voice:clip.cached?'Saved narration ready · AI-generated voice':'Narration saved on this PC · AI-generated voice');
     if(p.playing||replay)await playNarrationAudio();
   }catch(error){if(current()){n.pending=false;n.error=true;narrationStatus(error.message+' Choose Replay narration to retry.');}}
 }
 function initTourNarration(){
   const controls=document.createElement('details');controls.className='tour-narration-controls';
-  controls.innerHTML=`<summary>Voice options</summary><div class="tour-narration-fields"><label>Narrator<select id="tour-narration-provider"><option value="openai">OpenAI voice</option><option value="browser">Browser voice</option></select></label><label>Voice<select id="tour-narration-voice"><option value="cedar">Cedar</option><option value="marin">Marin</option><option value="coral">Coral</option></select></label></div><p class="tour-narration-note">AI-generated voice. OpenAI receives the guide text and bills new audio to your API account. Replays use audio saved on this PC.</p><div class="tour-narration-actions"><button id="tour-narration-replay" class="text-button">Replay narration</button><button id="tour-narration-connect" class="text-button">OpenAI connection</button></div><audio id="tour-narration-audio" preload="metadata"></audio>`;
+  controls.innerHTML=`<summary>Voice options</summary><div class="tour-narration-fields"><label>Narrator<select id="tour-narration-provider"><option value="openai">OpenAI voice</option><option value="windows">Windows voice · local</option><option value="browser">Browser voice</option></select></label><label>Voice<select id="tour-narration-voice"><option value="cedar">Cedar</option><option value="marin">Marin</option><option value="coral">Coral</option></select></label></div><p class="tour-narration-note">Windows voice generates speech on this PC without an API key. Browser voice depends on browser support. OpenAI voice sends guide text to OpenAI and bills new audio to your API account. Replays use saved audio.</p><div class="tour-narration-actions"><button id="tour-narration-replay" class="text-button">Replay narration</button><button id="tour-narration-connect" class="text-button">OpenAI connection</button></div><audio id="tour-narration-audio" preload="metadata"></audio>`;
   $('#route-stop-actions').before(controls);
   const message=document.createElement('p');message.id='tour-narration-status';message.setAttribute('role','status');controls.after(message);
   $('#route-narration').parentElement.lastChild.textContent=' Voice narration';
@@ -57,7 +57,7 @@ function initTourNarration(){
   n.audio.onended=()=>{n.started=false;narrationStatus('Narration complete · saved on this PC');};
   n.audio.onerror=()=>{if(n.audio.getAttribute('src')){n.error=true;n.started=false;narrationStatus('Audio could not play. Choose Replay narration to retry.');}};
   $('#route-narration').onchange=()=>{resetTourNarration();if(narrationEnabled()&&routePlayer.playing)void startTourNarration();};
-  const settingsChanged=()=>{resetTourNarration();$('#tour-narration-voice').disabled=$('#tour-narration-provider').value!=='openai';if(narrationEnabled()&&routePlayer.playing)void startTourNarration();};
+  const settingsChanged=()=>{resetTourNarration();$('#tour-narration-voice').disabled=$('#tour-narration-provider').value!=='openai';$('#tour-narration-voice').parentElement.hidden=$('#tour-narration-provider').value!=='openai';if(narrationEnabled()&&routePlayer.playing)void startTourNarration();};
   $('#tour-narration-provider').onchange=settingsChanged;$('#tour-narration-voice').onchange=settingsChanged;
   $('#tour-narration-replay').onclick=()=>{$('#route-narration').checked=true;void startTourNarration(true);};
   $('#tour-narration-connect').onclick=()=>openCloudConnection('speech').catch(failure);

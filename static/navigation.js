@@ -53,7 +53,7 @@ async function inspectNavigationMedia(m){
 }
 function showTourStopDetails(m){
   if(!m)return;pauseRoute('Paused to read about this stop');
-  modal(m.title,`<p>${esc(m.description||'No guide text is available for this stop.')}</p>${storySourcesMarkup(m)}<p class="small muted">Guide source: ${esc(m.credit||m.location_note||'Published target information')}</p>${m.source_url?`<a class="button" href="${esc(m.source_url)}" target="_blank" rel="noopener">Read the publisher source ↗</a>`:''}`);
+  modal(m.title,`${m.kind==='notebook'&&m.preview_url?`<img class="notebook-stop-snapshot" src="${esc(m.preview_url)}" alt="Saved notebook sky snapshot">`:''}<p>${esc(m.description||'No guide text is available for this stop.')}</p>${storySourcesMarkup(m)}<p class="small muted">Guide source: ${esc(m.credit||m.location_note||'Published target information')}</p>${m.source_url?`<a class="button" href="${esc(m.source_url)}" target="_blank" rel="noopener">Read the publisher source ↗</a>`:''}`);
 }
 function visitNavigationMedia(m){
   flyTo({name:m.title,ra:m.ra,dec:m.dec,fov:m.fov,survey:m.survey,type:m.mission||'PUBLISHED GUIDE',description:m.description?.slice(0,300)});drawNavigationFootprint(m.footprint);
@@ -135,6 +135,7 @@ function renderRouteEditor(){
   renderSavedRoutes();
 }
 async function loadNavigationPage(){
+  await loadNotes();
   await loadSavedRoutes();
   const d=await api('/api/navigation/templates');navigationUI.templates=d.rows;navigationUI.loaded=true;renderTourTemplates();
 }

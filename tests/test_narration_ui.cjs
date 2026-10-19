@@ -7,6 +7,15 @@ const source=fs.readFileSync(path.join(__dirname,'../static/narration.js'),'utf8
 const plain=value=>JSON.parse(JSON.stringify(value));
 const settle=async()=>{for(let i=0;i<5;i++)await Promise.resolve();};
 
+test('Windows narration requests only the local WAV endpoint and uses the audio player',async()=>{
+  const h=narrator();h.$('#tour-narration-provider').value='windows';
+  const pending=h.run('startTourNarration()');
+  assert.equal(h.requests[0].url,'/api/narration/local/clip');assert.equal(h.requests[0].body.voice,undefined);
+  h.requests[0].resolve({url:'/api/narration/local/audio/test.wav',voice:'Microsoft David Desktop',cached:false});await pending;
+  assert.equal(h.audio.src,'/api/narration/local/audio/test.wav');assert.equal(h.audio.paused,false);
+  assert.match(h.$('#tour-narration-status').textContent,/Windows narration/);
+});
+
 function narrator(){
   const nodes=new Map(),requests=[],spoken=[],calls=[];
   const node=()=>({value:'',checked:false,disabled:false,textContent:'',listeners:{},

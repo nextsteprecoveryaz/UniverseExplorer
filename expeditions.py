@@ -8,6 +8,7 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from urllib.parse import urlparse
 
 import coverage_guide as coverage
 import cefca_tours
@@ -40,12 +41,36 @@ class Reference(Strict):
     kind:Literal['featured','gallery','mast','cefca']
     id:str=Field(min_length=1,max_length=80,pattern=r'^[A-Za-z0-9_-]+$')
 
+class StorySource(Strict):
+    title:str=Field(min_length=1,max_length=300)
+    url:str=Field(min_length=1,max_length=2000)
+    @model_validator(mode='after')
+    def safe_url(self):
+        parsed=urlparse(self.url)
+        if parsed.scheme!='https' or not parsed.hostname or parsed.username or parsed.password:raise ValueError('Story sources must use public HTTPS links.')
+        return self
+
+class NotebookGuide(Strict):
+    narrator:Literal['windows','browser','openai']='windows'
+    note_id:str=Field(pattern=r'^[a-f0-9]{32}$')
+    note_revision:int=Field(ge=1)
+    narration:str=Field(min_length=1,max_length=3500)
+    description:str=Field(min_length=1,max_length=3500)
+    sources:list[StorySource]=Field(default_factory=list,max_length=20)
+    image_id:str|None=Field(default=None,pattern=r'^[a-f0-9]{32}$')
+    image_sha256:str|None=Field(default=None,pattern=r'^[a-f0-9]{64}$')
+    identity_label:str=Field(default='',max_length=400)
+    researched_at:str|None=Field(default=None,max_length=80)
+    credit:str=Field(default='',max_length=1000)
+    edited:bool=False
+
 class Stop(View):
     title:str=Field(default='Sky waypoint',min_length=1,max_length=200)
     notes:str=Field(default='',max_length=4000)
     travel:float=Field(default=4,ge=1,le=30)
     hold:float=Field(default=15,ge=3,le=120)
     source:Reference|None=None
+    guide:NotebookGuide|None=None
 
 class Sample(View):
     t:float=Field(ge=0,le=1800)
@@ -86,11 +111,23 @@ def connect():
 def document(row,hydrate=False):
     d={**json.loads(row['payload']),**{k:row[k] for k in ('id','revision','created_at','updated_at')}}
     if hydrate:
-        d['media']=[resolve_source(s.get('source')) for s in d['stops']]
+        d['media']=[resolve_notebook(s) if s.get('guide') else resolve_source(s.get('source')) for s in d['stops']]
         with connect() as c:p=c.execute('SELECT payload FROM progress WHERE route_id=?',(d['id'],)).fetchone()
         d['progress']=json.loads(p[0]) if p else None
         if d['progress'] and d['progress']['revision']!=d['revision']:d['progress']=None
     return d
+
+def resolve_notebook(stop):
+    import science
+    guide=stop['guide'];preview=None
+    if guide.get('image_id'):
+        try:
+            image=science.metadata(guide['image_id'])
+            if image['sha256']==guide.get('image_sha256'):preview=image['preview_url']
+        except (ValueError,KeyError):pass
+    return {**guide,'id':guide['note_id'],'kind':'notebook','title':stop['title'],'ra':stop['ra'],'dec':stop['dec'],
+            'available':True,'preview_url':preview,'story_sources':guide['sources'],'source_url':next((s['url'] for s in guide['sources']),None),
+            'location_note':guide['identity_label'],'snapshot_missing':bool(guide.get('image_id') and not preview)}
 
 def resolve_source(ref):
     if not ref:return None
