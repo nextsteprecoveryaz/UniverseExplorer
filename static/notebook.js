@@ -107,7 +107,8 @@ function renderNotebookTourOrder(){
 }
 function activateNotebookNarration(route){
   const guide=route.stops?.find(s=>s.guide)?.guide;if(!guide)return;
-  $('#route-narration').checked=true;$('#tour-narration-provider').value=guide.narrator||'windows';$('#tour-narration-voice').disabled=guide.narrator!=='openai';if($('#tour-narration-voice').parentElement)$('#tour-narration-voice').parentElement.hidden=guide.narrator!=='openai';resetTourNarration();
+  const provider=typeof preferredNarrator==='function'?preferredNarrator():'elevenlabs';
+  $('#route-narration').checked=true;$('#tour-narration-provider').value=provider;$('#tour-narration-voice').disabled=provider!=='openai';if($('#tour-narration-voice').parentElement)$('#tour-narration-voice').parentElement.hidden=provider!=='openai';resetTourNarration();
 }
 async function createNotebookTour(play){
   if(notebookUI.saving)return;notebookUI.saving=true;renderNotebookTourOrder();
@@ -115,6 +116,7 @@ async function createNotebookTour(play){
     const entries=notebookUI.selected.map(id=>{const n=notebookUI.notes.find(n=>n.id===id);return {id,revision:n.revision};});
     if(!$('#notebook-tour-title').reportValidity())return;
     if(navigationUI.dirty)await saveEditedRoute();
+    if(typeof setNarratorPreference==='function')setNarratorPreference($('#notebook-tour-voice').value);
     const route=await jsonPost('/api/notebook/tour',{title:$('#notebook-tour-title').value.trim(),narrator:$('#notebook-tour-voice').value,entries});
     await loadSavedRoutes();await editSavedRoute(route.id);toast('Notebook tour saved with its stories and sources.');
     if(play)await playSavedRoute(route.id);else $('#route-editor').scrollIntoView({behavior:'smooth',block:'start'});
@@ -122,6 +124,9 @@ async function createNotebookTour(play){
   finally{notebookUI.saving=false;renderNotebookTourOrder();}
 }
 function initNotebook(){
+  $('#notebook-tour-voice').value=typeof preferredNarrator==='function'?preferredNarrator():'elevenlabs';
+  $('#notebook-tour-voice').onchange=()=>{if(typeof setNarratorPreference==='function')setNarratorPreference($('#notebook-tour-voice').value);};
+  $('#notebook-elevenlabs-connect').onclick=()=>openElevenLabsConnection().catch(failure);
   $('#notebook-tour-refresh').onclick=()=>loadNotes().catch(failure);
   $('#notebook-tour-create').onclick=()=>createNotebookTour(false);$('#notebook-tour-play').onclick=()=>createNotebookTour(true);
 }

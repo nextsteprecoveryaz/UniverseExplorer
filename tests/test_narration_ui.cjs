@@ -16,7 +16,7 @@ test('Windows narration requests only the local WAV endpoint and uses the audio 
   assert.match(h.$('#tour-narration-status').textContent,/Windows narration/);
 });
 
-function narrator(){
+function narrator(preference='openai'){
   const nodes=new Map(),requests=[],spoken=[],calls=[];
   const node=()=>({value:'',checked:false,disabled:false,textContent:'',listeners:{},
     parentElement:{lastChild:{textContent:''}},before(){},after(){},setAttribute(){},
@@ -42,7 +42,7 @@ function narrator(){
     speak(utterance){this.current=utterance;spoken.push(utterance);},
   };
   const route={id:'tour',revision:1,kind:'waypoints',stops:[{title:'M87',notes:''},{title:'M86',notes:''}],media:[{description:'Explore the smooth central glow.'},{description:'Compare the neighboring galaxy.'}]};
-  const c=vm.createContext({$,console,window:{speechSynthesis:speech},document:{createElement:node},
+  const c=vm.createContext({$,console,window:{speechSynthesis:speech},document:{createElement:node},localStorage:{getItem:()=>preference,setItem:(_k,v)=>{preference=v;}},
     routePlayer:{route,index:0,playing:true},
     narrationFor:(media,stop)=>[stop?.title,media?.description||stop?.notes||''].filter(Boolean).join('. '),
     SpeechSynthesisUtterance:class{constructor(text){this.text=text;}},
@@ -155,7 +155,7 @@ test('changing provider discards cloud responses and old browser completion call
   assert.equal(p.$('#tour-narration-voice').disabled,false);
   utterance.onend();
   assert.equal(p.run('tourNarration.pending'),true);
-  assert.match(p.$('#tour-narration-status').textContent,/Preparing OpenAI/);
+  assert.match(p.$('#tour-narration-status').textContent,/Checking saved OpenAI/);
   p.resolve(1,'/current.mp3');await settle();assert.equal(p.audio.src,'/current.mp3');
 });
 
@@ -176,4 +176,15 @@ test('browser narration errors release the hold and do not automatically enqueue
   assert.equal(p.run('tourNarrationPending()'),false);
   await p.run('startTourNarration()');assert.equal(p.spoken.length,1);
   assert.match(p.$('#tour-narration-status').textContent,/Replay narration/);
+});
+
+test('ElevenLabs is the default narrator, requests its dedicated cache and preserves replay identity',async()=>{
+  const p=narrator(null);assert.equal(p.$('#tour-narration-provider').value,'elevenlabs');
+  assert.equal(p.$('#route-narration').checked,true);assert.equal(p.$('#tour-narration-voice').parentElement.hidden,true);
+  const first=p.run('startTourNarration()');assert.equal(p.requests[0].url,'/api/narration/elevenlabs/clip');
+  assert.deepEqual(Object.keys(p.requests[0].body),['text']);p.resolve(0,'/eleven.mp3');await first;
+  assert.match(p.$('#tour-narration-status').textContent,/Playing ElevenLabs/);p.audio.finish();
+  p.run('routePlayer.route.revision=2;routePlayer.route.id="other-route"');
+  const replay=p.run('startTourNarration(true)');assert.deepEqual(p.requests[1].body,p.requests[0].body);
+  p.resolve(1,'/eleven.mp3',true);await replay;assert.equal(p.audio.src,'/eleven.mp3');
 });

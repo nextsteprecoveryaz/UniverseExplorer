@@ -51,7 +51,7 @@ class StorySource(Strict):
         return self
 
 class NotebookGuide(Strict):
-    narrator:Literal['windows','browser','openai']='windows'
+    narrator:Literal['elevenlabs','windows','browser','openai']='elevenlabs'
     note_id:str=Field(pattern=r'^[a-f0-9]{32}$')
     note_revision:int=Field(ge=1)
     narration:str=Field(min_length=1,max_length=3500)

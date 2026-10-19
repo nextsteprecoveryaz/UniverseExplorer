@@ -251,7 +251,7 @@ class Selection(Strict):
 
 class NotebookTour(Strict):
     title:str=Field(min_length=1,max_length=200)
-    narrator:Literal['windows','browser','openai']='windows'
+    narrator:Literal['elevenlabs','windows','browser','openai']='elevenlabs'
     entries:list[Selection]=Field(min_length=1,max_length=50)
 
 

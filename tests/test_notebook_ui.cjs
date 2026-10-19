@@ -41,10 +41,10 @@ test('catalog label right-click saves its anchor and name even when label text i
   const result=h.context.notebookLocation(event,sky,{left:0,top:0,width:500,height:400});
   assert.ok(Math.abs(result.ra-70.0328375)<1e-9);assert.equal(result.object_hint.name,'NGC 1635');assert.equal(result.dec,-.5475611);
 });
-test('narrated notebook routes restore their explicitly selected provider and enable speech',()=>{
+test('legacy notebook routes use the preferred narrator without rewriting the saved guide',()=>{
   const h=harness();h.context.activateNotebookNarration({stops:[{guide:{narrator:'browser'}}]});
-  assert.equal(h.$('#route-narration').checked,true);assert.equal(h.$('#tour-narration-provider').value,'browser');assert.equal(h.$('#tour-narration-voice').disabled,true);
-  h.context.activateNotebookNarration({stops:[{guide:{narrator:'openai'}}]});assert.equal(h.$('#tour-narration-provider').value,'openai');
+  assert.equal(h.$('#route-narration').checked,true);assert.equal(h.$('#tour-narration-provider').value,'elevenlabs');assert.equal(h.$('#tour-narration-voice').disabled,true);
+  h.context.preferredNarrator=()=>'openai';h.context.activateNotebookNarration({stops:[{guide:{narrator:'windows'}}]});assert.equal(h.$('#tour-narration-provider').value,'openai');
 });
 test('manual scripts take precedence without overwriting the researched draft',()=>{
   const h=harness();assert.equal(h.run("notebookScript({research:{story:'Research',edited_narration:'My story'}})"),'My story');

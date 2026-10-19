@@ -1,5 +1,8 @@
 'use strict';
 const tourNarration={audio:null,serial:0,context:null,pending:false,browserPending:false,started:false,error:false};
+function preferredNarrator(){try{const value=localStorage.getItem('universe-narrator-v2');if(['elevenlabs','openai','windows','browser'].includes(value))return value;}catch{}return 'elevenlabs';}
+function setNarratorPreference(value){try{localStorage.setItem('universe-narrator-v2',value);}catch{}if($('#tour-narration-provider'))$('#tour-narration-provider').value=value;if($('#notebook-tour-voice'))$('#notebook-tour-voice').value=value;}
+function narratorName(){return {elevenlabs:'ElevenLabs',windows:'Windows',openai:'OpenAI',browser:'Browser'}[$('#tour-narration-provider').value]||'ElevenLabs';}
 function narrationStatus(text){const node=$('#tour-narration-status');if(node)node.textContent=text;}
 function narrationEnabled(){return Boolean($('#route-narration')?.checked);}
 function resetTourNarration(){
@@ -15,7 +18,7 @@ async function playNarrationAudio(){
   const n=tourNarration;if(!n.audio?.src||n.audio.ended)return;
   const serial=n.serial;n.started=true;
   n.audio.playbackRate=Number($('#route-play-speed').value)||1;
-  try{await n.audio.play();if(serial!==n.serial)return;n.error=false;narrationStatus($('#tour-narration-provider').value==='windows'?'Playing Windows narration · generated on this PC':'Playing OpenAI narration · AI-generated voice');}
+  try{await n.audio.play();if(serial!==n.serial)return;n.error=false;narrationStatus('Playing '+narratorName()+' narration · saved audio on this PC');}
   catch{if(serial!==n.serial)return;n.error=true;narrationStatus('Audio needs a click to play. Choose Replay narration.');}
 }
 function resumeTourNarration(){
@@ -39,28 +42,39 @@ async function startTourNarration(replay=false){
     speech.onerror=()=>{if(current()){n.browserPending=false;n.error=true;narrationStatus('Browser narration stopped. Choose Replay narration to retry.');}};
     window.speechSynthesis.resume();window.speechSynthesis.speak(speech);narrationStatus('Playing browser narration');return;
   }
-  n.pending=true;narrationStatus(provider==='windows'?'Preparing Windows narration on this PC…':'Preparing OpenAI narration…');
+  n.pending=true;narrationStatus(provider==='windows'?'Preparing Windows narration on this PC…':'Checking saved '+narratorName()+' narration… New scripts are generated once.');
   try{
-    const clip=await jsonPost(provider==='windows'?'/api/narration/local/clip':'/api/narration/clip',provider==='windows'?{text}:{text,voice});if(!current())return;
+    const endpoint={windows:'/api/narration/local/clip',elevenlabs:'/api/narration/elevenlabs/clip',openai:'/api/narration/clip'}[provider];
+    const clip=await jsonPost(endpoint,provider==='openai'?{text,voice}:{text});if(!current())return;
     n.audio.src=clip.url;n.audio.load();n.pending=false;
-    narrationStatus(provider==='windows'?'Windows narration ready · '+clip.voice:clip.cached?'Saved narration ready · AI-generated voice':'Narration saved on this PC · AI-generated voice');
+    narrationStatus(clip.cached?'Saved '+narratorName()+' narration ready · no generation charge':narratorName()+' narration saved on this PC');
     if(p.playing||replay)await playNarrationAudio();
   }catch(error){if(current()){n.pending=false;n.error=true;narrationStatus(error.message+' Choose Replay narration to retry.');}}
 }
 function initTourNarration(){
   const controls=document.createElement('details');controls.className='tour-narration-controls';
-  controls.innerHTML=`<summary>Voice options</summary><div class="tour-narration-fields"><label>Narrator<select id="tour-narration-provider"><option value="openai">OpenAI voice</option><option value="windows">Windows voice · local</option><option value="browser">Browser voice</option></select></label><label>Voice<select id="tour-narration-voice"><option value="cedar">Cedar</option><option value="marin">Marin</option><option value="coral">Coral</option></select></label></div><p class="tour-narration-note">Windows voice generates speech on this PC without an API key. Browser voice depends on browser support. OpenAI voice sends guide text to OpenAI and bills new audio to your API account. Replays use saved audio.</p><div class="tour-narration-actions"><button id="tour-narration-replay" class="text-button">Replay narration</button><button id="tour-narration-connect" class="text-button">OpenAI connection</button></div><audio id="tour-narration-audio" preload="metadata"></audio>`;
+  controls.innerHTML=`<summary>Voice options</summary><div class="tour-narration-fields"><label>Narrator<select id="tour-narration-provider"><option value="elevenlabs">ElevenLabs · saved voice</option><option value="windows">Windows voice · local</option><option value="browser">Browser voice</option><option value="openai">OpenAI voice</option></select></label><label>Voice<select id="tour-narration-voice"><option value="cedar">Cedar</option><option value="marin">Marin</option><option value="coral">Coral</option></select></label></div><p class="tour-narration-note">ElevenLabs uses your selected voice for every tour, including older saved tours. New scripts use API credits once; completed MP3s are kept on this PC and reused across tours and app restarts. Keep the data/narration-elevenlabs folder in your backups. Changing the text or voice creates new audio.</p><div class="tour-narration-actions"><button id="tour-narration-replay" class="text-button">Replay narration</button><button id="tour-narration-connect" class="text-button">ElevenLabs connection & cache</button></div><audio id="tour-narration-audio" preload="metadata"></audio>`;
   $('#route-stop-actions').before(controls);
   const message=document.createElement('p');message.id='tour-narration-status';message.setAttribute('role','status');controls.after(message);
   $('#route-narration').parentElement.lastChild.textContent=' Voice narration';
+  $('#route-narration').checked=true;
   const n=tourNarration;n.audio=$('#tour-narration-audio');
   n.audio.onended=()=>{n.started=false;narrationStatus('Narration complete · saved on this PC');};
   n.audio.onerror=()=>{if(n.audio.getAttribute('src')){n.error=true;n.started=false;narrationStatus('Audio could not play. Choose Replay narration to retry.');}};
   $('#route-narration').onchange=()=>{resetTourNarration();if(narrationEnabled()&&routePlayer.playing)void startTourNarration();};
-  const settingsChanged=()=>{resetTourNarration();$('#tour-narration-voice').disabled=$('#tour-narration-provider').value!=='openai';$('#tour-narration-voice').parentElement.hidden=$('#tour-narration-provider').value!=='openai';if(narrationEnabled()&&routePlayer.playing)void startTourNarration();};
+  const updateVoiceControls=()=>{const openai=$('#tour-narration-provider').value==='openai';$('#tour-narration-voice').disabled=!openai;$('#tour-narration-voice').parentElement.hidden=!openai;$('#tour-narration-connect').textContent=openai?'OpenAI connection':'ElevenLabs connection & cache';};
+  const settingsChanged=()=>{setNarratorPreference($('#tour-narration-provider').value);resetTourNarration();updateVoiceControls();if(narrationEnabled()&&routePlayer.playing)void startTourNarration();};
   $('#tour-narration-provider').onchange=settingsChanged;$('#tour-narration-voice').onchange=settingsChanged;
   $('#tour-narration-replay').onclick=()=>{$('#route-narration').checked=true;void startTourNarration(true);};
-  $('#tour-narration-connect').onclick=()=>openCloudConnection('speech').catch(failure);
+  $('#tour-narration-connect').onclick=()=>($('#tour-narration-provider').value==='openai'?openCloudConnection('speech'):openElevenLabsConnection()).catch(failure);
   $('#route-play-speed').addEventListener('change',()=>{n.audio.playbackRate=Number($('#route-play-speed').value)||1;});
-  narrationStatus('OpenAI reads the guide text. New audio uses your API account; replay is cached.');
+  setNarratorPreference(preferredNarrator());updateVoiceControls();
+  narrationStatus('ElevenLabs reads the guide once; saved audio is reused on this PC.');
+}
+
+async function openElevenLabsConnection(){
+  const info=await api('/api/narration/elevenlabs/status');
+  modal('ElevenLabs voice & saved narration',`<form id="elevenlabs-form" class="note-form"><p>${info.configured?'Connected · '+esc(info.voice_name||info.voice_id):'Connect your ElevenLabs account'} · ${info.cached_clips} saved clips (${(info.cached_bytes/1048576).toFixed(1)} MB)</p><p class="small muted">New narration sends the guide text to ElevenLabs and uses API credits. Replays use local audio. Your key is encrypted for your Windows account and is never included in tours or exports.</p><label for="elevenlabs-key">ElevenLabs API key</label><input id="elevenlabs-key" type="password" autocomplete="off" spellcheck="false" required><label for="elevenlabs-voice">Voice ID</label><input id="elevenlabs-voice" value="${esc(info.voice_id)}" pattern="[A-Za-z0-9]{10,64}" required><p class="small muted">Model: ${esc(info.model)} · MP3 audio. Back up data/narration-elevenlabs to keep your paid audio. Edited text or a different voice/model needs a new generation.</p><p id="elevenlabs-message" role="status">${esc(info.problem||'')}</p><button class="button primary" type="submit">Verify & save encrypted connection</button>${info.configured?'<button class="button" id="elevenlabs-disconnect" type="button">Remove key · keep saved audio</button>':''}</form>`);
+  $('#elevenlabs-form').onsubmit=async e=>{e.preventDefault();const input=$('#elevenlabs-key'),key=input.value;input.value='';await busy($('#elevenlabs-form button'),'Verifying…',async()=>{await jsonPost('/api/narration/elevenlabs/connect',{api_key:key,voice_id:$('#elevenlabs-voice').value.trim()});setNarratorPreference('elevenlabs');resetTourNarration();closeModal();toast('ElevenLabs connected. Narration is saved locally after its first generation.');});};
+  if($('#elevenlabs-disconnect'))$('#elevenlabs-disconnect').onclick=async()=>{await api('/api/narration/elevenlabs/connection',{method:'DELETE'});closeModal();toast('Saved key removed. Your narration audio is still available.');};
 }
