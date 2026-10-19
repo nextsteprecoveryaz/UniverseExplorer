@@ -34,6 +34,7 @@ import research
 import sdss
 import narration
 import image_3d
+import live_enhancement
 
 ROOT=Path(__file__).parent
 DATA=ROOT/'data'
@@ -50,6 +51,7 @@ app.include_router(research.router)
 app.include_router(sdss.router)
 app.include_router(narration.router)
 app.include_router(image_3d.router)
+app.include_router(live_enhancement.router)
 app.add_middleware(TrustedHostMiddleware,allowed_hosts=['127.0.0.1','localhost','testserver'])
 HEAVY=asyncio.Semaphore(1)
 CLOUD_BUSY=asyncio.Lock()

@@ -35,7 +35,7 @@ function initExplorePixelMapping(){
   const controller=new PixelMappingController({host:panel,sky:state.sky,storageKey:'universe:explore-pixel-mapping:v1',
     captureKind:'explore-sky-capture',captureLabel:'Explore sky',surveyInfo:explorePixelSurveyInfo,
     onResize:open=>{button.setAttribute('aria-expanded',String(open));page.classList.toggle('explore-pixels-open',open);explorePixelMapping.controller?.invalidateView();window.dispatchEvent(new Event('resize'));},
-    onChange:(settings,preview)=>{const select=$('#sky-stretch');if(select)select.value=preview.original||settings.stretch==='linear'?'native':settings.stretch;}});
+    onChange:(settings,preview)=>{const select=$('#sky-stretch');if(select)select.value=preview.original||settings.stretch==='linear'?'native':settings.stretch;globalThis.exploreEnhancement?.invalidate();}});
   explorePixelMapping.controller=controller;
   button.onclick=()=>controller.setOpen(controller.host.hidden);
   state.sky.addListener?.('AL:Layer.added',event=>{

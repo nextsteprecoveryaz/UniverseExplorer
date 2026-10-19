@@ -51,6 +51,12 @@ Image Lab has **Red, Yellow, Green and Blue** intensity sliders for either the o
 
 ## Glide through telescope imagery
 
+Open **Enhance** in the map toolbar to enable local GPU processing. **Auto** applies fast sharpening during flight, then runs the bundled FSRCNN model to reconstruct a 2× view after the camera settles. **Fast** keeps only sharpening; **AI 2×** starts refinement after a shorter pause; **Off** releases the enhancement GPU cache. **Show original** temporarily bypasses enhancement. Close the panel with **×** while leaving enhancement enabled. Your mode is remembered in this browser; new installations start with enhancement off.
+
+This feature needs hardware-accelerated WebGPU in current Chrome or Edge. It uses the browser's selected GPU (shown in the panel), including RTX GPUs; it is app-level WebGPU processing, not NVIDIA RTX Video or DLSS. No cloud upload, API key, extra neural runtime, or new model download is required. Refined views use a bounded 256 MiB GPU cache; tiled processing cancels when the camera changes. Processing pauses outside Explore and when the tab is hidden. If GPU processing is unavailable, the original map remains usable.
+
+AI refinement can alter apparent stars and structures. It does not add observed detail or speed up survey downloads. Use original imagery and calibrated data for discovery. Pixel-mapping PNG exports and Image Lab transfers record the processing and model checksum; AI outputs carry a visible label. Object markers, coordinates, and source data remain separate from enhancement.
+
 The map has a **− minimize button** on its panels. Use **Panels** at the top right to show individual panels again, or **Hide sidebar** for more map space. **Clear view** (keyboard **H**, outside text fields) hides the map panels and sidebar together; **Restore layout** brings back your previous arrangement. Your choices survive a browser reload. A compact Stop/Exit bar stays available when flight controls are minimized, and tours keep their Pause/Resume and End controls. Minimizing information panels does not turn off imagery or catalog markers.
 
 Click **Fly** beside **All sky** to enter the flight cockpit at your current coordinates. From the full-sky overview it narrows to a 70-degree perspective view; you can start anywhere. Select Visible, Near-IR, SDSS or a wavelength lens as you explore. The wide visible survey provides context where individual telescope datasets have no coverage.

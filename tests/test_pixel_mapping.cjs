@@ -571,6 +571,27 @@ test('original preview PNG uses neutral rendering and retains saved adjustments 
   assert.match(text,/DSS2/);assert.equal(h.controller.settings.green,.7);assert.equal(h.controller.original,true);
 });
 
+test('Explore enhanced exports use the upscaled image, keep overlays neutral, and label AI in pixels and metadata', async () => {
+  const h=exportHarness({controllerOptions:{captureKind:'explore-sky-capture'}});await h.bind('optical',layer('optical'));
+  const enhanced={width:800,height:480,name:'ai-upscaled'};
+  h.context.exploreEnhancement={snapshotForExport:async()=>({source:enhanced,metadata:{ai:true,processing:'FSRCNN 2× neural luminance upscaling',model_sha256:'verified',scientific_evidence:false}})};
+  const pending=h.controller.capturePNG({creditFooter:false});h.flushFrames();const {metadata,blob}=await pending;
+  const image=h.canvases[0];
+  assert.equal(image.width,800);assert.equal(image.height,480);assert.equal(image.draws[0].image,enhanced);
+  assert.equal(image.draws[1].image,h.catalogCanvas);assert.equal(image.draws[1].filter,'none');
+  assert.deepEqual(image.draws[1].args,[0,0,800,480]);
+  assert.ok(image.labels.some(label=>label.text.includes('AI ENHANCED')));
+  assert.equal(metadata.live_enhancement.model_sha256,'verified');assert.equal(metadata.live_enhancement.scientific_evidence,false);
+  assert.match(Buffer.from(await blob.arrayBuffer()).toString(),/AI ENHANCED - VISUALIZATION ONLY/);
+});
+
+test('Telescope Live exports do not inherit Explore enhancement', async () => {
+  const h=exportHarness();await h.bind('optical',layer('optical'));
+  h.context.exploreEnhancement={snapshotForExport:async()=>{throw Error('Must not capture another map');}};
+  const pending=h.controller.capturePNG();h.flushFrames();const {metadata}=await pending;
+  assert.equal(metadata.live_enhancement,undefined);assert.equal(h.canvases[0].draws[0].image,h.source);
+});
+
 test('changed view cancels pending PNG instead of attaching stale source information', async () => {
   const h=exportHarness();await h.bind('2mass',layer('2mass'));
   const pending=h.controller.savePNG();h.controller.invalidateView();h.flushFrames();await pending;

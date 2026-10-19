@@ -71,6 +71,7 @@ function coordinates(){
   onNavigationSkyChanged();
   onAtlasViewChanged();
   if(typeof invalidateExplorePixelMapping==='function')invalidateExplorePixelMapping();
+  globalThis.exploreEnhancement?.invalidate();
 }
 const HIDDEN_MAP_SURVEYS=new Set(['webb-color','hubble-color','oxygen','sulfur']);
 function skyMapSurveys(){return state.config.surveys.filter(s=>!HIDDEN_MAP_SURVEYS.has(s.id));}
@@ -122,6 +123,7 @@ async function initSky(){
     state.sky.on('positionChanged',()=>coordinates());
     state.sky.on('zoomChanged',()=>coordinates());
     initExplorePixelMapping();
+    initLiveEnhancement();
     $('#aladin-lite-div').style.opacity='1';
     $('#sky-fallback').classList.add('loaded');
     $('#sky-status').innerHTML='<i></i> RELEASED IMAGERY · SKY ATLAS';

@@ -223,7 +223,10 @@ class PixelMappingController {
       const metadata=this.exportMetadata(),s=metadata.display;
       // This is the same image snapshot API used by Aladin's built-in export.
       this.sky.view.wasm.update(0);
-      const source=this.sky.view.wasm.canvas(),width=source.width,height=source.height;
+      const enhanced=this.captureKind==='explore-sky-capture'?await globalThis.exploreEnhancement?.snapshotForExport():null;
+      assertCurrent();
+      const source=enhanced?.source||this.sky.view.wasm.canvas(),width=source.width,height=source.height;
+      if(enhanced){metadata.live_enhancement=enhanced.metadata;metadata.processing+=' '+enhanced.metadata.processing+'.';metadata.image_kind=enhanced.metadata.ai?'AI ENHANCED - VISUALIZATION ONLY. Not scientific evidence.':'GPU-sharpened display visualization. Not calibrated photometry.';}
       if(!width||!height||width*height>25000000)throw Error('Open the map at a smaller size before saving.');
       const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
       const ctx=canvas.getContext('2d',{willReadFrequently:true});
@@ -238,6 +241,7 @@ class PixelMappingController {
       }
       const overlay=this.sky.aladinDiv.querySelector('.aladin-catalogCanvas');
       if(overlay)ctx.drawImage(overlay,0,0,width,height);
+      if(enhanced?.metadata.ai){ctx.fillStyle='#061018';ctx.fillRect(0,height-30,width,30);ctx.fillStyle='#dceee8';ctx.font='14px sans-serif';ctx.fillText('AI ENHANCED · FSRCNN 2× · VISUALIZATION ONLY · use originals for discovery',12,height-10);}
       metadata.image={width,height};
       const output=creditFooter?PixelMappingController.addCreditFooter(canvas,metadata):canvas;
       metadata.export={width:output.width,height:output.height,format:'image/png',credit_footer:creditFooter};

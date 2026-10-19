@@ -25,6 +25,7 @@ function setMapPanel(id,minimized){
   saveMapLayout();applyMapLayout();
 }
 function toggleMapClearView(){
+  globalThis.exploreEnhancement?.open(false);
   mapPanelUI.layout=toggleClearMap(mapPanelUI.layout);
   if(mapPanelUI.layout.beforeClear!==null)stopObjectVideo();
   saveMapLayout();applyMapLayout();closeMapPanelMenu();
