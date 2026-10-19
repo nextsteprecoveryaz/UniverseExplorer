@@ -7,6 +7,16 @@ const source=fs.readFileSync(path.join(__dirname,'../static/narration.js'),'utf8
 const plain=value=>JSON.parse(JSON.stringify(value));
 const settle=async()=>{for(let i=0;i<5;i++)await Promise.resolve();};
 
+test('saved object tour narration keeps its frozen script and original ElevenLabs voice',async()=>{
+  const h=narrator('elevenlabs');
+  h.run("routePlayer.route.stops[0].guide={research_id:'saved-object',narration:'The exact approved story.',voice_id:'BNgbHR0DNeZixGQVzloa'}");
+  const pending=h.run('startTourNarration()');
+  assert.equal(h.requests[0].url,'/api/object-research/clip');
+  assert.equal(h.requests[0].body.narration,'The exact approved story.');
+  assert.equal(h.requests[0].body.voice_id,'BNgbHR0DNeZixGQVzloa');
+  h.resolve(0,'/saved-object.mp3',true);await pending;assert.equal(h.audio.src,'/saved-object.mp3');
+});
+
 test('Windows narration requests only the local WAV endpoint and uses the audio player',async()=>{
   const h=narrator();h.$('#tour-narration-provider').value='windows';
   const pending=h.run('startTourNarration()');

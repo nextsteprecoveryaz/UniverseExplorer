@@ -1,0 +1,9 @@
+.object-research-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:18px 0 10px;font-size:12px;color:var(--accent)}
+.object-research-actions{display:flex;flex-wrap:wrap;gap:7px}.object-research-actions .button{font-size:11px;padding:9px 10px}
+#object-research-status{font-size:10px;line-height:1.6;color:#a1bec7;margin:10px 0 15px}
+#object-research-audio{width:100%;height:38px;margin:5px 0}#object-research-audio[hidden]{display:none}
+.object-panel .object-voice-disclosure{font-size:9px;color:#a1bec7}
+.object-panel .object-evidence-note{font-size:10px;border-left:2px solid #bc9c65;padding-left:10px;color:#d4c4a9}
+#object-research-story p{font-size:12px;line-height:1.85}#object-research-story a{white-space:nowrap}
+.object-research-connections{font-size:10px;margin:15px 0;color:#a1bec7}.object-research-connections button{display:block;margin:12px 0}
+#object-tour-choice,#object-tour-title{width:100%;margin:8px 0 16px}

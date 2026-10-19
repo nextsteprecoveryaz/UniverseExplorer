@@ -51,6 +51,14 @@ Image Lab has **Red, Yellow, Green and Blue** intensity sliders for either the o
 5. **Open this view in image lab** captures the current sky visualization. **Local GPU** offers full-resolution Real-ESRNet and Real-ESRGAN enhancement. The legacy CPU model and optional cloud providers remain available. Comparisons and exported PNGs are labeled. Open your own FITS, PNG, JPEG, TIFF, or WebP files as well.
 6. Save fields and images to the **Discovery notebook**. Recent images and their AI outputs remain in the image lab after reopening the app. Export notes and analyses as JSON.
 
+## Research an object from its sky card
+
+In **Explore the sky**, click an object marker or object-list entry, then **Research Object** in its card. OpenAI writes a source-backed object story in complete paragraphs, shown in place of the generic catalog summary. Sparse object-specific evidence is identified as such; general stellar or galaxy science is distinguished from measurements of that individual object. This biography is independent of the selected sky survey.
+
+Research is saved immediately in `data/object-research/`, whether or not you create narration, save a notebook entry, or make a tour. Returning to the same catalog object reloads it without an API call. Closing the card while research finishes does not cancel the saved result. The folder has no automatic expiry; include the app's data folder in your backups.
+
+**Create narration** separately sends the exact saved paragraphs to ElevenLabs. Citations stay clickable in the card and are excluded from speech. The selected ElevenLabs voice is retained with the story (default `BNgbHR0DNeZixGQVzloa`). **Listen to narration** plays the saved MP3 locally, without another generation charge. **Add to tour** lets you create a tour or append to an existing waypoint tour before or after creating audio. Tours retain a portable copy of the story, sources, and voice, and reuse the same cached recording. Research never automatically starts narration.
+
 ## Glide through telescope imagery
 
 Open **Enhance** in the map toolbar to enable local GPU processing. **Auto** applies fast sharpening during flight, then runs the bundled FSRCNN model to reconstruct a 2× view after the camera settles. **Fast** keeps only sharpening; **AI 2×** starts refinement after a shorter pause; **Off** releases the enhancement GPU cache. **Show original** temporarily bypasses enhancement. Close the panel with **×** while leaving enhancement enabled. Your mode is remembered in this browser; new installations start with enhancement off.

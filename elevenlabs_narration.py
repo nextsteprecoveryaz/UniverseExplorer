@@ -200,7 +200,11 @@ async def generate(spec,key):
 
 @router.post('/clip')
 async def clip(request:ClipRequest):
-    spec=identity(request,settings()['voice_id']);key=cache_key(spec)
+    return await clip_for_voice(request,settings()['voice_id'])
+
+
+async def clip_for_voice(request,voice):
+    spec=identity(request,voice);key=cache_key(spec)
     existing=cached_clip(spec,key)
     if existing:return existing
     task=_inflight.get(key)

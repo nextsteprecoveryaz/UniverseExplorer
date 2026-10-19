@@ -56,7 +56,8 @@ async function startTourNarration(replay=false){
   n.pending=true;narrationStatus(provider==='windows'?'Preparing Windows narration on this PC…':'Checking saved '+narratorName()+' narration… New scripts are generated once.');
   try{
     const endpoint={windows:'/api/narration/local/clip',elevenlabs:'/api/narration/elevenlabs/clip',openai:'/api/narration/clip'}[provider];
-    const clip=await jsonPost(endpoint,provider==='openai'?{text,voice}:{text});if(!current())return;
+    const objectGuide=route.stops[index]?.guide?.research_id&&provider==='elevenlabs';
+    const clip=await jsonPost(objectGuide?'/api/object-research/clip':endpoint,objectGuide?route.stops[index].guide:provider==='openai'?{text,voice}:{text});if(!current())return;
     n.audio.src=clip.url;n.audio.load();n.pending=false;
     narrationStatus(clip.cached?'Saved '+narratorName()+' narration ready · no generation charge':narratorName()+' narration saved on this PC');
     if(p.playing||replay)await playNarrationAudio();

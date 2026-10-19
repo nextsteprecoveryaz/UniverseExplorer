@@ -83,7 +83,7 @@ def test_unusable_research_is_never_cached_or_returned_as_narration(isolated,mon
     with TestClient(isolated) as c:
         r=c.post('/api/navigation/stories',json={'stop':STOP});assert r.status_code==502
         again=c.post('/api/navigation/stories',json={'stop':STOP});assert again.status_code==409
-    assert len(calls)==1 and not [p for p in stories.ROOT.glob('*.json') if not p.name.endswith('.attempt.json')]
+    assert len(calls)==1 and not [p for p in stories.ROOT.glob('*.json') if not p.name.endswith(('.attempt.json','.response.json'))]
 
 
 def test_uncertain_failure_requires_explicit_retry_and_never_echoes_key(isolated,monkeypatch):
@@ -140,3 +140,14 @@ def test_missing_key_and_invalid_inputs_do_not_make_paid_requests(isolated,monke
 
 @pytest.mark.parametrize('url',['https://science.nasa.gov.evil.test','https://nasa.gov@evil.test','http://science.nasa.gov','https://localhost/','file:///secret'])
 def test_source_links_are_restricted_to_primary_publishers(url):assert not stories.source_url(url)
+
+
+def test_completed_provider_response_is_recoverable_without_credentials_or_rebilling(isolated,monkeypatch):
+    context=stories.context_for(stories.expeditions.Stop(**STOP));key=stories.cache_key(context)
+    stories.atomic_json(stories.ROOT/(key+'.response.json'),{'context':context,'catalog_context':{},'response':output()})
+    stories.atomic_json(stories.ROOT/(key+'.attempt.json'),{'context':context})
+    monkeypatch.setattr(stories.cloud_ai,'get_key',lambda:pytest.fail('Recovery must not read credentials'))
+    with TestClient(isolated) as c:
+        r=c.post('/api/navigation/stories',json={'stop':STOP});assert r.status_code==200,r.text
+        assert r.json()['cached'] and r.json()['narration']=='\n\n'.join(TEXTS)
+    assert (stories.ROOT/(key+'.json')).exists() and not (stories.ROOT/(key+'.attempt.json')).exists()

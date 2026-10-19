@@ -64,13 +64,25 @@ class NotebookGuide(Strict):
     credit:str=Field(default='',max_length=1000)
     edited:bool=False
 
+class ObjectGuide(Strict):
+    research_id:str=Field(pattern=r'^[a-f0-9]{64}$')
+    research_revision:int=Field(default=1,ge=1)
+    narration:str=Field(min_length=1,max_length=3500)
+    description:str=Field(min_length=1,max_length=3500)
+    sources:list[StorySource]=Field(default_factory=list,max_length=25)
+    identity_label:str=Field(min_length=1,max_length=400)
+    researched_at:str=Field(max_length=80)
+    voice_id:str=Field(pattern=r'^[A-Za-z0-9]{10,64}$')
+    narrator:Literal['elevenlabs']='elevenlabs'
+    credit:str=Field(default='OpenAI research from linked sources; saved object story.',max_length=1000)
+
 class Stop(View):
     title:str=Field(default='Sky waypoint',min_length=1,max_length=200)
     notes:str=Field(default='',max_length=4000)
     travel:float=Field(default=4,ge=1,le=30)
     hold:float=Field(default=15,ge=3,le=120)
     source:Reference|None=None
-    guide:NotebookGuide|None=None
+    guide:NotebookGuide|ObjectGuide|None=None
 
 class Sample(View):
     t:float=Field(ge=0,le=1800)
@@ -118,6 +130,12 @@ def document(row,hydrate=False):
     return d
 
 def resolve_notebook(stop):
+    # Both kinds carry a portable, frozen script. No live research is needed on replay.
+    if stop['guide'].get('research_id'):
+        guide=stop['guide']
+        return {**guide,'id':guide['research_id'],'kind':'object-research','title':stop['title'],'ra':stop['ra'],'dec':stop['dec'],
+                'available':True,'preview_url':None,'story_sources':guide['sources'],'source_url':next((s['url'] for s in guide['sources']),None),
+                'location_note':guide['identity_label']}
     import science
     guide=stop['guide'];preview=None
     if guide.get('image_id'):
