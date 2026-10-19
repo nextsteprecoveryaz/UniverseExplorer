@@ -33,7 +33,6 @@ async function visitDestinationShortcut(d){
   cancelDestinationVisit();
   if(!state.sky){toast('Connect to the sky map before visiting a destination.',true);return;}
   flyTo({...d,survey:'optical'});
-  if(!mapUI.enabled)toggleMapping(true);
   setMapPanel('objects',false);setMapPanel('destinations',false);
   const o=shortcutObject(d),loaded=showObjectDetail(o),serial=++destinationVisit.serial;
   destinationVisit.active=true;

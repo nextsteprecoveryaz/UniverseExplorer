@@ -13,13 +13,19 @@ function onSkyViewChanged(){
   cancelAnimationFrame(mapUI.frame);mapUI.frame=requestAnimationFrame(positionObjectMarkers);
   clearTimeout(mapUI.timer);mapUI.timer=setTimeout(refreshMappedObjects,900);
 }
+function syncObjectMapVisibility(){
+  const showPanel=mapUI.enabled||Boolean(mapUI.selected);
+  $('#mapping-toggle').checked=mapUI.enabled;$('#object-markers').hidden=!mapUI.enabled;
+  $('#object-panel').hidden=!showPanel;$('#mapping-labels-control').hidden=!mapUI.enabled;
+  $('#explore-page').classList.toggle('mapping-active',showPanel);
+}
 function toggleMapping(enabled){
   if(enabled&&typeof setNearbyVisible==='function')setNearbyVisible(false);
   mapUI.enabled=enabled;mapUI.request++;clearTimeout(mapUI.timer);
-  $('#mapping-toggle').checked=enabled;$('#object-markers').hidden=!enabled;$('#object-panel').hidden=!enabled;$('#mapping-labels-control').hidden=!enabled;
-  $('#explore-page').classList.toggle('mapping-active',enabled);
+  syncObjectMapVisibility();
   try{localStorage.setItem('universe-object-map',String(enabled));}catch{}
-  if(enabled){showObjectList();mapUI.lastQuery='';refreshMappedObjects();}else stopObjectVideo();
+  // Overlay visibility must not replace the selected card or interrupt its audio/research.
+  if(enabled){if(!mapUI.selected)showObjectList();mapUI.lastQuery='';refreshMappedObjects();}
 }
 async function refreshMappedObjects(){
   if(!mapUI.enabled||!state.sky||state.page!=='explore')return;
@@ -86,6 +92,7 @@ function renderObjectList(){
 }
 function showObjectList(){
   stopObjectVideo();mapUI.selected=null;
+  syncObjectMapVisibility();
   $('#object-detail').hidden=true;$('#object-list-view').hidden=false;$('#object-panel-back').hidden=true;
   positionObjectMarkers();renderObjectList();
 }
@@ -93,6 +100,7 @@ function showObjectDetail(o){
   if(typeof pauseRouteForFlight==='function')pauseRouteForFlight();
   if(typeof setNearbyVisible==='function')setNearbyVisible(false);
   if(!o)return;stopObjectVideo();mapUI.selected=o;
+  syncObjectMapVisibility();
   $('#object-list-view').hidden=true;$('#object-detail').hidden=false;$('#object-panel-back').hidden=false;
   $('#object-detail').innerHTML=`<span class="badge teal">${esc(o.catalog)}</span><h2>${esc(o.name)}</h2><div class="object-kind">${esc(o.type)}</div><section id="object-research" aria-label="Object research"></section><div class="object-coordinates">RA ${Number(o.ra).toFixed(6)}°<br>Dec ${Number(o.dec).toFixed(6)}° · ICRS</div><a href="${esc(o.source_url)}" target="_blank" rel="noopener">${o.featured?'Read the source & credits':'Open SIMBAD record & references'} ↗</a>${o.video_url?`<div class="object-video"><h3>${esc(o.video_title)}</h3><video id="object-video" controls playsinline preload="metadata" aria-label="${esc(o.video_title)}"><source src="${esc(o.video_url)}" type="video/mp4"></video><p class="video-kind">${esc(o.video_kind)}</p><a href="${esc(o.video_page)}" target="_blank" rel="noopener">Video source, description & full credits ↗</a><p id="video-error" class="small muted" hidden>Video playback is unavailable here. Open the publisher’s video page above.</p></div>`:'<p class="video-unavailable">No object-specific video is linked for this catalog entry.</p>'}<div class="object-actions"><button id="object-center" class="button">Center on object</button><button id="object-save" class="button">+ Save to notebook</button></div>`;
   $('#object-panel').scrollTop=0;

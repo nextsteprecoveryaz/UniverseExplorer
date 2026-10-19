@@ -61,6 +61,8 @@ With **Narrate visits** enabled (the default), a click flies to the destination,
 
 Turn **Narrate visits** off to browse positions and existing research without automatic research or narration. This preference is saved in this browser.
 
+For an uncluttered view while listening, turn **Object map** off. This hides all object markers and labels while keeping the selected story card, pending research, and narration active. Turning it back on also preserves the card and playback position. Destination shortcuts respect this saved overlay preference. To hide only text labels and keep the dots, uncheck **Labels** instead.
+
 ## Research an object from its sky card
 
 In **Explore the sky**, click an object marker or object-list entry, then **Research Object** in its card. OpenAI writes a source-backed object story in complete paragraphs, shown in place of the generic catalog summary. Sparse object-specific evidence is identified as such; general stellar or galaxy science is distinguished from measurements of that individual object. This biography is independent of the selected sky survey.

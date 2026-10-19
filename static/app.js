@@ -114,7 +114,7 @@ function flyTo(destination){
 }
 function showAllSky(){
   flyTo(ALL_SKY);
-  if(mapUI.enabled)showObjectList();
+  if(mapUI.enabled||mapUI.selected)showObjectList();
 }
 async function initSky(){
   try{

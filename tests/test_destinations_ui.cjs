@@ -41,6 +41,15 @@ test('return visits play cached audio without research or synthesis requests',as
   assert.equal(h.requests.length,1);assert.equal(h.calls.filter(v=>v==='play').length,1);
 });
 
+test('destination visits preserve the marker preference while still opening and narrating the card',async()=>{
+  for(const enabled of [false,true]){
+    const h=harness();h.c.mapUI.enabled=enabled;const done=h.visit(2);
+    h.requests[0].resolve(record('b'.repeat(64),{url:'/existing.mp3',cached:true}));await h.arrive(2);await done;
+    assert.equal(h.c.mapUI.enabled,enabled);assert.equal(h.c.mapUI.selected.research_name,'M 42');
+    assert.equal(h.calls.filter(v=>v==='play').length,1);assert.equal(h.requests.length,1);
+  }
+});
+
 test('changing destinations during research preserves its result but never starts old speech',async()=>{
   const h=harness(),first=h.visit(2);h.requests[0].resolve({id:'a'.repeat(64),status:'empty'});await h.arrive(2);
   const second=h.visit(4);h.requests[2].resolve(record('b'.repeat(64),{url:'/andromeda.mp3'}));await h.arrive(4);await second;

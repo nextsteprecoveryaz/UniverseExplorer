@@ -24,9 +24,9 @@
   <script type="importmap">{"imports":{"three":"/vendor/three/three.module.js"}}</script>
   <script type="module" src="/image-3d.js?v=4"></script>
   <script src="/vendor/aladin.js" charset="utf-8" defer></script>
-  <script src="/features.js?v=destinations-1" defer></script>
+  <script src="/features.js?v=markers-2" defer></script>
   <script src="/object-research.js?v=destinations-1" defer></script>
-  <script src="/destinations.js?v=1" defer></script>
+  <script src="/destinations.js?v=2" defer></script>
   <script src="/journeys.js?v=fullsky-1" defer></script>
   <script src="/photometry.js" defer></script>
   <script src="/flight-math.js" defer></script>
@@ -53,7 +53,7 @@
   <script src="/telescope-live.js?v=9" defer></script>
   <script src="/local-gpu.js?v=1" defer></script>
   <script src="/notebook.js?v=elevenlabs-1" defer></script>
-  <script src="/app.js?v=destinations-1" defer></script>
+  <script src="/app.js?v=markers-2" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -101,7 +101,7 @@
       <div id="object-markers" class="object-markers" aria-label="Known object markers" hidden></div>
       <div id="image-markers" class="image-markers" aria-label="Hubble, Webb and NASA image locations"></div>
       <div class="sky-top"><span id="sky-status" class="pill"><i></i> CONNECTING SKY ATLAS</span><span class="sky-caption">REAL OBSERVATIONS · ICRS SKY MAP</span></div>
-      <div class="mapping-control"><button id="overview-button" class="text-button overview-button" aria-label="All sky" aria-pressed="true" title="Return to the all-sky overview">◎ All sky</button><label class="switch-label"><input id="mapping-toggle" type="checkbox" role="switch"><span class="switch-track"></span>Object map</label><label id="mapping-labels-control" class="small" hidden><input id="mapping-labels" type="checkbox" checked> Labels</label><button id="flight-toggle" class="text-button flight-toggle" aria-pressed="false">✧ Fly</button></div>
+      <div class="mapping-control"><button id="overview-button" class="text-button overview-button" aria-label="All sky" aria-pressed="true" title="Return to the all-sky overview">◎ All sky</button><label class="switch-label" title="Show or hide object markers and labels. The open story and narration stay active."><input id="mapping-toggle" type="checkbox" role="switch"><span class="switch-track"></span>Object map</label><label id="mapping-labels-control" class="small" hidden><input id="mapping-labels" type="checkbox" checked> Labels</label><button id="flight-toggle" class="text-button flight-toggle" aria-pressed="false">✧ Fly</button></div>
       <div class="image-map-control"><label class="switch-label"><input id="image-map-toggle" type="checkbox" role="switch" checked><span class="switch-track"></span>Image locations</label><select id="image-map-source" aria-label="Image map source"><option value="both">Hubble + Webb</option><option value="webb">Webb archive</option><option value="hubble">Hubble archive</option><option value="flickr">NASA Webb gallery</option></select><button id="browse-journeys" class="text-button">Browse images ↗</button></div>
       <div id="image-index-card" class="image-index-card"><div class="image-map-legend"><span class="webb-dot">● Webb</span><span class="hubble-dot">● Hubble</span><span class="flickr-dot">◆ NASA releases</span></div><p id="image-index-summary" role="status">Connecting to your image collections…</p><p id="image-update-status" class="small muted"></p><span class="small subtle">Counts group image locations. Click to travel or open an image.</span></div>
       <aside id="object-panel" class="object-panel" aria-label="Object information" hidden>
